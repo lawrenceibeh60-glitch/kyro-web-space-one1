@@ -1,0 +1,13 @@
+/* frontend/css/editor/viewport.css */
+.vp { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; }
+.vp-head { display: flex; align-items: center; gap: 4px; padding: 2px 6px; background: var(--header); border-bottom: 1px solid var(--line); }
+.vp-head .dim { color: var(--dim); margin-left: 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.vp-camera-mode { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--dim); font-size: 11px; white-space: nowrap; }
+.vp-camera-mode select { height: 24px; max-width: 85px; padding: 0 4px; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: var(--radius); font: inherit; }
+.vp-head #canvasFocus { white-space: nowrap; }
+.viewport { position: relative; overflow: hidden; background: var(--workspace); min-width: 0; min-height: 0; }
+.viewport canvas { position: absolute; inset: 0; display: block; touch-action: none; }
+@media (max-width: 700px) {
+  .vp-camera-mode span { display: none; }
+  .vp-head #canvasFocus { padding: 0 5px; font-size: 11px; }
+}

@@ -1,0 +1,3 @@
+/* frontend/css/animation/graph_editor.css */
+#graphCanvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+#p-graph .panel-h { user-select: none; }

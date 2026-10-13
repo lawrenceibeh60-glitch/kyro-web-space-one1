@@ -1,0 +1,415 @@
+import { execute, setValue } from '../core/command_manager.js';
+import { bus } from '../core/event_bus.js';
+import { state, setState } from '../core/state_manager.js';
+import { Audio, StudioCharacters } from '../api/studio.js';
+import { evaluateTrack } from '../animation/interpolation.js';
+import { toast } from './notifications.js';
+
+const $ = id => document.getElementById(id);
+const clone = value => JSON.parse(JSON.stringify(value));
+
+function option(value, label) {
+  const item = document.createElement('option');
+  item.value = value;
+  item.textContent = label;
+  return item;
+}
+
+function selectOptions(select, values, selectedValue, emptyLabel) {
+  select.replaceChildren();
+  if (!values.length) select.append(option('', emptyLabel));
+  for (const [value, label] of values) select.append(option(value, label));
+  select.value = values.some(([value]) => value === selectedValue) ? selectedValue : (values[0]?.[0] || '');
+}
+
+function nextId(prefix, used = []) {
+  const ids = new Set(used);
+  let suffix = Date.now().toString(36);
+  let id = `${prefix}_${suffix}`;
+  let index = 1;
+  while (ids.has(id)) id = `${prefix}_${suffix}_${index++}`;
+  return id;
+}
+
+function makeControl(label, min, max, value, onChange, step = 1) {
+  const row = document.createElement('label');
+  row.className = 'studio-control';
+  const title = document.createElement('span');
+  title.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'range'; input.min = min; input.max = max; input.step = step; input.value = value;
+  const output = document.createElement('output');
+  output.textContent = String(value);
+  input.oninput = () => { output.textContent = input.value; };
+  input.onchange = () => onChange(Number(input.value));
+  row.append(title, input, output);
+  return row;
+}
+
+export function initStudioPanel({ onCharacterImported }) {
+  const root = $('p-studio');
+  let activeTab = 'effects';
+  let selectedCharacterId = '';
+
+  function showTab(name) {
+    activeTab = name;
+    root.querySelectorAll('[data-studio-tab]').forEach(button =>
+      button.classList.toggle('on', button.dataset.studioTab === name));
+    root.querySelectorAll('[data-studio-pane]').forEach(pane =>
+      { pane.hidden = pane.dataset.studioPane !== name; });
+  }
+
+  function changeProjectArray(key, next, label) {
+    execute(setValue([key], next, label));
+  }
+
+  function renderEffects() {
+    const list = $('effectList');
+    list.replaceChildren();
+    if (!state.project) return;
+    const sceneId = state.sceneId || state.project.scenes[0]?.id;
+    const effects = state.project.effects || [];
+    const sceneEffects = effects.filter(effect => effect.scene_id === sceneId);
+    if (!sceneEffects.length) {
+      const empty = document.createElement('div');
+      empty.className = 'studio-empty'; empty.textContent = 'No effects in this scene yet.';
+      list.append(empty);
+    }
+    for (const effect of sceneEffects) {
+      const row = document.createElement('div'); row.className = 'studio-row';
+      const head = document.createElement('div'); head.className = 'studio-row-head';
+      const enabled = document.createElement('input'); enabled.type = 'checkbox';
+      enabled.checked = effect.enabled !== false;
+      enabled.setAttribute('aria-label', `Enable ${effect.type}`);
+      enabled.onchange = () => updateEffect(effect.id, { enabled: enabled.checked });
+      const name = document.createElement('strong');
+      name.textContent = effect.type.replace('_', ' ');
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.textContent = '×'; remove.title = 'Remove effect';
+      remove.onclick = () => changeProjectArray('effects', effects.filter(item => item.id !== effect.id), 'Remove effect');
+      head.append(enabled, name, remove);
+      row.append(head);
+      row.append(makeControl('Strength', 0, 100, Math.round((effect.intensity ?? 0.5) * 100),
+        value => updateEffect(effect.id, { intensity: value / 100 })));
+      if (effect.type === 'particles' || effect.type === 'speed_lines') {
+        row.append(makeControl('Count', 1, 200, effect.count ?? 36,
+          value => updateEffect(effect.id, { count: value })));
+      }
+      if (effect.type !== 'camera_shake') {
+        row.append(makeControl('Speed', 0, 20, effect.speed ?? 1,
+          value => updateEffect(effect.id, { speed: value }), 0.1));
+      }
+      const timing = document.createElement('div'); timing.className = 'xrow n';
+      const start = document.createElement('input'); start.type = 'number'; start.min = 1;
+      start.value = (effect.start_frame ?? 0) + 1; start.title = 'First active frame';
+      start.onchange = () => {
+        const startFrame = Math.max(0, Math.round(Number(start.value) || 1) - 1);
+        updateEffect(effect.id, {
+          start_frame: startFrame,
+          end_frame: Math.max(startFrame, effect.end_frame ?? state.project.settings.duration_frames - 1),
+        });
+      };
+      const end = document.createElement('input'); end.type = 'number'; end.min = 1;
+      end.value = (effect.end_frame ?? state.project.settings.duration_frames - 1) + 1; end.title = 'Last active frame';
+      end.onchange = () => updateEffect(effect.id, {
+        end_frame: Math.max(effect.start_frame ?? 0, Math.round(Number(end.value) || 1) - 1),
+      });
+      timing.append(start, end);
+      row.append(timing);
+      if (effect.type !== 'camera_shake') {
+        const color = document.createElement('input'); color.type = 'color'; color.value = effect.color || '#ffffff';
+        color.setAttribute('aria-label', 'Effect color');
+        color.onchange = () => updateEffect(effect.id, { color: color.value });
+        row.append(color);
+      }
+      list.append(row);
+    }
+  }
+
+  function updateEffect(id, patch) {
+    const next = (state.project.effects || []).map(effect =>
+      effect.id === id ? { ...effect, ...patch } : effect);
+    changeProjectArray('effects', next, 'Edit effect');
+  }
+
+  function addEffect() {
+    const id = nextId('fx', (state.project.effects || []).map(effect => effect.id));
+    const type = $('effectType').value;
+    const effect = {
+      id, scene_id: state.sceneId, type, enabled: true,
+      start_frame: 0, end_frame: state.project.settings.duration_frames - 1,
+      intensity: 0.5, color: '#ffffff', count: 36, speed: 1,
+    };
+    changeProjectArray('effects', [...(state.project.effects || []), effect], 'Add effect');
+  }
+
+  function renderRig() {
+    if (!state.project) return;
+    const characters = state.project.characters || [];
+    const characterOptions = characters.map(character => [character.id, `${character.name || character.id} · ${character.id}`]);
+    if (!characters.some(character => character.id === selectedCharacterId)) {
+      selectedCharacterId = characterOptions[0]?.[0] || '';
+    }
+    selectOptions($('rigCharacter'), characterOptions, selectedCharacterId, 'Import or generate a character first');
+    const character = characters.find(item => item.id === selectedCharacterId);
+    const rigs = state.project.rigs || [];
+    const rig = rigs.find(item => item.character_id === selectedCharacterId);
+    $('rigEditor').hidden = !rig;
+    $('rigCreate').disabled = !character;
+    $('rigCreate').textContent = rig ? `Rig active: ${rig.name}` : 'Create / select rig';
+    const attachedParts = new Set((rig?.bones || []).map(bone => bone.character_part_id));
+    const partOptions = (character?.parts || [])
+      .filter(part => !attachedParts.has(part.id))
+      .map(part => [part.id, part.name || part.id]);
+    selectOptions($('bonePart'), partOptions, $('bonePart').value, 'No character parts');
+    const boneOptions = (rig?.bones || []).map(bone => [bone.id, bone.name || bone.id]);
+    selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
+    const list = $('boneList');
+    list.replaceChildren();
+    for (const bone of rig?.bones || []) {
+      const row = document.createElement('div'); row.className = 'studio-row studio-bone';
+      const name = document.createElement('strong'); name.textContent = `${bone.name} → ${bone.character_part_id}`;
+      const rotation = document.createElement('input');
+      rotation.type = 'range'; rotation.min = -180; rotation.max = 180;
+      rotation.value = bone.tracks?.rotation?.length
+        ? evaluateTrack(bone.tracks.rotation, state.frame)
+        : (bone.rotation ?? 0);
+      rotation.title = 'Bone rotation';
+      rotation.onchange = () => {
+        if (bone.tracks?.rotation?.length) {
+          const tracks = clone(bone.tracks);
+          const keys = [...tracks.rotation];
+          const keyframe = { t: state.frame, v: Number(rotation.value), ease: state.keyEase || 'linear' };
+          const index = keys.findIndex(item => item.t === state.frame);
+          if (index >= 0) keys[index] = keyframe; else keys.push(keyframe);
+          keys.sort((a, b) => a.t - b.t);
+          tracks.rotation = keys;
+          updateBone(rig, bone.id, { tracks });
+        } else {
+          updateBone(rig, bone.id, { rotation: Number(rotation.value) });
+        }
+      };
+      const key = document.createElement('button'); key.type = 'button'; key.textContent = 'Key';
+      key.title = `Key rotation at frame ${state.frame + 1}`;
+      key.onclick = () => {
+        const tracks = clone(bone.tracks || {});
+        const keys = [...(tracks.rotation || [])];
+        const keyframe = { t: state.frame, v: Number(rotation.value), ease: state.keyEase || 'linear' };
+        const index = keys.findIndex(item => item.t === state.frame);
+        if (index >= 0) keys[index] = keyframe; else keys.push(keyframe);
+        keys.sort((a, b) => a.t - b.t);
+        tracks.rotation = keys;
+        updateBone(rig, bone.id, { tracks });
+      };
+      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×';
+      remove.title = 'Remove bone';
+      remove.onclick = () => {
+        const nextRig = clone(rig);
+        const parentId = nextRig.bones.find(item => item.id === bone.id)?.parent_id || null;
+        nextRig.bones = nextRig.bones.filter(item => item.id !== bone.id);
+        nextRig.bones.forEach(item => { if (item.parent_id === bone.id) item.parent_id = parentId; });
+        updateRig(nextRig);
+      };
+      row.append(name, rotation, key, remove);
+      list.append(row);
+    }
+    if (rig && !rig.bones.length) {
+      const empty = document.createElement('div'); empty.className = 'studio-empty';
+      empty.textContent = 'Add bones and assign them to character parts to rig the drawing.';
+      list.append(empty);
+    }
+  }
+
+  function updateRig(rig) {
+    const rigs = state.project.rigs || [];
+    const next = rigs.some(item => item.id === rig.id)
+      ? rigs.map(item => item.id === rig.id ? rig : item)
+      : [...rigs, rig];
+    changeProjectArray('rigs', next, 'Edit character rig');
+  }
+
+  function updateBone(rig, boneId, patch) {
+    const nextRig = clone(rig);
+    nextRig.bones = nextRig.bones.map(bone =>
+      bone.id === boneId ? { ...bone, ...patch } : bone);
+    updateRig(nextRig);
+  }
+
+  function createRig() {
+    const character = (state.project.characters || []).find(item => item.id === selectedCharacterId);
+    if (!character) return;
+    if ((state.project.rigs || []).some(item => item.character_id === character.id)) return;
+    const rig = {
+      id: nextId('rig', (state.project.rigs || []).map(item => item.id)),
+      name: `${character.name || character.id} Rig`,
+      character_id: character.id,
+      bones: [],
+    };
+    changeProjectArray('rigs', [...(state.project.rigs || []), rig], 'Create character rig');
+  }
+
+  function deleteRig() {
+    const rigs = state.project.rigs || [];
+    const rig = rigs.find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    changeProjectArray('rigs', rigs.filter(item => item.id !== rig.id), 'Remove character rig');
+  }
+
+  function addBone() {
+    const rig = (state.project.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig || !$('bonePart').value) return;
+    const name = $('boneName').value.trim() || 'Bone';
+    const id = nextId('bone', rig.bones.map(item => item.id));
+    updateRig({
+      ...clone(rig),
+      bones: [...rig.bones, {
+        id, name, parent_id: $('boneParent').value || null,
+        character_part_id: $('bonePart').value,
+        pivot: {
+          x: Number($('boneX').value || state.project.settings.width / 2),
+          y: Number($('boneY').value || state.project.settings.height * 0.44),
+        },
+        rotation: 0,
+      }],
+    });
+  }
+
+  async function generateCharacter() {
+    const id = $('generatorId').value.trim();
+    const name = $('generatorName').value.trim();
+    if (!id || !name) {
+      toast('Enter a stable character ID and name before generating.', 'err');
+      return;
+    }
+    const button = $('generateCharacter');
+    button.disabled = true;
+    try {
+      const result = await StudioCharacters.generate(state.projectId, {
+        id, name,
+        hairstyle: $('generatorHair').value,
+        expression: $('generatorExpression').value,
+        hair_color: $('generatorHairColor').value,
+        eye_color: $('generatorEyeColor').value,
+        skin_color: $('generatorSkinColor').value,
+        outfit_color: $('generatorOutfitColor').value,
+      });
+      onCharacterImported?.(result.project, result.character);
+      selectedCharacterId = result.character.id;
+      renderRig();
+      toast(`Generated ${result.character.name} · ${result.character.parts.length} editable parts`, 'ok', 5000);
+    } catch (error) {
+      const details = error.details?.length ? `: ${error.details.slice(0, 4).join('; ')}` : '';
+      toast(`${error.message}${details}`, 'err', 6000);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function renderCharacterList() {
+    const list = $('generatorCharacters');
+    list.replaceChildren();
+    for (const character of state.project?.characters || []) {
+      const row = document.createElement('div'); row.className = 'studio-row-head';
+      const name = document.createElement('strong'); name.textContent = `${character.name || character.id} · ${character.id}`;
+      const use = document.createElement('button'); use.type = 'button'; use.textContent = 'Edit';
+      use.onclick = () => {
+        $('generatorId').value = character.id;
+        $('generatorName').value = character.name || character.id;
+      };
+      row.append(name, use); list.append(row);
+    }
+  }
+
+  function renderAudio() {
+    if (!state.project) return;
+    if (!$('audioStart').value) $('audioStart').value = state.frame + 1;
+    const list = $('audioList'); list.replaceChildren();
+    for (const clip of state.project.audio || []) {
+      const row = document.createElement('div'); row.className = 'studio-row';
+      const head = document.createElement('div'); head.className = 'studio-row-head';
+      const name = document.createElement('strong'); name.textContent = `${clip.name} · F${clip.start_frame + 1}`;
+      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×';
+      remove.title = 'Remove audio clip';
+      remove.onclick = () =>
+        changeProjectArray('audio', (state.project.audio || []).filter(item => item.id !== clip.id), 'Remove audio clip');
+      head.append(name, remove);
+      row.append(head);
+      const startRow = document.createElement('div'); startRow.className = 'xrow n';
+      const startLabel = document.createElement('span'); startLabel.textContent = 'Start frame';
+      const start = document.createElement('input'); start.type = 'number'; start.min = 1; start.value = clip.start_frame + 1;
+      start.onchange = () => updateAudioClip(clip.id, { start_frame: Math.max(0, Math.round(Number(start.value) || 1) - 1) });
+      startRow.append(startLabel, start);
+      const offsetRow = document.createElement('div'); offsetRow.className = 'xrow n';
+      const offsetLabel = document.createElement('span'); offsetLabel.textContent = 'Trim offset';
+      const offset = document.createElement('input'); offset.type = 'number'; offset.min = 0; offset.step = '0.01';
+      offset.value = clip.offset_seconds || 0;
+      offset.onchange = () => updateAudioClip(clip.id, { offset_seconds: Math.max(0, Number(offset.value) || 0) });
+      offsetRow.append(offsetLabel, offset);
+      row.append(startRow, offsetRow);
+      row.append(makeControl('Volume', 0, 100, Math.round((clip.volume ?? 1) * 100), value => {
+        updateAudioClip(clip.id, { volume: value / 100 });
+      }));
+      list.append(row);
+    }
+
+    function updateAudioClip(id, patch) {
+      const next = (state.project.audio || []).map(item =>
+        item.id === id ? { ...item, ...patch } : item);
+      changeProjectArray('audio', next, 'Edit audio clip');
+    }
+  }
+
+  async function uploadAudio() {
+    const file = $('audioFile').files?.[0];
+    if (!file) { toast('Choose an audio file first.', 'err'); return; }
+    const button = $('audioUpload'); button.disabled = true;
+    try {
+      const result = await Audio.upload(state.projectId, file, {
+        id: $('audioId').value.trim(),
+        name: $('audioName').value.trim(),
+        start_frame: Math.max(0, Number($('audioStart').value || state.frame + 1) - 1),
+        offset_seconds: Math.max(0, Number($('audioOffset').value) || 0),
+        volume: 1,
+      });
+      const clips = state.project.audio || [];
+      const index = clips.findIndex(clip => clip.id === result.clip.id);
+      const next = index < 0 ? [...clips, result.clip] : clips.map((clip, i) => i === index ? result.clip : clip);
+      changeProjectArray('audio', next, 'Import audio clip');
+      $('audioFile').value = '';
+      toast(`Imported audio: ${result.clip.name}`, 'ok', 5000);
+    } catch (error) {
+      const details = error.details?.length ? `: ${error.details.slice(0, 4).join('; ')}` : '';
+      toast(`${error.message}${details}`, 'err', 6000);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function render() {
+    if (!state.project) return;
+    renderEffects();
+    renderRig();
+    renderCharacterList();
+    renderAudio();
+  }
+
+  root.querySelectorAll('[data-studio-tab]').forEach(button => {
+    button.onclick = () => showTab(button.dataset.studioTab);
+  });
+  $('effectAdd').onclick = addEffect;
+  $('rigCharacter').onchange = event => { selectedCharacterId = event.target.value; renderRig(); };
+  $('showRigOverlay').checked = state.showRigOverlay;
+  $('showRigOverlay').onchange = event => setState({ showRigOverlay: event.target.checked });
+  $('rigCreate').onclick = createRig;
+  $('rigDelete').onclick = deleteRig;
+  $('boneAdd').onclick = addBone;
+  $('generateCharacter').onclick = generateCharacter;
+  $('audioUpload').onclick = uploadAudio;
+  bus.on('project:changed', render);
+  bus.on('state', patch => {
+    if ('project' in patch || 'sceneId' in patch) render();
+  });
+  showTab(activeTab);
+  render();
+  return { showTab, refresh: render };
+}

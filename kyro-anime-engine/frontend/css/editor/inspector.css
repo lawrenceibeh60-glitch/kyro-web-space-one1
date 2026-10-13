@@ -1,0 +1,34 @@
+/* frontend/css/editor/inspector.css - right column: outliner, properties, timeline */
+.right { display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-left: 1px solid var(--line); }
+.panel { display: flex; flex-direction: column; min-height: 0; }
+.panel-h { display: flex; justify-content: space-between; align-items: center; min-height: 24px; padding: 0 6px;
+  background: var(--header); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.panel-h button { height: 20px; min-width: 20px; padding: 0; }
+.panel-b { overflow: auto; padding: 6px; flex: 1; min-height: 0; }
+
+.layers { list-style: none; margin: 0; padding: 2px; overflow: auto; flex: 1; min-height: 0; }
+.layer { display: flex; align-items: center; gap: 2px; padding: 2px 4px; min-height: 28px; border-radius: 3px; cursor: pointer; }
+.layer .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 2px; }
+.layer.active { background: var(--accent); color: #fff; }
+.layer button { height: 22px; min-width: 22px; padding: 0; border: none; background: none; }
+
+.fld { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "l v" "r r"; align-items: center; gap: 2px 4px; margin-bottom: 8px; color: var(--dim); }
+.fld > span { grid-area: l; } .fld > b { grid-area: v; font-weight: 400; color: var(--text); font-variant-numeric: tabular-nums; }
+.fld input[type=range] { grid-area: r; width: 100%; min-width: 0; margin: 0; }
+.fld input[type=color] { grid-area: r; width: 100%; height: 26px; padding: 0; border: 1px solid var(--line); background: none; }
+.swatches { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.sw { width: 22px; height: 22px; min-width: 0; padding: 0; border-radius: 3px; }
+.hint { color: var(--dim); margin-bottom: 8px; }
+.sep { border-top: 1px solid var(--line); margin: 4px 0 8px; }
+
+.grp-title { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin: 2px 0 6px; }
+.xrow { display: grid; grid-template-columns: 34px minmax(0, 1fr) 24px; gap: 4px; align-items: center; margin-bottom: 4px; }
+.xrow > span { color: var(--dim); }
+.xrow input { width: 100%; min-width: 0; height: 24px; padding: 0 4px; color: var(--text); background: var(--field);
+  border: 1px solid var(--line); border-radius: var(--radius); font: inherit; user-select: text; }
+.key { height: 24px; min-width: 24px; padding: 0; border: none; background: none; color: var(--dim); font-size: 15px; }
+.key.anim { color: var(--orange); }
+.xbtns { display: flex; gap: 4px; flex-wrap: wrap; margin: 6px 0 8px; }
+.xbtns button { height: 24px; padding: 0 6px; font-size: 12px; }
+.fld select { grid-area: r; height: 26px; color: var(--text); background: var(--field); border: 1px solid var(--line); border-radius: var(--radius); font: inherit; }

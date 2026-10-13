@@ -1,0 +1,9 @@
+/* frontend/css/animation/dope_sheet.css */
+.dope { display: grid; grid-template-columns: 84px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); flex: 1; min-height: 0; }
+.dope-names { position: relative; overflow: hidden; background: var(--panel); border-right: 1px solid var(--line); }
+.dn-sp { height: 18px; background: var(--header); }
+.dn-virtual { position: absolute; left: 0; right: 0; }
+.dn { height: 20px; line-height: 20px; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; color: var(--dim); }
+.dn.active { color: #fff; background: rgba(71, 114, 179, .45); }
+.dope-scroll { position: relative; overflow: auto; background: #232323; }
+.dope-scroll canvas { position: absolute; top: 0; left: 0; display: block; touch-action: pan-y; }

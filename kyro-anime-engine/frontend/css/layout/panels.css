@@ -1,0 +1,10 @@
+/* frontend/css/layout/panels.css - Properties tabs, history list, output/prefs panes */
+.ptabs { display: flex; gap: 2px; padding: 3px 4px; background: var(--header); border-bottom: 1px solid var(--line); }
+.ptab { height: 24px; min-width: 30px; padding: 0 6px; background: transparent; border: none; }
+.ptab.on { background: var(--accent); color: #fff; }
+.xrow.n { grid-template-columns: 52px minmax(0, 1fr); }
+.layer.future { opacity: .45; }
+.keymap { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 8px; font-size: 12px; align-items: center; }
+.keymap kbd { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; background: var(--field); font: inherit; font-size: 11px; white-space: nowrap; }
+.keymap span { color: var(--dim); }
+.panel-h .dim { color: var(--dim); }

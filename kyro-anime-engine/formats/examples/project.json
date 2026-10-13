@@ -1,0 +1,66 @@
+{
+  "format": "kae",
+  "version": 1,
+  "id": "bounce_demo",
+  "name": "Bouncing Ball",
+  "created": "2026-10-13T00:00:00Z",
+  "modified": "2026-10-13T00:00:00Z",
+  "settings": { "width": 1280, "height": 720, "fps": 12, "duration_frames": 24, "background": "#ffffff" },
+  "palette": ["#111111", "#e63946", "#457b9d", "#f1faee"],
+  "drawings": {
+    "d_ground": {
+      "id": "d_ground",
+      "name": "Ground",
+      "strokes": [
+        { "id": "s1", "tool": "pen", "color": "#111111", "width": 6,
+          "points": [[0, 600, 1], [1280, 600, 1]] }
+      ]
+    },
+    "d_ball_round": {
+      "id": "d_ball_round",
+      "name": "Ball round",
+      "strokes": [
+        { "id": "s1", "tool": "brush", "color": "#111111", "width": 4, "closed": true, "fill": "#e63946",
+          "points": [[40,0,1],[28,28,1],[0,40,1],[-28,28,1],[-40,0,1],[-28,-28,1],[0,-40,1],[28,-28,1]] }
+      ]
+    },
+    "d_ball_squash": {
+      "id": "d_ball_squash",
+      "name": "Ball squash",
+      "strokes": [
+        { "id": "s1", "tool": "brush", "color": "#111111", "width": 4, "closed": true, "fill": "#e63946",
+          "points": [[52,0,1],[37,20,1],[0,28,1],[-37,20,1],[-52,0,1],[-37,-20,1],[0,-28,1],[37,-20,1]] }
+      ]
+    }
+  },
+  "scenes": [
+    {
+      "id": "scene_1",
+      "name": "Scene 1",
+      "camera": { "transform": { "x": 0, "y": 0, "scale_x": 1, "scale_y": 1 } },
+      "layers": [
+        {
+          "id": "layer_ground", "name": "Ground", "type": "drawing",
+          "exposures": [{ "start": 0, "length": 24, "drawing": "d_ground" }]
+        },
+        {
+          "id": "layer_ball", "name": "Ball", "type": "drawing",
+          "transform": { "x": 200, "y": 560 },
+          "exposures": [
+            { "start": 0, "length": 11, "drawing": "d_ball_round" },
+            { "start": 11, "length": 2, "drawing": "d_ball_squash" },
+            { "start": 13, "length": 11, "drawing": "d_ball_round" }
+          ],
+          "tracks": {
+            "x": [{ "t": 0, "v": 200, "ease": "linear" }, { "t": 23, "v": 1000 }],
+            "y": [
+              { "t": 0, "v": 200, "ease": "ease_in" },
+              { "t": 12, "v": 560, "ease": "ease_out" },
+              { "t": 23, "v": 200 }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

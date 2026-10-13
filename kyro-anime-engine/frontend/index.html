@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAE</title>
+<link rel="stylesheet" href="css/base/variables.css">
+<link rel="stylesheet" href="css/layout/application.css">
+</head>
+<body class="home-page">
+<main class="home">
+  <header class="home-top">
+    <a class="home-brand" href="./" aria-label="KYRO Anime Engine home">
+      <span class="home-mark">K</span>
+      <span>KYRO <b>ANIME ENGINE</b></span>
+    </a>
+    <span class="home-version">2D ANIMATION WORKSPACE</span>
+  </header>
+
+  <section class="home-hero">
+    <div class="home-copy">
+      <p class="eyebrow">DRAW · ANIMATE · EXPORT</p>
+      <h1>Bring your drawings to life.</h1>
+      <p class="home-intro">A frame-by-frame animation studio with expressive drawing, camera animation, 2.5D parallax and fast exports.</p>
+      <div class="home-actions">
+        <div class="home-create">
+          <input id="newName" type="text" placeholder="Name your project" aria-label="New project name">
+          <button id="create" class="primary">Create project</button>
+        </div>
+        <button id="demo" class="demo-button" title="Open the animated bouncing-ball demo">Open animation demo <span aria-hidden="true">→</span></button>
+        <button id="importBtn" class="import-button" title="Import project JSON">Import project JSON</button>
+        <input id="importFile" type="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+    <div class="home-preview" aria-hidden="true">
+      <div class="preview-toolbar"><i></i><i></i><i></i><span>ANIMATION / SCENE 01</span></div>
+      <div class="preview-stage">
+        <span class="preview-cross cross-a"></span><span class="preview-cross cross-b"></span>
+        <span class="preview-orbit"></span><span class="preview-ball"></span>
+        <span class="preview-label">FRAME 024</span>
+      </div>
+      <div class="preview-timeline"><span></span><span></span><span></span><span></span><span></span><span></span><b>PLAY</b></div>
+    </div>
+  </section>
+
+  <section class="home-demos">
+    <div class="projects-heading">
+      <div><p class="eyebrow">START WITH A STUDY</p><h2>Animation demos</h2></div>
+      <span class="projects-note">Each opens as an editable project copy</span>
+    </div>
+    <div class="demo-grid">
+      <button class="demo-card" data-demo="bounce">
+        <span class="demo-art demo-art-bounce" aria-hidden="true">●</span>
+        <span><b>Bouncing Ball</b><small>Timing, squash, and stretch</small></span>
+        <span class="demo-arrow" aria-hidden="true">→</span>
+      </button>
+      <button class="demo-card" data-demo="parallax">
+        <span class="demo-art demo-art-parallax" aria-hidden="true">◢</span>
+        <span><b>Parallax Ridge</b><small>Layered scenery and camera depth</small></span>
+        <span class="demo-arrow" aria-hidden="true">→</span>
+      </button>
+      <button class="demo-card" data-demo="pendulum">
+        <span class="demo-art demo-art-pendulum" aria-hidden="true">◉</span>
+        <span><b>Pendulum Study</b><small>Pivoted rotation and easing</small></span>
+        <span class="demo-arrow" aria-hidden="true">→</span>
+      </button>
+      <button class="demo-card" data-demo="orbit">
+        <span class="demo-art demo-art-orbit" aria-hidden="true">✦</span>
+        <span><b>Orbit Study</b><small>Animated paths and depth layers</small></span>
+        <span class="demo-arrow" aria-hidden="true">→</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="home-features" aria-label="Editor features">
+    <article class="feature-card">
+      <span class="feature-index">01 / DRAW</span>
+      <h2>Grease Pencil</h2>
+      <p>Sketch directly in the canvas with pencil, ink, charcoal and highlight presets.</p>
+    </article>
+    <article class="feature-card">
+      <span class="feature-index">02 / ANIMATE</span>
+      <h2>Auto-key + Graph</h2>
+      <p>Change a transform to key it on the current frame, then inspect channels in the graph editor.</p>
+    </article>
+    <article class="feature-card">
+      <span class="feature-index">03 / BUILD</span>
+      <h2>JSON + Export</h2>
+      <p>Import project JSON and export PNG sequences, GIFs, sprite sheets or WebM video.</p>
+    </article>
+  </section>
+
+  <section class="home-projects">
+    <div class="projects-heading">
+      <div><p class="eyebrow">YOUR WORKSPACE</p><h2>Recent projects</h2></div>
+      <span class="projects-note">Select a project to continue editing</span>
+    </div>
+    <ul id="list" class="projlist"></ul>
+  </section>
+</main>
+<div id="toasts" class="toasts"></div>
+<script type="module" src="js/ui/project_manager.js"></script>
+</body>
+</html>

@@ -1,0 +1,379 @@
+KYRO ANIMATION ENGINE (KAE)
+PROJECT HANDOFF AND ROADMAP
+Updated: 2026-10-13
+
+======================================================================
+WHERE TO FIND THIS NOTE
+======================================================================
+
+This file is in the KAE project root:
+  kyro-anime-engine/KAE_PROJECT_HANDOFF.txt
+
+The project is located at:
+  /workspaces/kyro-web-space-one1/kyro-anime-engine
+
+Related project documentation:
+  README.md
+  docs/architecture.md
+  docs/project_format.md
+  docs/drawing_engine.md
+  docs/animation_pipeline.md
+  docs/rendering_pipeline.md
+  docs/character_generation.md
+  docs/rigging_system.md
+  docs/effects_system.md
+  docs/export_pipeline.md
+  docs/performance.md
+
+======================================================================
+HONEST STATUS
+======================================================================
+
+KAE is already a working browser-based 2D animation editor with a Flask
+backend. It is NOT yet the complete universal procedural animation platform
+in the original blueprint. The blueprint is a target, not a finished feature
+list. Several areas are working foundations; multiple advanced engine
+subsystems remain to be designed, implemented, integrated, and tested.
+
+The latest focused validation during this work completed successfully:
+  - Python tests: 40 passed, 14 subtests passed.
+  - JavaScript syntax checks passed for the checked editor/rendering modules.
+  - JSON parsing checks passed for the checked schemas.
+  - A Canvas renderer smoke test verified path line caps, joins, and fill rule.
+
+These checks are not proof that every UI workflow or every item in the
+architecture blueprint has been implemented.
+
+======================================================================
+HOW WORK HAS BEEN DONE / CODING APPROACH
+======================================================================
+
+Use this approach when continuing development:
+
+1. Read the existing implementation and relevant docs before changing code.
+   Search for existing helpers, patterns, and tests; do not assume the
+   blueprint's proposed file tree already exists or should be copied verbatim.
+
+2. Choose one coherent, user-visible feature slice. Follow it across the
+   necessary layers: project/schema representation, validation, backend
+   service/API if needed, frontend editor/rendering, tests, and docs.
+
+3. Preserve existing project behavior. In particular:
+   - Keep legacy point-based drawing strokes working alongside path strokes.
+   - Keep old project imports compatible when safe defaults can be applied.
+   - Reject unsupported future project formats rather than silently corrupting
+     them.
+   - Keep viewport and export rendering consistent.
+   - Prefer stable IDs and existing undoable command patterns.
+
+4. Make small, surgical edits that match local code style. Avoid introducing
+   unused abstractions or large parallel subsystems just to match names in the
+   proposed architecture diagram.
+
+5. Add regression tests for the requirement itself, including valid, invalid,
+   and compatibility cases when applicable. Update user-facing documentation
+   for behavior changes.
+
+6. Run the narrowest useful validation, then broaden to the full suite for
+   cross-cutting changes. Check JavaScript syntax, JSON schema syntax, and
+   whitespace/diff issues where applicable. Report the actual results and any
+   unverified areas.
+
+7. Do not claim a roadmap area is complete just because a schema, module
+   scaffold, or UI control exists. A feature is complete only when its data
+   format, behavior, integration, compatibility, and regression coverage work
+   together.
+
+Important worktree warning:
+  There are many existing staged, unstaged, and untracked project files.
+  Inspect git status and diffs before changing files. Do not reset, clean,
+  discard, or overwrite unrelated work. No commit was made as part of this
+  handoff.
+
+======================================================================
+HOW THE PROJECT STARTED AND WHAT WAS DONE IN THIS WORK
+======================================================================
+
+1. The initial user problem was that loading a large JSON project froze the
+   editor UI and timeline.
+
+2. The performance work addressed known expensive paths:
+   - Timeline drawing uses a viewport-sized canvas and renders visible rows
+     and frames instead of allocating a canvas for the entire timeline.
+   - Layer labels are virtualized.
+   - Project JSON text areas are not fully re-serialized on every project
+     change; the current state is refreshed when the JSON view is entered or
+     exported.
+   - Additive project import uses copy-on-write for existing structures and
+     efficient scene lookup.
+   - A JSON import summary counter bug was fixed.
+
+3. Project compatibility work:
+   - Legacy imports receive safe defaults for omitted fields.
+   - Missing scenes can be initialized as a blank scene.
+   - Projects declaring a newer unsupported format version are rejected.
+   - Compatibility and large import/reload behavior received regression tests.
+
+4. The next drawing milestone added Bézier path strokes:
+   - Existing `points` geometry remains supported.
+   - New `commands` geometry supports `M`, `L`, `Q`, `C`, and `Z`.
+   - Backend validation checks command ordering, tuple length, and finite
+     coordinates.
+   - Paths render in the browser renderer used by preview and exports.
+   - Geometry flattening supports operations such as hit checks, fill checks,
+     erasing, and bounds.
+   - Edit mode can move path anchors/control points.
+   - Asset preview and layer-origin bounds account for path geometry.
+
+5. The latest drawing-foundation slice:
+   - Added reusable `formats/schemas/path.schema.json`.
+   - Drawing schema references the reusable path schema.
+   - Added `fill_rule` values `nonzero` and `evenodd`.
+   - Added `line_cap` values `butt`, `round`, and `square`.
+   - Added `line_join` values `bevel`, `round`, and `miter`.
+   - Renderer passes these supported styles to Canvas.
+   - Backend validates these style values.
+   - Updated drawing docs and this project's architecture status doc.
+
+======================================================================
+CURRENT PROJECT SHAPE
+======================================================================
+
+The application uses a Flask/Python backend and a vanilla JavaScript browser
+editor. Major areas:
+
+  backend/api/
+    Flask endpoints for projects, scenes, layers, drawings, characters,
+    animation, cameras, rigs, effects, audio, rendering, exports, and schemas.
+
+  backend/services/
+    Project, drawing, scene, character, animation, timeline, rig, effects/
+    assets, audio, validation, rendering, and export behavior.
+
+  backend/storage/
+    Project and asset repositories, file management, project indexing, and
+    atomic writing.
+
+  frontend/js/
+    Editor modules for drawing, viewport/rendering, animation/timeline,
+    project import, scene, asset browsing, export, studio features, and UI.
+
+  formats/schemas/
+    Core project, character, scene, drawing/path, animation, rig, effects,
+    and render schemas, with JSON examples under formats/examples/.
+
+  tests/
+    Pytest regression modules and categorized test directories.
+
+Do not recreate this structure from the aspirational blueprint. Some proposed
+separate files (for example a dedicated rendering pipeline or geometry
+subsystem) do not exist yet; add them only when needed by a concrete feature.
+
+======================================================================
+FEATURES ALREADY PRESENT (AT VARYING LEVELS OF COMPLETENESS)
+======================================================================
+
+- Project JSON load/save, validation, compatibility defaults, and stable-ID
+  additive import.
+- Canvas drawing, brush pressure/smoothing, erasing, shapes, fill, eyedropper,
+  palette/color controls, and drawing assets.
+- Layers, scenes, exposures, undo/redo, viewport, properties, and outliner.
+- Timeline playback, transform keyframes/interpolation, auto-key, graph/dope
+  sheet support, onion skin, and transform tools.
+- Camera pan/zoom/roll and depth/parallax behavior.
+- Editable character JSON import and a configurable vector character
+  generator.
+- Hierarchical 2D rotation rigs.
+- Scene effects including lightning, particles, speed lines, and camera shake.
+- Audio clip metadata/playback and browser-recorded WebM audio mixing.
+- PNG sequence, GIF, sprite sheet/atlas, and browser WebM export paths.
+- Targeted performance changes for large timeline and project JSON workflows.
+- Point strokes plus Bézier path strokes and current simple line/fill styles.
+
+Some features are browser/editor implementations rather than full standalone
+Python engine services. Verify each flow before expanding or advertising it.
+
+======================================================================
+WHAT IS STILL MISSING OR ONLY PARTIAL
+======================================================================
+
+PROJECT / FORMATS
+  - General schema validation orchestration and complete schema coverage.
+  - A formal, repeatable migration registry beyond current compatibility
+    defaults.
+  - Dependency resolution for referenced external resources.
+  - Dedicated style, palette, material, lighting, asset, audio, and export
+    schemas where supported by real data and behavior.
+  - Comprehensive reference validation across all entities.
+
+DRAWING / GEOMETRY
+  - Complete reusable style model (gradients, patterns, textures, dash/taper
+    options, materials).
+  - Robust compound paths/holes and tested fill semantics.
+  - Boolean path operations, tessellation, triangulation, and explicit stroke
+    expansion.
+  - Clipping and masks.
+  - Geometry-level automated tests for edge cases and visual/render outputs.
+  - Decide whether Canvas remains the main rasterizer or whether a measured
+    need justifies a dedicated rasterization pipeline.
+
+SCENE GRAPH
+  - General drawable objects, groups, and reusable nested hierarchy.
+  - Parent/child transform composition and well-defined local/world transforms.
+  - Constraints, masks/clipping, and explicit depth sorting beyond current
+    layer ordering and camera-depth behavior.
+  - Tests ensuring old flat-layer projects continue to behave identically.
+
+CHARACTERS
+  - Separate anatomy, head/face/eye/hair/body/hand/clothing/expression/detail
+    builders from the current focused configurable generator.
+  - Proportion guides and richer attachment/hierarchy model.
+  - Fully reusable character instances in a scene rather than only generated
+    or imported part layers.
+  - A broader test suite for generated editable geometry and stable updates.
+
+ANIMATION
+  - Inverse kinematics and constraint solving.
+  - Rig data validation and more complete rig animation.
+  - Deformations/skin weights or another explicit deformation representation.
+  - Facial expression/blink/mouth tracks, drawing substitution, and path
+    deformation where they fit the product.
+  - Reliable evaluation tests across combinations of tracks, scene hierarchy,
+    and frame ranges.
+
+RENDERING / EXPORT
+  - Dedicated compositor/rasterizer, robust antialiasing/color management,
+    material rendering, lighting and shadows.
+  - Render cache with explicit invalidation keyed to project changes.
+  - Incremental/region redraw only if profiling shows it is beneficial.
+  - Backend rendering/video export API if required; current exports include
+    browser-side paths.
+  - Deterministic visual regression tests, including effects and export
+    parity.
+
+PERFORMANCE / PRODUCT QUALITY
+  - Profile representative small and large projects before new optimization.
+  - Add caching only with clear invalidation rules; avoid stale rendered art.
+  - Test project load and editor responsiveness at defined project sizes.
+  - Verify all editor features manually or via browser integration tests;
+    Python tests alone do not cover the complete browser UX.
+
+======================================================================
+RECOMMENDED NEXT STEPS
+======================================================================
+
+Continue in small end-to-end milestones. A practical order is:
+
+MILESTONE A - STABILIZE THE CURRENT DRAWING FOUNDATION
+  1. Verify drawing/path schema references with a Draft 2020-12 JSON Schema
+     validator in CI or a test dependency. JSON parsing is not schema
+     validation.
+  2. Add geometry tests for flattening, closed contours, multiple subpaths if
+     they become supported, and malformed browser asset imports.
+  3. Ensure all frontend callers reject or safely surface invalid path data.
+  4. Add an integration/regression test showing point drawings still render
+     and import after path changes.
+
+MILESTONE B - STYLES AND COMPOUND FILL
+  1. Define a versioned style schema, starting only with properties the editor
+     can actually render.
+  2. Specify and test hole/compound contour fill behavior.
+  3. Add gradients/patterns only with a chosen project representation, editor
+     controls, import/export behavior, and tests.
+
+MILESTONE C - SCENE HIERARCHY
+  1. Agree on a backward-compatible group/child model.
+  2. Implement transform composition and visibility inheritance in one shared
+     evaluator used by viewport and exports.
+  3. Validate references/cycles, define z-order rules, and test nested
+     transforms, hidden parents, and old flat projects.
+
+MILESTONE D - CHARACTER BUILDERS AND INSTANCES
+  1. Split the current generator into deterministic, independently testable
+     builders while preserving editable output and stable IDs.
+  2. Add character instances with per-instance transform/overrides and a clear
+     relationship to part drawings/rigs.
+  3. Verify generator edits do not duplicate layers or lose animation.
+
+MILESTONE E - ADVANCED ANIMATION
+  1. Specify rig constraints and data schema.
+  2. Implement and unit-test a minimal 2D IK solver before adding UI.
+  3. Add deformation or drawing substitution using stable project data.
+  4. Test pose evaluation at static frames and interpolated frames.
+
+MILESTONE F - RENDERING, CACHE, AND EXPORT PARITY
+  1. Capture baselines and profile first.
+  2. Build cache keys/invalidation around stable project revisions and affected
+     scene/drawing/layer dependencies.
+  3. Reuse one rendering/evaluation contract in editor and export.
+  4. Add pixel/output regression tests and resource cleanup tests.
+
+MILESTONE G - COMPLETION AND RELEASE
+  1. Close schema/API/documentation gaps for implemented features.
+  2. Run full backend tests, frontend syntax/lint/build, and browser end-to-end
+     tests.
+  3. Test old project fixtures, large project fixtures, and fresh projects.
+  4. Verify exports, save/reload, undo/redo, and deterministic rerender.
+  5. Document known limitations and release/version migration behavior.
+
+Do not implement all milestones in one giant change. Each should ship as a
+working, tested increment. Ask for product decisions where behavior is
+ambiguous (for example whether groups can contain animated characters or how
+compound fill rules should interact with open contours).
+
+======================================================================
+RUNNING AND VALIDATING
+======================================================================
+
+The README's simple setup is:
+  pip install flask pillow
+  python run.py
+
+Open:
+  http://127.0.0.1:5000
+
+For this workspace, the configured Python environment is:
+  /workspaces/kyro-web-space-one1/.venv/bin/python
+
+Run the full current Python suite from the app folder:
+  cd /workspaces/kyro-web-space-one1/kyro-anime-engine
+  /workspaces/kyro-web-space-one1/.venv/bin/python -m pytest -q
+
+For frontend module syntax checks in this environment:
+  node --input-type=module --check < frontend/js/path/to/module.js
+
+Use the project's available npm/build/lint scripts if one is present; inspect
+package manifests before assuming a frontend build command exists. JSON parse
+checks only prove syntactic JSON validity; use a real JSON Schema validator
+for schema-instance validation.
+
+======================================================================
+WHAT "FINISHED" SHOULD MEAN
+======================================================================
+
+KAE should not be called complete until:
+
+- Every advertised feature has a defined project representation and schema.
+- Invalid data produces useful errors and cannot silently corrupt projects.
+- Load/save/migration and references are reliable for old and current files.
+- Drawings, groups, characters, scenes, animation, camera, effects, and audio
+  are editable and reusable in one coherent model.
+- Viewport, preview, and all export paths evaluate and render consistently.
+- Geometry features have deterministic tested behavior, including curves,
+  fills, holes, clipping/masks, and stroke styles.
+- Character generation produces editable output with stable identities.
+- Scene hierarchy and animation include tested transforms, rigging, IK, and
+  supported deformation features.
+- Performance has measured targets, representative stress tests, and correct
+  cache invalidation.
+- Automated tests cover backend, frontend integration, compatibility, and
+  representative rendered outputs.
+- Documentation says clearly what each supported format and feature does.
+
+This is a substantial multi-milestone project. No trustworthy fixed duration
+can be given from this handoff alone; the remaining work depends on how much
+of the aspirational blueprint is required for the first usable release.
+
+======================================================================
+END OF HANDOFF
+======================================================================

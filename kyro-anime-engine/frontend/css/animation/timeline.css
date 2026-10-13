@@ -1,0 +1,25 @@
+/* frontend/css/animation/timeline.css - timeline header + transport */
+#p-timeline { background: var(--panel); }
+.tl-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px;
+  padding: 2px 6px; background: var(--header); border-bottom: 1px solid var(--line); }
+.tl-ctrls { display: flex; align-items: center; gap: 4px; }
+.tl-drawing-actions { gap: 5px; }
+.tl-drawing-actions > button { height: 24px; font-size: 11px; }
+.zoom-control { display: inline-flex; align-items: center; gap: 5px; color: var(--dim); font-size: 10px; white-space: nowrap; }
+.zoom-control input { width: 66px; margin: 0; }
+.zoom-control b { min-width: 20px; color: var(--text); font-weight: 500; text-align: right; }
+.tl-head button { height: 26px; min-width: 28px; padding: 0 6px; }
+.tl-head .dim { color: var(--dim); font-size: 11px; }
+.num { width: 52px; height: 26px; padding: 0 4px; text-align: center; color: var(--text); background: var(--field);
+  border: 1px solid var(--line); border-radius: var(--radius); font: inherit; user-select: text; }
+.tgl.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#autokey.on { background: #c0392b; border-color: #c0392b; }
+@media (max-width: 900px) {
+  .tl-head { justify-content: flex-start; }
+  .tl-drawing-actions { flex-wrap: wrap; }
+  .zoom-control { display: none; }
+}
+@media (max-width: 700px) {
+  #firstF, #lastF { display: none; }
+  .tl-drawing-actions > button { padding: 0 4px; }
+}

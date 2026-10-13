@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>KAE Editor</title>
+<link rel="stylesheet" href="css/base/variables.css">
+<link rel="stylesheet" href="css/layout/application.css">
+<link rel="stylesheet" href="css/layout/workspace.css">
+<link rel="stylesheet" href="css/layout/panels.css">
+<link rel="stylesheet" href="css/editor/viewport.css">
+<link rel="stylesheet" href="css/editor/toolbar.css">
+<link rel="stylesheet" href="css/editor/inspector.css">
+<link rel="stylesheet" href="css/editor/workspace.css">
+<link rel="stylesheet" href="css/editor/studio_panel.css">
+<link rel="stylesheet" href="css/editor/asset_browser.css">
+<link rel="stylesheet" href="css/animation/timeline.css">
+<link rel="stylesheet" href="css/animation/dope_sheet.css">
+<link rel="stylesheet" href="css/animation/graph_editor.css">
+<link rel="stylesheet" href="css/rendering/export_dialog.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <a class="btn" href="index.html" title="Projects"><i data-icon="home"></i></a>
+    <button id="projName" class="name">...</button>
+    <span id="dirty" class="dirty" hidden><i data-icon="dot"></i></span>
+    <nav class="wtabs" id="wtabs">
+      <button data-ws="draw" title="Draw workspace"><i data-icon="brush"></i><span>Draw</span></button>
+      <button data-ws="animate" title="Animate workspace"><i data-icon="timeline"></i><span>Animate</span></button>
+      <button data-ws="edit" title="Edit workspace"><i data-icon="nodes"></i><span>Edit</span></button>
+      <button data-ws="studio" title="Studio tools"><i data-icon="sliders"></i><span>Studio</span></button>
+    </nav>
+    <div class="spacer"></div>
+    <button id="undo" title="Undo (Ctrl+Z)" disabled><i data-icon="undo"></i></button>
+    <button id="redo" title="Redo (Ctrl+Shift+Z)" disabled><i data-icon="redo"></i></button>
+    <button id="exportBtn" title="Export (Ctrl+E)"><i data-icon="download"></i></button>
+    <button id="save" class="primary" title="Save (Ctrl+S)"><i data-icon="save"></i></button>
+  </header>
+
+  <div class="main">
+    <nav class="shelf">
+      <button class="tool" data-tool="pan" title="Hand (H)"><i data-icon="hand"></i></button>
+      <button class="tool" data-tool="camera" title="Camera (K): drag to pan, wheel to zoom"><i data-icon="camera"></i></button>
+      <button class="tool" data-tool="brush" title="Brush (B)"><i data-icon="brush"></i></button>
+      <button class="tool" data-tool="eraser" title="Eraser (E)"><i data-icon="eraser"></i></button>
+      <button class="tool" data-tool="grease" title="Grease pencil (G)"><i data-icon="brush"></i></button>
+      <button class="tool" data-tool="edit" title="Edit points (Tab)"><i data-icon="nodes"></i></button>
+      <span class="shelf-sep"></span>
+      <button class="tool" data-tool="line" title="Draw line (L)"><i data-icon="line"></i></button>
+      <button class="tool" data-tool="rectangle" title="Draw rectangle (U)"><i data-icon="rectangle"></i></button>
+      <button class="tool" data-tool="ellipse" title="Draw ellipse (O)"><i data-icon="ellipse"></i></button>
+      <button class="tool" data-tool="polygon" title="Draw hexagon (P)"><i data-icon="polygon"></i></button>
+      <button class="tool" data-tool="star" title="Draw star (T)"><i data-icon="star"></i></button>
+      <button class="tool" data-tool="fill" title="Fill a closed shape (F)"><i data-icon="fill"></i></button>
+      <button class="tool" data-tool="eyedropper" title="Sample canvas color (C)"><i data-icon="eyedropper"></i></button>
+      <span class="shelf-sep"></span>
+      <button class="tool" data-tool="move" title="Move (M)"><i data-icon="move"></i></button>
+      <button class="tool" data-tool="rotate" title="Rotate (R)"><i data-icon="rotate"></i></button>
+      <button class="tool" data-tool="scale" title="Scale (S)"><i data-icon="scale"></i></button>
+    </nav>
+
+    <section class="vp">
+      <div class="vp-head">
+        <button id="zoomOut" title="Zoom out"><i data-icon="minus"></i></button>
+        <button id="fit" class="mono" title="Fit view">100%</button>
+        <button id="zoomIn" title="Zoom in"><i data-icon="plus"></i></button>
+        <span class="vp-sep"></span>
+        <button id="gridToggle" class="vp-toggle on" title="Toggle viewport grid" aria-pressed="true">Grid</button>
+        <button id="onionToggle" class="vp-toggle" title="Toggle previous/next frame onion skin" aria-pressed="false">Onion</button>
+        <label class="vp-camera-mode"><span>Camera tool</span><select id="cameraMode" title="With Camera tool active: Pan drags the scene camera, Dolly drags or wheels to zoom, Roll rotates it. Pan mode uses the wheel for editor zoom.">
+          <option value="pan">Pan</option><option value="dolly">Dolly</option><option value="roll">Roll</option>
+        </select></label>
+        <button id="canvasFocus" class="vp-toggle" title="Expand the drawing canvas; click again to restore panels" aria-pressed="false">Focus Canvas</button>
+        <span id="statusTool" class="dim"></span>
+        <span class="vp-readout"><span id="frameReadout">F 001</span><span id="canvasReadout">1280 × 720</span></span>
+      </div>
+      <div class="viewport" id="viewport"><canvas id="canvas"></canvas></div>
+    </section>
+
+    <aside class="right" id="rightCol">
+      <div class="slot" id="slotA"></div>
+      <div class="slot" id="slotB"></div>
+    </aside>
+  </div>
+
+  <div class="slot" id="slotC"></div>
+</div>
+
+<!-- editor panels live here until an area shows them (see js/editor/workspace_layout.js) -->
+<div id="panelPool" hidden>
+  <section class="panel" id="p-outliner">
+    <div class="panel-h"><span class="dim">Scene Collection · Layers</span>
+      <div class="panel-actions">
+        <button id="duplicateLayer" title="Duplicate selected layer (Shift+D)" disabled><i data-icon="duplicate"></i></button>
+        <button id="deleteLayer" title="Delete selected layer" disabled><i data-icon="trash"></i></button>
+        <button id="addLayer" title="Add layer"><i data-icon="plus"></i></button>
+      </div>
+    </div>
+    <ul id="layers" class="layers"></ul>
+  </section>
+
+  <section class="panel" id="p-properties">
+    <div class="ptabs">
+      <button class="ptab on" data-tab="tool" title="Tool"><i data-icon="sliders"></i></button>
+      <button class="ptab" data-tab="object" title="Object"><i data-icon="object"></i></button>
+      <button class="ptab" data-tab="output" title="Output"><i data-icon="film"></i></button>
+      <button class="ptab" data-tab="json" title="JSON"><i data-icon="code"></i></button>
+      <button class="ptab" data-tab="prefs" title="Preferences"><i data-icon="gear"></i></button>
+    </div>
+    <div class="panel-b">
+      <div data-pane="tool">
+        <section class="color-picker">
+          <div class="grp-title">Color</div>
+          <canvas id="colorWheel" width="168" height="168" aria-label="Color wheel"></canvas>
+          <label class="fld"><span>Value</span><b id="colorValueText">100%</b><input id="colorValue" type="range" min="15" max="100" value="100"></label>
+          <label class="fld color"><span>Hex</span><input type="color" id="toolColor" value="#111111"></label>
+          <div class="palette-head"><span>Palette</span><button id="paletteAdd" title="Add current color to project palette"><i data-icon="plus"></i></button></div>
+          <div id="swatches" class="swatches"></div>
+        </section>
+
+        <section class="panel studio-panel" id="p-studio">
+          <div class="studio-tabs" role="tablist" aria-label="Studio tools">
+            <button class="on" data-studio-tab="effects">Effects</button>
+            <button data-studio-tab="rig">Rig</button>
+            <button data-studio-tab="character">Character</button>
+            <button data-studio-tab="audio">Audio</button>
+          </div>
+          <div class="studio-body">
+            <section data-studio-pane="effects">
+              <div class="grp-title">Scene effects</div>
+              <div class="hint">Effects are saved with the project and included in frame, GIF, sprite, and WebM rendering.</div>
+              <div class="xrow"><select id="effectType" aria-label="Effect type">
+                <option value="lightning">Lightning</option><option value="particles">Particles</option>
+                <option value="speed_lines">Speed lines</option><option value="camera_shake">Camera shake</option>
+              </select><button id="effectAdd" class="primary">Add</button></div>
+              <div id="effectList" class="studio-list"></div>
+            </section>
+            <section data-studio-pane="rig" hidden>
+              <div class="grp-title">2D character rig</div>
+              <div class="hint">Attach bones to stable character parts. Parent bones pass their rotation to child parts; key rotations at the current frame.</div>
+              <label class="chk"><input id="showRigOverlay" type="checkbox"> Show rig overlay in viewport</label>
+              <label class="fld"><span>Character</span><select id="rigCharacter"></select></label>
+              <div class="xbtns"><button id="rigCreate">Create / select rig</button></div>
+              <div id="rigEditor" hidden>
+                <div class="xbtns"><button id="rigDelete">Remove rig</button></div>
+                <div class="grp-title">Add bone</div>
+                <label class="fld"><span>Bone name</span><input id="boneName" type="text" maxlength="64" value="Bone"></label>
+                <label class="fld"><span>Character part</span><select id="bonePart"></select></label>
+                <label class="fld"><span>Parent bone</span><select id="boneParent"></select></label>
+                <div class="xrow n"><span>Pivot X</span><input id="boneX" type="number" step="1"></div>
+                <div class="xrow n"><span>Pivot Y</span><input id="boneY" type="number" step="1"></div>
+                <button id="boneAdd">Add bone</button>
+                <div id="boneList" class="studio-list"></div>
+              </div>
+            </section>
+            <section data-studio-pane="character" hidden>
+              <div class="grp-title">Anime character generator</div>
+              <div class="hint">Generate editable vector parts. Reusing an ID updates that character while preserving existing part animation.</div>
+              <label class="fld"><span>Stable character ID</span><input id="generatorId" type="text" maxlength="64" placeholder="e.g. hero_01"></label>
+              <label class="fld"><span>Name</span><input id="generatorName" type="text" maxlength="100" value="Anime Hero"></label>
+              <label class="fld"><span>Hairstyle</span><select id="generatorHair">
+                <option value="short">Short</option><option value="long">Long</option><option value="twin_tails">Twin tails</option>
+              </select></label>
+              <label class="fld"><span>Expression</span><select id="generatorExpression">
+                <option value="smile">Smile</option><option value="neutral">Neutral</option><option value="determined">Determined</option>
+              </select></label>
+              <label class="fld color"><span>Hair</span><input id="generatorHairColor" type="color" value="#303b70"></label>
+              <label class="fld color"><span>Eyes</span><input id="generatorEyeColor" type="color" value="#4c8ba8"></label>
+              <label class="fld color"><span>Skin</span><input id="generatorSkinColor" type="color" value="#f2c7a5"></label>
+              <label class="fld color"><span>Outfit</span><input id="generatorOutfitColor" type="color" value="#a34f78"></label>
+              <button id="generateCharacter" class="primary">Generate / update character</button>
+              <div id="generatorCharacters" class="studio-list"></div>
+            </section>
+            <section data-studio-pane="audio" hidden>
+              <div class="grp-title">Timeline audio</div>
+              <div class="hint">Imported clips preview in sync with playback. WebM export mixes active clips; frame and image exports remain silent.</div>
+              <label class="fld"><span>Stable clip ID (optional)</span><input id="audioId" type="text" maxlength="64" placeholder="Reuse to replace"></label>
+              <label class="fld"><span>Clip name (optional)</span><input id="audioName" type="text" maxlength="160"></label>
+              <div class="xrow n"><span>Start frame</span><input id="audioStart" type="number" min="1" step="1"></div>
+              <div class="xrow n"><span>Trim offset</span><input id="audioOffset" type="number" min="0" step="0.01" value="0"></div>
+              <label class="fld"><span>Audio file</span><input id="audioFile" type="file" accept="audio/*,.m4a,.aac,.webm"></label>
+              <button id="audioUpload" class="primary">Import / replace audio</button>
+              <div id="audioList" class="studio-list"></div>
+            </section>
+          </div>
+        </section>
+        <div data-tools="brush grease">
+          <label class="fld"><span>Size</span><b id="optSizeV"></b><input type="range" id="optSize" min="1" max="80"></label>
+          <label class="fld"><span>Opacity</span><b id="optOpacityV"></b><input type="range" id="optOpacity" min="5" max="100"></label>
+          <label class="fld"><span>Smoothing</span><b id="optSmoothV"></b><input type="range" id="optSmooth" min="0" max="100"></label>
+        </div>
+        <div data-tools="brush">
+          <div class="hint">Draw freehand strokes on the active layer.</div>
+        </div>
+        <div data-tools="grease">
+          <div class="xbtns">
+            <button class="gp-preset on" data-gp-preset="pencil">Pencil</button>
+            <button class="gp-preset" data-gp-preset="ink">Ink</button>
+            <button class="gp-preset" data-gp-preset="charcoal">Charcoal</button>
+            <button class="gp-preset" data-gp-preset="highlight">Highlight</button>
+          </div>
+          <div class="hint">Grease-pencil strokes are drawn as sketch marks with a soft, expressive feel.</div>
+        </div>
+        <div data-tools="eraser">
+          <label class="fld"><span>Eraser size</span><b id="optEraserV"></b><input type="range" id="optEraser" min="4" max="120"></label>
+          <div class="hint">Removes whole strokes it touches.</div>
+        </div>
+        <div data-tools="line rectangle ellipse polygon star">
+          <div class="hint">Drag on the canvas to create a shape. Shape strokes are editable and saved in the project.</div>
+          <label class="chk"><input id="shapeFill" type="checkbox"> Fill closed shapes</label>
+          <label class="fld color"><span>Fill color</span><input type="color" id="fillColor" value="#4772b3"></label>
+        </div>
+        <div data-tools="fill">
+          <div class="hint">Click inside a closed shape to set its fill color.</div>
+          <label class="fld color"><span>Fill color</span><input type="color" id="fillColorTool" value="#4772b3"></label>
+        </div>
+        <div data-tools="eyedropper" class="hint">Click a color in the canvas to sample it into the active brush color.</div>
+        <div data-tools="edit">
+          <div class="hint">Tap or drag a point to move it. Drag on empty space to box-select.</div>
+          <div class="xbtns">
+            <button id="eSelAll" title="Select all (A)"><i data-icon="select-all"></i></button>
+            <button id="eSmooth" title="Smooth selected"><i data-icon="wave"></i></button>
+            <button id="eDel" title="Delete selected (X)"><i data-icon="trash"></i></button>
+          </div>
+        </div>
+        <div data-tools="pan" class="hint">Drag to pan the editor view. Pinch or wheel to zoom.</div>
+        <div data-tools="camera" class="hint">Drag in the viewport to move the scene camera; use the wheel to zoom around the pointer. Changes key at the current frame when Auto-key is on.</div>
+        <div data-tools="move rotate scale" class="hint">Drag to transform the layer. Press I to key.</div>
+      </div>
+
+      <div data-pane="object" hidden>
+        <div class="grp-title">Object</div>
+        <div class="xrow"><span>X</span><input type="number" id="f_x" step="1"><button class="key" data-ch="x"></button></div>
+        <div class="xrow"><span>Y</span><input type="number" id="f_y" step="1"><button class="key" data-ch="y"></button></div>
+        <div class="xrow"><span>Rot</span><input type="number" id="f_rotation" step="1"><button class="key" data-ch="rotation"></button></div>
+        <div class="xrow"><span>Sx</span><input type="number" id="f_scale_x" step="0.05"><button class="key" data-ch="scale_x"></button></div>
+        <div class="xrow"><span>Sy</span><input type="number" id="f_scale_y" step="0.05"><button class="key" data-ch="scale_y"></button></div>
+        <div class="xrow"><span>Alpha</span><input type="number" id="f_opacity" step="0.05" min="0" max="1"><button class="key" data-ch="opacity"></button></div>
+        <label class="fld"><span>Depth influence</span><b id="layerDepthV">100%</b><input type="range" id="layerDepth" min="0" max="200" step="5" value="100"></label>
+        <div class="hint">Back layers move less with the camera; foreground layers move more for a 2.5D parallax effect.</div>
+        <div class="xbtns">
+          <button id="keyAll" title="Insert keys (I)">Key</button>
+          <button id="unkey" title="Delete keys (Alt+I)">Unkey</button>
+          <button id="originBtn" title="Origin to drawing centre">Origin</button>
+        </div>
+        <div class="grp-title">Quick Animation</div>
+        <div class="xbtns">
+          <button id="createMotion" title="Create a left-to-right motion across the full timeline">Create Motion</button>
+          <button id="createFade" title="Create an opacity fade-in across the full timeline">Create Fade</button>
+        </div>
+        <label class="fld"><span>Key ease</span>
+          <select id="keyEase">
+            <option value="ease_in_out">Ease in-out</option><option value="linear">Linear</option>
+            <option value="ease_in">Ease in</option><option value="ease_out">Ease out</option><option value="hold">Hold</option>
+          </select>
+        </label>
+      </div>
+
+      <div data-pane="output" hidden>
+        <div class="grp-title">Output</div>
+        <div class="xrow n"><span>Width</span><input type="number" id="o_w" min="16" max="8192" step="1"></div>
+        <div class="xrow n"><span>Height</span><input type="number" id="o_h" min="16" max="8192" step="1"></div>
+        <div class="xrow n"><span>FPS</span><input type="number" id="o_fps" min="1" max="120" step="1"></div>
+        <div class="xrow n"><span>Frames</span><input type="number" id="o_end" min="1" max="2000" step="1"></div>
+        <label class="fld color"><span>Background</span><input type="color" id="o_bg" value="#ffffff"></label>
+        <div class="grp-title">Camera · current scene</div>
+        <div class="xrow n"><span>Pan X</span><input type="number" id="cam_x" min="-8192" max="8192" step="1"></div>
+        <div class="xrow n"><span>Pan Y</span><input type="number" id="cam_y" min="-8192" max="8192" step="1"></div>
+        <div class="xrow n"><span>Roll °</span><input type="number" id="cam_rotation" min="-3600" max="3600" step="1"></div>
+        <label class="fld"><span>Zoom</span><input type="range" id="cam_zoom" min="5" max="3200" step="5"><b id="cam_zoomV"></b></label>
+        <div class="xbtns"><button id="cam_key" title="Key the camera pan and zoom at the current frame">Key Camera</button></div>
+        <div class="grp-title">Lighting · current scene</div>
+        <div class="xbtns">
+          <select id="lightSelect" aria-label="Select light"></select>
+          <button id="lightAdd" title="Add a scene point light"><i data-icon="plus"></i></button>
+          <button id="lightDelete" title="Remove selected light"><i data-icon="trash"></i></button>
+        </div>
+        <div class="xrow n"><span>Light X</span><input type="number" id="light_x" min="-8192" max="8192" step="1"></div>
+        <div class="xrow n"><span>Light Y</span><input type="number" id="light_y" min="-8192" max="8192" step="1"></div>
+        <label class="fld"><span>Radius</span><input type="range" id="light_radius" min="16" max="8192" step="16"><b id="light_radiusV"></b></label>
+        <label class="fld"><span>Intensity</span><input type="range" id="light_intensity" min="0" max="100" step="1"><b id="light_intensityV"></b></label>
+        <label class="fld color"><span>Light color</span><input type="color" id="light_color" value="#ffd9a0"></label>
+        <div class="xbtns">
+          <button id="o_fit" title="Fit view"><i data-icon="scale"></i></button>
+          <button id="o_importJson" title="Import project JSON"><i data-icon="upload"></i><span>Import JSON</span></button>
+          <button id="o_export" title="Export"><i data-icon="download"></i><span>Export</span></button>
+        </div>
+      </div>
+
+      <div data-pane="json" hidden>
+        <div class="grp-title">Project JSON</div>
+        <div class="hint">Import Files merges multiple project or character JSON files, adding only non-conflicting components. Apply + Open replaces the open project.</div>
+        <textarea id="jsonText" rows="10" spellcheck="false" style="width:100%; box-sizing:border-box; resize:vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;"></textarea>
+        <div class="hint" id="jsonStatus" aria-live="polite"></div>
+        <div class="xbtns">
+          <button id="jsonImportEditor" title="Import one or more project or character JSON files without replacing existing components">Import Files</button>
+          <button id="jsonReload" title="Reload current project">Reload</button>
+          <button id="jsonApply" class="primary" title="Validate, save and open this project JSON">Apply + Open</button>
+          <button id="jsonCharacterApply" title="Import or update a character using its stable ID">Import Character</button>
+          <button id="jsonDownload" title="Download JSON">Download</button>
+        </div>
+
+        <div class="grp-title">Selected layer patch</div>
+        <textarea id="layerJson" rows="8" spellcheck="false" style="width:100%; box-sizing:border-box; resize:vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;"></textarea>
+        <div class="xbtns">
+          <button id="layerRefresh" title="Refresh selected layer JSON">Refresh Layer</button>
+          <button id="layerApply" title="Apply selected layer patch">Apply Layer Patch</button>
+        </div>
+
+        <div class="grp-title">Timeline script</div>
+        <textarea id="scriptJson" rows="8" spellcheck="false" style="width:100%; box-sizing:border-box; resize:vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;">{"ops":[{"op":"set_key","scene_id":"scene_1","layer_id":"layer_1","channel":"x","time":0,"value":0,"ease":"linear"}]}</textarea>
+        <div class="xbtns">
+          <button id="scriptApply" class="primary" title="Apply timeline script">Apply Script</button>
+          <button id="scriptSample" title="Load sample script">Sample Script</button>
+        </div>
+      </div>
+
+      <div data-pane="prefs" hidden>
+        <label class="fld"><span>Text size</span><b id="p_fontV"></b><input type="range" id="p_font" min="11" max="18"></label>
+        <label class="fld"><span>Point size</span><b id="p_handleV"></b><input type="range" id="p_handle" min="4" max="14"></label>
+        <label class="chk"><input type="checkbox" id="p_autosave"> Auto-save every 20 s</label>
+        <div class="xbtns"><button id="p_reset" title="Reset layout"><i data-icon="reset"></i><span>Reset layout</span></button></div>
+        <div class="grp-title">Keymap</div>
+        <div id="keymap" class="keymap"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-graph">
+    <div class="panel-h"><span class="dim">Graph Editor · drag keys to retime or adjust values</span></div>
+    <div class="tl-ctrls" style="padding:8px 10px 0; gap:8px;">
+      <label class="fld" style="display:flex; align-items:center; gap:8px; flex:1; margin:0;">
+        <span>Channel</span>
+        <select id="graphChannel" style="flex:1;">
+          <option value="x">X</option>
+          <option value="y">Y</option>
+          <option value="rotation">Rotation</option>
+          <option value="scale_x">Scale X</option>
+          <option value="scale_y">Scale Y</option>
+          <option value="opacity">Opacity</option>
+        </select>
+      </label>
+    </div>
+    <div class="dope-scroll" style="height:calc(100% - 52px); margin:8px 8px 8px; border:1px solid var(--line); background:var(--panel);">
+      <canvas id="graphCanvas" style="display:block; width:100%; height:100%;"></canvas>
+    </div>
+  </section>
+
+  <section class="panel" id="p-timeline">
+    <div class="tl-head">
+      <div class="tl-ctrls">
+        <button id="firstF" title="First (Home)"><i data-icon="first"></i></button>
+        <button id="prevF" title="Previous (Left)"><i data-icon="prev"></i></button>
+        <button id="play" class="primary" title="Play (Space)"><i data-icon="play"></i></button>
+        <button id="nextF" title="Next (Right)"><i data-icon="next"></i></button>
+        <button id="lastF" title="Last (End)"><i data-icon="last"></i></button>
+      </div>
+      <div class="tl-ctrls">
+        <input id="frameNum" class="num" type="number" min="1" title="Frame">
+        <span class="dim">End</span><input id="endFrame" class="num" type="number" min="1" max="2000" title="Last frame">
+        <button id="loop" class="tgl" title="Loop"><i data-icon="loop"></i></button>
+        <button id="autokey" class="tgl" title="Auto-key"><i data-icon="record"></i></button>
+      </div>
+      <div class="tl-ctrls tl-drawing-actions">
+        <button id="newDrawing" title="Create a blank drawing at the current frame">New Drawing</button>
+        <button id="duplicateDrawing" title="Duplicate the current drawing exposure">Duplicate</button>
+        <button id="holdDrawing" title="Extend the current drawing to the next exposure">Hold</button>
+        <label class="zoom-control" title="Timeline zoom"><span>Zoom</span><input id="dopeZoom" type="range" min="1" max="12" value="1"><b id="dopeZoomValue">1×</b></label>
+      </div>
+    </div>
+    <div class="dope">
+      <div class="dope-names" id="dopeNames"></div>
+      <div class="dope-scroll" id="dopeScroll"><div id="dopeContent"></div><canvas id="dope"></canvas></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-history">
+    <div class="panel-h"><span class="dim">Undo history</span></div>
+    <ul id="histList" class="layers"></ul>
+  </section>
+
+  <section class="panel asset-browser" id="p-assets">
+    <div class="panel-h"><span class="dim">Drawing Assets</span><div class="panel-actions">
+      <button id="assetImport" title="Import drawing JSON"><i data-icon="upload"></i></button>
+      <button id="assetCapture" title="Save current drawing as a reusable asset"><i data-icon="plus"></i></button>
+    </div></div>
+    <p class="asset-help">Reusable drawings in this project. Select a layer, then add an asset at the current frame.</p>
+    <label class="asset-search"><span>Search</span><input id="assetSearch" type="search" placeholder="Filter drawings"></label>
+    <div id="assetList" class="asset-list"></div>
+    <input id="assetFile" type="file" accept=".json,application/json" hidden>
+  </section>
+</div>
+
+<div id="exportDlg" class="dlg" hidden>
+  <div class="dlg-box">
+    <header class="panel-h"><span>Export</span><button id="exClose" title="Close"><i data-icon="close"></i></button></header>
+    <div class="dlg-body">
+      <div class="seg" id="exFormat">
+        <button data-f="png" class="on">PNG</button><button data-f="gif">GIF</button><button data-f="sprite">Sprite</button><button data-f="webm">WebM</button>
+      </div>
+      <label class="fld"><span>Scale</span><b id="exScaleV">100%</b><input type="range" id="exScale" min="25" max="200" step="25" value="100"></label>
+      <div class="rowx">Frames <input id="exStart" class="num" type="number" min="1"> to <input id="exEnd" class="num" type="number" min="1"></div>
+      <label class="chk" data-fmt="png gif sprite"><input type="checkbox" id="exTransp"> Transparent background</label>
+      <label class="chk" data-fmt="gif"><input type="checkbox" id="exLoop" checked> Loop forever</label>
+      <div class="rowx" data-fmt="sprite">Columns <input id="exCols" class="num" type="number" min="0" placeholder="auto"> Gap <input id="exPad" class="num" type="number" min="0" value="0"></div>
+      <div id="exInfo" class="hint"></div>
+      <div class="bar"><b id="exBar"></b></div>
+      <div id="exMsg" class="hint"></div>
+      <div class="dlg-actions"><button id="exGo" class="primary"><i data-icon="download"></i><span>Export</span></button></div>
+    </div>
+  </div>
+</div>
+
+<input id="jsonImportFile" type="file" accept=".json,application/json" multiple hidden>
+<div id="toasts" class="toasts"></div>
+<script type="module" src="js/editor/editor_controller.js"></script>
+</body>
+</html>

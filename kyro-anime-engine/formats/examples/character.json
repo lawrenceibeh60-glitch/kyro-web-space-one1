@@ -1,0 +1,158 @@
+{
+  "format": "kae-character",
+  "version": 1,
+  "id": "sample_hero",
+  "name": "Sample Hero",
+  "parts": [
+    {
+      "id": "body",
+      "name": "Body",
+      "transform": { "x": 640, "y": 405, "anchor_x": 0, "anchor_y": 0 },
+      "strokes": [
+        {
+          "id": "torso",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 6,
+          "closed": true,
+          "fill": "#557da8",
+          "points": [[-48, -82], [-64, -65], [-58, 24], [-39, 79], [39, 79], [58, 24], [64, -65], [48, -82]]
+        },
+        {
+          "id": "collar",
+          "tool": "brush",
+          "color": "#f1f3f5",
+          "width": 4,
+          "closed": true,
+          "fill": "#f1f3f5",
+          "points": [[-22, -77], [0, -54], [22, -77], [15, -39], [0, -30], [-15, -39]]
+        }
+      ]
+    },
+    {
+      "id": "arms",
+      "name": "Arms",
+      "transform": { "x": 640, "y": 376 },
+      "strokes": [
+        {
+          "id": "left-arm",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 5,
+          "closed": true,
+          "fill": "#557da8",
+          "points": [[-47, -32], [-72, -27], [-112, 29], [-99, 46], [-57, 6], [-39, 5]]
+        },
+        {
+          "id": "right-arm",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 5,
+          "closed": true,
+          "fill": "#557da8",
+          "points": [[47, -32], [72, -27], [112, 29], [99, 46], [57, 6], [39, 5]]
+        }
+      ]
+    },
+    {
+      "id": "legs",
+      "name": "Legs",
+      "transform": { "x": 640, "y": 485, "anchor_x": 0, "anchor_y": 0 },
+      "strokes": [
+        {
+          "id": "left-leg",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 5,
+          "closed": true,
+          "fill": "#344965",
+          "points": [[-39, -10], [-4, -10], [-8, 105], [-35, 105]]
+        },
+        {
+          "id": "right-leg",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 5,
+          "closed": true,
+          "fill": "#344965",
+          "points": [[4, -10], [39, -10], [35, 105], [8, 105]]
+        },
+        {
+          "id": "left-shoe",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 5,
+          "closed": true,
+          "fill": "#f1f3f5",
+          "points": [[-36, 96], [-7, 96], [-3, 113], [-53, 113], [-51, 104], [-43, 98]]
+        },
+        {
+          "id": "right-shoe",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 5,
+          "closed": true,
+          "fill": "#f1f3f5",
+          "points": [[7, 96], [36, 96], [43, 98], [51, 104], [53, 113], [3, 113]]
+        }
+      ]
+    },
+    {
+      "id": "head",
+      "name": "Head",
+      "transform": { "x": 640, "y": 285, "anchor_x": 0, "anchor_y": 0 },
+      "strokes": [
+        {
+          "id": "face",
+          "tool": "brush",
+          "color": "#684b42",
+          "width": 5,
+          "closed": true,
+          "fill": "#f2c7a5",
+          "points": [[0, -64], [42, -52], [54, -18], [46, 29], [25, 57], [0, 67], [-25, 57], [-46, 29], [-54, -18], [-42, -52]]
+        },
+        {
+          "id": "left-eye",
+          "tool": "brush",
+          "color": "#25374e",
+          "width": 3,
+          "closed": true,
+          "fill": "#25374e",
+          "points": [[-31, -8], [-24, -13], [-17, -8], [-24, 1]]
+        },
+        {
+          "id": "right-eye",
+          "tool": "brush",
+          "color": "#25374e",
+          "width": 3,
+          "closed": true,
+          "fill": "#25374e",
+          "points": [[17, -8], [24, -13], [31, -8], [24, 1]]
+        },
+        {
+          "id": "smile",
+          "tool": "pen",
+          "color": "#a4544b",
+          "width": 3,
+          "points": [[-10, 25], [-4, 30], [4, 30], [10, 25]]
+        }
+      ]
+    },
+    {
+      "id": "hair",
+      "name": "Hair",
+      "transform": { "x": 640, "y": 278, "anchor_x": 0, "anchor_y": 0 },
+      "strokes": [
+        {
+          "id": "hair-shape",
+          "tool": "brush",
+          "color": "#26354a",
+          "width": 5,
+          "closed": true,
+          "fill": "#344965",
+          "points": [[-52, -27], [-63, -71], [-35, -59], [-18, -92], [0, -67], [29, -89], [34, -55], [61, -65], [50, -24], [36, -37], [18, -27], [0, -40], [-18, -27], [-36, -38]]
+        }
+      ]
+    }
+  ]
+}

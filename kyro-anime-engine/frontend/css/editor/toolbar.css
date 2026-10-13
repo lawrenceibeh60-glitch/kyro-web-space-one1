@@ -1,0 +1,4 @@
+/* frontend/css/editor/toolbar.css - left tool shelf */
+.shelf { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding: 4px; background: var(--panel); border-right: 1px solid var(--line); }
+.tool { width: 100%; height: auto; aspect-ratio: 1; font-size: 17px; padding: 0; min-width: 0; }
+.tool.active { background: var(--accent); border-color: var(--accent); color: #fff; }

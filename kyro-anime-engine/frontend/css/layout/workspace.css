@@ -1,0 +1,18 @@
+/* frontend/css/layout/workspace.css - areas (slots), area headers, editor-type menu, workspace tabs */
+.right { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.slot { display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--panel); overflow: hidden; }
+.slot > .panel { flex: 1; min-height: 0; }
+#slotA { flex: 0 0 38%; }
+#slotB { flex: 1; }
+#slotC { border-top: 1px solid var(--line); }
+.area-h { display: flex; align-items: center; min-height: 24px; padding: 0 4px; background: var(--header); border-bottom: 1px solid var(--line); }
+.area-btn { height: 20px; padding: 0 6px; gap: 6px; background: transparent; border: none; font-size: 12px; }
+.area-btn:hover { background: var(--field); }
+.area-btn .ic { width: 14px; height: 14px; }
+.menu { position: fixed; z-index: 30; width: 170px; padding: 4px; display: grid; gap: 2px; background: var(--header); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 18px rgba(0, 0, 0, .5); }
+.menu-item { justify-content: flex-start; gap: 8px; height: 30px; background: transparent; border: none; }
+.menu-item span { flex: 1; text-align: left; }
+.menu-item.on { color: #fff; background: rgba(71, 114, 179, .45); }
+.wtabs { display: flex; gap: 2px; margin-left: 4px; padding: 2px; background: var(--bg); border-radius: 6px; }
+.wtabs button { height: 24px; min-width: 28px; padding: 0 6px; background: transparent; border: none; }
+.wtabs button.on { background: var(--accent); color: #fff; }

@@ -1,0 +1,62 @@
+# KYRO Anime Engine (KAE)
+
+2D animation app, Blender-style: Flask backend + vanilla-JS canvas editor. Pydroid friendly.
+
+## Run
+```
+pip install flask pillow
+python run.py
+```
+Open http://127.0.0.1:5000. Choose one of the editable animation demos or create a blank project.
+
+## Built so far
+1. `formats/` - JSON schemas + example project (one shared format)
+2. `backend/` - Flask app, atomic project save/load, validation, `/api/projects`
+3. `frontend/` - Blender-style editor shell: viewport, outliner, properties, undo/redo
+4. Drawing - brush (smoothing, pressure), stroke eraser, per-layer frames
+5. Animation - playback, keyframes with easing, move/rotate/scale tools, dope sheet, auto-key
+6. Export - PNG sequence (zip), GIF, sprite sheet + JSON atlas, and browser-recorded WebM; frames use the same renderer as the editor. Pillow is only needed for GIF and sprite sheets. All UI icons are inline SVG (`frontend/js/ui/icons.js`).
+7. Blender-style UI - workspaces (Draw / Animate / Edit), switchable areas (Outliner, Properties, Timeline, Graph Editor, History, Asset Browser), editable drawing exposures, onion skin, Edit mode for stroke points, undo history, preferences + keymap, auto-save option
+8. Drawing tools - line, rectangle, ellipse, vector fill, canvas eyedropper, HSV color wheel, project palette, and Grease Pencil presets
+9. Drawing assets - search project drawings, save the current frame as an asset, import/export drawing JSON, and place independent copies on the timeline
+10. Camera - per-scene pan and zoom, keyframed at the current frame; select Camera (`K`) to drag-pan and wheel-zoom around the pointer. Framing is applied consistently in the viewport and image/video exports
+11. 2.5D depth - adjust each layer's camera influence to create parallax between distant backgrounds and foreground art
+12. Scene lighting - add, position, color, and tune soft radial lights in the Output properties; lights render in the viewport and exports
+13. Demo gallery - Bouncing Ball, Parallax Ridge, Pendulum Study, and Orbit Study open as separate editable projects
+14. JSON characters - import `formats/examples/character.json` in the Project JSON pane; stable character and part IDs update vector artwork in place, while existing animation tracks survive reimports that omit tracks
+15. Expanded drawing controls - polygon and star shape tools, draggable graph-editor keyframes, a dedicated Studio workspace, and Focus Canvas (`Shift+F`, `Escape` to restore). Panel split adjusters have been removed to keep the canvas unobstructed
+16. Camera movement modes - select Camera (`K`), then Pan to truck the shot, Dolly to zoom with drag/wheel, or Roll to rotate with drag/wheel; camera rotation is keyframable and exported with the scene
+17. Studio features - scene-scoped lightning, particle, speed-line, and camera-shake effects; editable hierarchical 2D character rigs with per-part rotation keys; a color/hairstyle/expression character generator; and synchronized timeline audio with WebM mixing
+18. Additive multi-file JSON import - select multiple project and character documents in one batch; project components merge by stable IDs, and character documents update matching character IDs while retaining existing part animation. A different project identity or canvas setup requires confirmation
+19. Bézier path strokes - JSON drawings and character parts may use M/L/Q/C/Z path commands; paths render in the viewport and exports and can be selected and edited in Edit mode, with configurable fill rules, line caps, and joins
+
+### Character JSON
+
+Each `kae-character` document contains an `id` plus vector `parts`. A part's strokes use the same point-based drawing format as the editor; its transform positions the part, and optional `tracks` animate it. Import a character using **Import Character** in the Project JSON pane, or `POST /api/projects/<project_id>/characters/import`. The first import adds each part as a normal timeline layer. Reimporting the same character ID updates its drawings without duplicating layers; matching part IDs keep their layer IDs and retain existing transform/animation data unless the JSON supplies replacements. Parts can be selected and animated with the regular layer tools and timeline.
+
+Choose stable IDs for a character and each part, and keep their combined generated drawing/layer IDs under 64 characters. To place a character in a particular scene, include its `scene_id`; otherwise an update keeps its existing placement and a new character goes into the first scene. The canonical input format is described by `formats/schemas/character.schema.json`.
+
+Use **Import Files** in the Project JSON pane to select several `.json` files at once. Full project documents merge drawings, scenes, layers, characters, effects, rigs, lights, and palette colors by stable IDs; conflicting project components keep the open project's version. Character documents use their stable character ID as an upsert key, so a matching ID updates art while preserving part animation omitted from the incoming document. Audio clip metadata is not merged because the audio bytes are stored separately from project JSON; import audio files from the Audio studio tab.
+
+Project JSON uses `format: "kae"` version 1. The import endpoint supplies safe defaults for omitted legacy fields, creates a blank scene if `scenes` is omitted, and rejects versions newer than the running app supports. See [docs/project_format.md](docs/project_format.md) for compatibility and validation behavior.
+
+### Studio workspace
+
+Choose **Studio** in the workspace bar to open the Effects, Rig, Character, and Audio tools.
+
+- Effects are scene-scoped and frame-ranged. Lightning, particles, speed lines, and camera shake render through the same frame renderer used by exports. Intensity, color, count/speed where relevant, enable state, and active frame range are editable and undoable.
+- Create a rig for an imported/generated character, attach one bone to each character part, set its pivot, and optionally parent it to another bone. A bone's rotation affects its part and descendants; use **Key** to animate rotation at the current frame.
+- Generate a vector anime character with stable ID, hairstyle, expression, hair/eye/skin/outfit colors. Reusing its ID updates the same editable part layers and preserves existing animation.
+- Import WAV, MP3, OGG, M4A, AAC, or WebM audio clips. Set timeline start frame, trim offset, and volume. Playback follows the timeline; browser-recorded WebM exports mix the active audio clips. PNG, GIF, and sprite exports are silent.
+
+## Shortcuts
+`B` brush, `G` Grease Pencil, `E` eraser, `H` hand, `K` camera, `M` move, `R` rotate, `S` scale, `[` `]` size.
+`L` line, `U` rectangle, `O` ellipse, `P` hexagon, `T` star, `F` vector fill, `C` eyedropper.
+`Space` play, `I` key all, `Alt+I` unkey, `X` delete selected key, `Up/Down` jump key, `Left/Right` frame, `Home/End`.
+`Tab` Edit mode, `A` select all points, `X` delete key/points.
+`Shift+F` focus/restore the canvas, `Escape` restore panels, `Ctrl+Z` / `Ctrl+Shift+Z` undo/redo, `Ctrl+S` save, `Ctrl+E` export, `0` fit. Two fingers pan/zoom on touch.
+
+## Remaining scaffold
+The `engine/` tree contains additional planned modules that are not yet connected to the editor workflow.
+
+See [docs/architecture.md](docs/architecture.md) for an honest blueprint status and remaining implementation roadmap.

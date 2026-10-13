@@ -1,0 +1,7 @@
+/* frontend/css/base/variables.css - Blender-like dark theme */
+:root {
+  --bg: #232323; --panel: #303030; --header: #3d3d3d; --field: #545454; --field-h: #656565; --line: #1a1a1a;
+  --text: #d9d9d9; --dim: #8f8f8f; --accent: #4772b3; --orange: #e87d0d; --workspace: #393939;
+  --slotC-h: clamp(104px, 22vh, 140px); --radius: 4px; --bar: 38px; --shelf: 42px; --right: clamp(150px, 28vw, 250px);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

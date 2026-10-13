@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+cache/
+exports/
+projects/
+user_assets/
+.venv/
+*.tmp
+*.recovery
+*.bak

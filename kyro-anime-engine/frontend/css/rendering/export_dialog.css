@@ -1,0 +1,20 @@
+/* frontend/css/rendering/export_dialog.css */
+.dlg { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .55); }
+.dlg-box { width: min(92vw, 340px); max-height: 92vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.dlg-box .panel-h { border-top: none; }
+.dlg-body { padding: 10px; display: grid; gap: 8px; }
+.dlg-body .fld { margin-bottom: 0; }
+.seg { display: flex; }
+.seg button { flex: 1; border-radius: 0; }
+.seg button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.seg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rowx { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+.rowx .num { width: 60px; }
+.chk { display: flex; align-items: center; gap: 6px; }
+.bar { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.bar > b { display: block; height: 100%; width: 0; background: var(--orange); transition: width .1s; }
+#exMsg { min-height: 1.3em; }
+#exMsg.err { color: #e57373; }
+.dlg-actions { display: flex; justify-content: flex-end; }
+.dlg-actions button { gap: 6px; }

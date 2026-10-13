@@ -1,0 +1,25 @@
+.studio-panel { display: flex; flex-direction: column; min-height: 0; }
+.studio-tabs { display: flex; flex-wrap: wrap; gap: 3px; padding: 4px; background: var(--header); border-bottom: 1px solid var(--line); }
+.studio-tabs button { flex: 1; min-width: 58px; height: 25px; padding: 0 5px; font-size: 11px; }
+.studio-tabs button.on { background: var(--accent); color: white; }
+.studio-body { min-height: 0; overflow: auto; padding: 10px; }
+.studio-body > section { display: grid; gap: 7px; }
+.studio-body .hint { margin: 0 0 3px; }
+.studio-list { display: grid; gap: 7px; margin-top: 8px; }
+.studio-row { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: #262626; }
+.studio-row-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.studio-row-head strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.studio-row-head button { min-width: 24px; height: 23px; padding: 0 5px; }
+.studio-control { display: grid; grid-template-columns: 55px minmax(0, 1fr) 36px; gap: 5px; align-items: center; color: var(--dim); font-size: 11px; }
+.studio-control input[type=range] { width: 100%; min-width: 0; }
+.studio-control output { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.studio-row .fld { margin: 0; }
+.studio-bone { grid-template-columns: minmax(0, 1fr) 90px auto auto; align-items: center; }
+.studio-bone strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.studio-bone input[type=range] { width: 86px; }
+.studio-empty { padding: 9px; color: var(--dim); border: 1px dashed var(--line); border-radius: var(--radius); font-size: 11px; }
+.studio-panel .xrow { margin: 0; }
+.studio-panel .fld { display: grid; grid-template-columns: 85px minmax(0, 1fr); }
+.studio-panel .fld.color { grid-template-columns: 85px minmax(0, 1fr); }
+.studio-panel input[type=text], .studio-panel input[type=number], .studio-panel select { min-width: 0; width: 100%; }
+.studio-panel #audioFile { font-size: 11px; }

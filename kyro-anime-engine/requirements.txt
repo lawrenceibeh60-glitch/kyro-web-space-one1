@@ -1,0 +1,4 @@
+# Core runtime stays dependency-light (Pydroid friendly)
+flask
+# Needed for GIF + sprite sheet export (PNG sequence works without it)
+pillow

@@ -1,0 +1,690 @@
+"""backend/services/validation_service.py
+Dependency-free validation of a project document against formats/schemas
+(structure + cross-references the JSON schemas can't express). Returns a list of error strings.
+"""
+import math
+import re
+
+ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+CHANNELS = {"x", "y", "rotation", "scale_x", "scale_y", "opacity"}
+EASES = {"linear", "hold", "ease_in", "ease_out", "ease_in_out"}
+MAX_ERRORS = 50
+
+
+def _num(v):
+    return (
+        isinstance(v, int) and not isinstance(v, bool)
+        or isinstance(v, float) and math.isfinite(v)
+    )
+
+
+def _int(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _check_settings(s, errs):
+    if not isinstance(s, dict):
+        errs.append("settings: must be an object")
+        return
+    for k in ("width", "height"):
+        if not _int(s.get(k)) or not 16 <= s[k] <= 8192:
+            errs.append(f"settings.{k}: integer 16..8192 required")
+    if not _num(s.get("fps")) or not 0 < s["fps"] <= 120:
+        errs.append("settings.fps: number in (0, 120] required")
+    if not _int(s.get("duration_frames")) or s["duration_frames"] < 1:
+        errs.append("settings.duration_frames: integer >= 1 required")
+
+
+def _check_drawings(drawings, errs):
+    if not isinstance(drawings, dict):
+        errs.append("drawings: must be an object")
+        return
+    for key, d in drawings.items():
+        w = f"drawings.{key}"
+        if not isinstance(d, dict):
+            errs.append(f"{w}: must be an object")
+            continue
+        if d.get("id") != key:
+            errs.append(f"{w}: id must equal its key")
+        strokes = d.get("strokes")
+        if not isinstance(strokes, list):
+            errs.append(f"{w}.strokes: must be a list")
+            continue
+        for i, s in enumerate(strokes):
+            sw = f"{w}.strokes[{i}]"
+            if not isinstance(s, dict):
+                errs.append(f"{sw}: must be an object")
+                continue
+            if not isinstance(s.get("id"), str) or not ID_RE.match(s["id"]):
+                errs.append(f"{sw}.id: invalid")
+            _check_stroke(s, sw, errs)
+
+
+def _check_tracks(tracks, where, errs):
+    if not isinstance(tracks, dict):
+        errs.append(f"{where}: tracks must be an object")
+        return
+    for ch, kfs in tracks.items():
+        w = f"{where}.{ch}"
+        if ch not in CHANNELS:
+            errs.append(f"{w}: unknown channel")
+            continue
+        if not isinstance(kfs, list) or not kfs:
+            errs.append(f"{w}: non-empty list required")
+            continue
+        last = -1
+        for i, k in enumerate(kfs):
+            kw = f"{w}[{i}]"
+            if not isinstance(k, dict):
+                errs.append(f"{kw}: must be an object")
+                continue
+            t = k.get("t")
+            if not _int(t) or t < 0:
+                errs.append(f"{kw}.t: integer >= 0 required")
+            else:
+                if t <= last:
+                    errs.append(f"{kw}.t: keyframe times must strictly increase")
+                last = t
+            if not _num(k.get("v")):
+                errs.append(f"{kw}.v: number required")
+            e = k.get("ease", "linear")
+            if isinstance(e, dict):
+                b = e.get("bezier")
+                ok = isinstance(b, list) and len(b) == 4 and all(_num(x) for x in b)
+            else:
+                ok = isinstance(e, str) and e in EASES
+            if not ok:
+                errs.append(f"{kw}.ease: invalid")
+
+
+def _check_path_commands(commands, where, errs):
+    if not isinstance(commands, list) or len(commands) < 2:
+        errs.append(f"{where}: path requires a move and at least one segment")
+        return
+    expected_lengths = {"M": 3, "L": 3, "Q": 5, "C": 7, "Z": 1}
+    has_segment = False
+    has_current_point = False
+    for index, command in enumerate(commands):
+        path = f"{where}[{index}]"
+        if (
+            not isinstance(command, list)
+            or not command
+            or not isinstance(command[0], str)
+            or command[0] not in expected_lengths
+        ):
+            errs.append(f"{path}: expected M, L, Q, C, or Z command")
+            continue
+        kind = command[0]
+        if len(command) != expected_lengths[kind]:
+            errs.append(f"{path}: {kind} command requires {expected_lengths[kind] - 1} coordinates")
+            continue
+        if not all(_num(value) for value in command[1:]):
+            errs.append(f"{path}: coordinates must be finite numbers")
+            continue
+        if kind == "M":
+            if index != 0:
+                errs.append(f"{path}: only the first command may move to a new subpath")
+            has_current_point = True
+        elif kind == "Z":
+            if not has_current_point:
+                errs.append(f"{path}: close command requires a current point")
+            has_segment = True
+        elif has_current_point:
+            has_segment = True
+        else:
+            errs.append(f"{path}: path must begin with a move command")
+    if commands and (
+        not isinstance(commands[0], list)
+        or not commands[0]
+        or commands[0][0] != "M"
+    ):
+        errs.append(f"{where}: path must begin with M")
+    if not has_segment:
+        errs.append(f"{where}: path requires at least one segment")
+
+
+def _check_stroke(stroke, where, errs):
+    points = stroke.get("points")
+    commands = stroke.get("commands")
+    if (points is None) == (commands is None):
+        errs.append(f"{where}: exactly one of points or commands is required")
+    if points is not None:
+        if not isinstance(points, list) or not points:
+            errs.append(f"{where}.points: non-empty list required")
+        else:
+            for index, point in enumerate(points):
+                if not (
+                    isinstance(point, list)
+                    and 2 <= len(point) <= 3
+                    and all(_num(value) for value in point)
+                ):
+                    errs.append(f"{where}.points[{index}]: expected [x, y, pressure?]")
+                    break
+    if commands is not None:
+        _check_path_commands(commands, f"{where}.commands", errs)
+    if "width" in stroke and (not _num(stroke["width"]) or stroke["width"] <= 0):
+        errs.append(f"{where}.width: must be > 0")
+    for field, allowed in (
+        ("line_cap", {"butt", "round", "square"}),
+        ("line_join", {"bevel", "round", "miter"}),
+        ("fill_rule", {"nonzero", "evenodd"}),
+    ):
+        if field in stroke and (
+            not isinstance(stroke[field], str) or stroke[field] not in allowed
+        ):
+            errs.append(f"{where}.{field}: unsupported value")
+
+
+def _check_studio_data(project, errs):
+    scenes = project.get("scenes", [])
+    scene_ids = {
+        scene.get("id") for scene in scenes
+        if isinstance(scene, dict) and isinstance(scene.get("id"), str)
+    } if isinstance(scenes, list) else set()
+    settings = project.get("settings")
+    duration = settings.get("duration_frames", 0) if isinstance(settings, dict) else 0
+    if not _int(duration) or duration < 1:
+        duration = 1
+
+    effects = project.get("effects", [])
+    if not isinstance(effects, list):
+        errs.append("effects: must be a list")
+    else:
+        effect_ids = set()
+        for index, effect in enumerate(effects):
+            where = f"effects[{index}]"
+            if not isinstance(effect, dict):
+                errs.append(f"{where}: must be an object")
+                continue
+            for key in effect.keys() - {
+                "id", "scene_id", "type", "enabled", "start_frame", "end_frame",
+                "intensity", "count", "speed", "color",
+            }:
+                errs.append(f"{where}.{key}: unknown property")
+            effect_id = effect.get("id")
+            if not isinstance(effect_id, str) or not ID_RE.fullmatch(effect_id) or effect_id in effect_ids:
+                errs.append(f"{where}.id: invalid or duplicate")
+            if isinstance(effect_id, str):
+                effect_ids.add(effect_id)
+            scene_id = effect.get("scene_id")
+            if not isinstance(scene_id, str) or scene_id not in scene_ids:
+                errs.append(f"{where}.scene_id: scene not found")
+            effect_type = effect.get("type")
+            if not isinstance(effect_type, str) or effect_type not in {"lightning", "particles", "speed_lines", "camera_shake"}:
+                errs.append(f"{where}.type: unsupported effect")
+            if "enabled" in effect and not isinstance(effect["enabled"], bool):
+                errs.append(f"{where}.enabled: boolean required")
+            for field, default in (("start_frame", 0), ("end_frame", duration - 1)):
+                value = effect.get(field, default)
+                if not _int(value) or value < 0:
+                    errs.append(f"{where}.{field}: integer >= 0 required")
+            if _int(effect.get("start_frame", 0)) and _int(effect.get("end_frame", duration - 1)):
+                if effect.get("start_frame", 0) > effect.get("end_frame", duration - 1):
+                    errs.append(f"{where}: start_frame must not exceed end_frame")
+            intensity = effect.get("intensity", 0.5)
+            if not _num(intensity) or not 0 <= intensity <= 1:
+                errs.append(f"{where}.intensity: number 0..1 required")
+            if effect_type in {"particles", "speed_lines"}:
+                count = effect.get("count", 36)
+                if not _int(count) or not 1 <= count <= 200:
+                    errs.append(f"{where}.count: integer 1..200 required")
+            speed = effect.get("speed", 1)
+            if not _num(speed) or not 0 <= speed <= 20:
+                errs.append(f"{where}.speed: number 0..20 required")
+            color = effect.get("color", "#ffffff")
+            if not isinstance(color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
+                errs.append(f"{where}.color: hex color #RRGGBB required")
+
+    characters = {
+        item.get("id"): item for item in project.get("characters", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    } if isinstance(project.get("characters", []), list) else {}
+    rigs = project.get("rigs", [])
+    if not isinstance(rigs, list):
+        errs.append("rigs: must be a list")
+    else:
+        rig_ids = set()
+        rig_characters = set()
+        for index, rig in enumerate(rigs):
+            where = f"rigs[{index}]"
+            if not isinstance(rig, dict):
+                errs.append(f"{where}: must be an object")
+                continue
+            for key in rig.keys() - {"id", "name", "character_id", "bones"}:
+                errs.append(f"{where}.{key}: unknown property")
+            rig_id = rig.get("id")
+            if not isinstance(rig_id, str) or not ID_RE.fullmatch(rig_id) or rig_id in rig_ids:
+                errs.append(f"{where}.id: invalid or duplicate")
+            if isinstance(rig_id, str):
+                rig_ids.add(rig_id)
+            if not isinstance(rig.get("name"), str) or not rig["name"].strip():
+                errs.append(f"{where}.name: non-empty string required")
+            character_id = rig.get("character_id")
+            character = characters.get(character_id) if isinstance(character_id, str) else None
+            if character is None:
+                errs.append(f"{where}.character_id: character not found")
+            elif character_id in rig_characters:
+                errs.append(f"{where}.character_id: only one active rig per character is supported")
+            if isinstance(character_id, str):
+                rig_characters.add(character_id)
+            bones = rig.get("bones")
+            if not isinstance(bones, list):
+                errs.append(f"{where}.bones: must be a list")
+                continue
+            bone_ids = set()
+            attached_parts = set()
+            for bone_index, bone in enumerate(bones):
+                bw = f"{where}.bones[{bone_index}]"
+                if not isinstance(bone, dict):
+                    errs.append(f"{bw}: must be an object")
+                    continue
+                for key in bone.keys() - {
+                    "id", "name", "parent_id", "character_part_id", "pivot", "rotation", "tracks",
+                }:
+                    errs.append(f"{bw}.{key}: unknown property")
+                bone_id = bone.get("id")
+                if not isinstance(bone_id, str) or not ID_RE.fullmatch(bone_id) or bone_id in bone_ids:
+                    errs.append(f"{bw}.id: invalid or duplicate")
+                if isinstance(bone_id, str):
+                    bone_ids.add(bone_id)
+                if not isinstance(bone.get("name"), str) or not bone["name"].strip():
+                    errs.append(f"{bw}.name: non-empty string required")
+                parent = bone.get("parent_id")
+                if parent is not None and (not isinstance(parent, str) or parent == bone_id):
+                    errs.append(f"{bw}.parent_id: invalid")
+                part_id = bone.get("character_part_id")
+                parts = character.get("parts", []) if isinstance(character, dict) else []
+                parts = parts if isinstance(parts, list) else []
+                if not isinstance(part_id, str):
+                    errs.append(f"{bw}.character_part_id: character part not found")
+                elif not any(isinstance(part, dict) and part.get("id") == part_id for part in parts):
+                    errs.append(f"{bw}.character_part_id: character part not found")
+                else:
+                    if part_id in attached_parts:
+                        errs.append(f"{bw}.character_part_id: each character part can attach to one bone")
+                    attached_parts.add(part_id)
+                if "rotation" in bone and (
+                    not _num(bone["rotation"]) or not -3600 <= bone["rotation"] <= 3600
+                ):
+                    errs.append(f"{bw}.rotation: number -3600..3600 required")
+                pivot = bone.get("pivot")
+                if not isinstance(pivot, dict) or any(
+                    not _num(pivot.get(axis)) or not -8192 <= pivot[axis] <= 8192
+                    for axis in ("x", "y")
+                ):
+                    errs.append(f"{bw}.pivot: x and y between -8192 and 8192 required")
+                elif pivot.keys() - {"x", "y"}:
+                    errs.append(f"{bw}.pivot: unknown property")
+                tracks = bone.get("tracks", {})
+                if not isinstance(tracks, dict) or any(channel != "rotation" for channel in tracks):
+                    errs.append(f"{bw}.tracks: only rotation tracks are supported")
+                else:
+                    _check_tracks(tracks, f"{bw}.tracks", errs)
+            for bone_index, bone in enumerate(bones):
+                if isinstance(bone, dict):
+                    parent_id = bone.get("parent_id")
+                    if isinstance(parent_id, str) and parent_id not in bone_ids:
+                        errs.append(f"{where}.bones[{bone_index}].parent_id: bone not found")
+            parent_map = {
+                bone.get("id"): bone.get("parent_id")
+                for bone in bones
+                if isinstance(bone, dict) and isinstance(bone.get("id"), str)
+                and (bone.get("parent_id") is None or isinstance(bone.get("parent_id"), str))
+            }
+            for bone_id in parent_map:
+                seen = set()
+                parent_id = bone_id
+                while parent_id in parent_map and parent_map[parent_id] is not None:
+                    if parent_id in seen:
+                        errs.append(f"{where}.bones: parent relationships must not contain cycles")
+                        break
+                    seen.add(parent_id)
+                    parent_id = parent_map[parent_id]
+
+    audio = project.get("audio", [])
+    if not isinstance(audio, list):
+        errs.append("audio: must be a list")
+    else:
+        audio_ids = set()
+        for index, clip in enumerate(audio):
+            where = f"audio[{index}]"
+            if not isinstance(clip, dict):
+                errs.append(f"{where}: must be an object")
+                continue
+            for key in clip.keys() - {
+                "id", "name", "filename", "mime_type", "url", "start_frame",
+                "offset_seconds", "volume", "duration_frames",
+            }:
+                errs.append(f"{where}.{key}: unknown property")
+            clip_id = clip.get("id")
+            if not isinstance(clip_id, str) or not ID_RE.fullmatch(clip_id) or clip_id in audio_ids:
+                errs.append(f"{where}.id: invalid or duplicate")
+            if isinstance(clip_id, str):
+                audio_ids.add(clip_id)
+            for field in ("filename", "mime_type"):
+                if not isinstance(clip.get(field), str) or not clip[field]:
+                    errs.append(f"{where}.{field}: non-empty string required")
+            filename = clip.get("filename")
+            file_match = re.fullmatch(
+                r"([A-Za-z0-9_-]{1,64})\.(aac|m4a|mp3|ogg|wav|webm)",
+                filename if isinstance(filename, str) else "",
+            )
+            if not file_match or file_match.group(1) != clip_id:
+                errs.append(f"{where}.filename: must be the clip ID and a supported audio extension")
+            elif clip.get("mime_type") != {
+                "aac": "audio/aac", "m4a": "audio/mp4", "mp3": "audio/mpeg",
+                "ogg": "audio/ogg", "wav": "audio/wav", "webm": "audio/webm",
+            }[file_match.group(2)]:
+                errs.append(f"{where}.mime_type: does not match the audio filename")
+            if "url" in clip and clip["url"] != f"/api/projects/{project.get('id')}/audio/{clip_id}":
+                errs.append(f"{where}.url: must use the project audio endpoint")
+            if not isinstance(clip.get("name"), str) or not clip["name"].strip():
+                errs.append(f"{where}.name: non-empty string required")
+            start = clip.get("start_frame", 0)
+            if not _int(start) or start < 0:
+                errs.append(f"{where}.start_frame: integer >= 0 required")
+            offset = clip.get("offset_seconds", 0)
+            if not _num(offset) or offset < 0:
+                errs.append(f"{where}.offset_seconds: number >= 0 required")
+            volume = clip.get("volume", 1)
+            if not _num(volume) or not 0 <= volume <= 1:
+                errs.append(f"{where}.volume: number 0..1 required")
+            if "duration_frames" in clip and (
+                not _int(clip["duration_frames"]) or clip["duration_frames"] < 1
+            ):
+                errs.append(f"{where}.duration_frames: integer >= 1 required")
+
+
+def validate_character_document(character):
+    errs = []
+    if not isinstance(character, dict):
+        return ["character: must be an object"]
+    allowed_character_fields = {"format", "version", "id", "name", "scene_id", "parts"}
+    for key in character.keys() - allowed_character_fields:
+        errs.append(f"character.{key}: unknown property")
+    if character.get("format") != "kae-character":
+        errs.append("character.format: must be 'kae-character'")
+    if not _int(character.get("version")) or character["version"] != 1:
+        errs.append("character.version: supported version is 1")
+    character_id = character.get("id")
+    if not isinstance(character_id, str) or not ID_RE.fullmatch(character_id):
+        errs.append("character.id: invalid")
+    if not isinstance(character.get("name"), str) or not character["name"].strip():
+        errs.append("character.name: non-empty string required")
+    if "scene_id" in character and (
+        not isinstance(character["scene_id"], str)
+        or not ID_RE.fullmatch(character["scene_id"])
+    ):
+        errs.append("character.scene_id: invalid")
+    parts = character.get("parts")
+    if not isinstance(parts, list) or not parts:
+        errs.append("character.parts: non-empty list required")
+        return errs[:MAX_ERRORS]
+
+    part_ids = set()
+    for index, part in enumerate(parts):
+        where = f"character.parts[{index}]"
+        if not isinstance(part, dict):
+            errs.append(f"{where}: must be an object")
+            continue
+        allowed_part_fields = {"id", "name", "strokes", "transform", "tracks", "depth"}
+        for key in part.keys() - allowed_part_fields:
+            errs.append(f"{where}.{key}: unknown property")
+        part_id = part.get("id")
+        if not isinstance(part_id, str) or not ID_RE.fullmatch(part_id):
+            errs.append(f"{where}.id: invalid")
+        elif part_id in part_ids:
+            errs.append(f"{where}.id: duplicate '{part_id}'")
+        else:
+            part_ids.add(part_id)
+        if not isinstance(part.get("name"), str) or not part["name"].strip():
+            errs.append(f"{where}.name: non-empty string required")
+        drawing = {"id": "part", "strokes": part.get("strokes")}
+        _check_drawings({"part": drawing}, errs)
+        strokes = part.get("strokes")
+        if isinstance(strokes, list):
+            stroke_ids = set()
+            for stroke_index, stroke in enumerate(strokes):
+                stroke_where = f"{where}.strokes[{stroke_index}]"
+                if not isinstance(stroke, dict):
+                    continue
+                for key in stroke.keys() - {
+                    "id", "tool", "color", "width", "opacity", "closed", "fill", "smoothing",
+                    "points", "commands",
+                }:
+                    errs.append(f"{stroke_where}.{key}: unknown property")
+                stroke_id = stroke.get("id")
+                if isinstance(stroke_id, str):
+                    if stroke_id in stroke_ids:
+                        errs.append(f"{stroke_where}.id: duplicate '{stroke_id}'")
+                    stroke_ids.add(stroke_id)
+                if "tool" in stroke and (
+                    not isinstance(stroke["tool"], str)
+                    or stroke["tool"] not in {"brush", "pen", "eraser"}
+                ):
+                    errs.append(f"{stroke_where}.tool: invalid")
+                for color_key in ("color", "fill"):
+                    color = stroke.get(color_key)
+                    if color_key in stroke and color is not None and (
+                        not isinstance(color, str)
+                        or not re.fullmatch(r"#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?", color)
+                    ):
+                        errs.append(f"{stroke_where}.{color_key}: invalid color")
+                for number_key, low, high in (("opacity", 0, 1), ("smoothing", 0, 1)):
+                    if number_key in stroke and (
+                        not _num(stroke[number_key]) or not low <= stroke[number_key] <= high
+                    ):
+                        errs.append(f"{stroke_where}.{number_key}: number {low}..{high} required")
+                if "closed" in stroke and not isinstance(stroke["closed"], bool):
+                    errs.append(f"{stroke_where}.closed: boolean required")
+        transform = part.get("transform", {})
+        if not isinstance(transform, dict):
+            errs.append(f"{where}.transform: must be an object")
+        else:
+            for key in transform.keys() - {
+                "x", "y", "rotation", "scale_x", "scale_y", "anchor_x", "anchor_y"
+            }:
+                errs.append(f"{where}.transform.{key}: unknown channel")
+            for channel in ("x", "y", "rotation", "scale_x", "scale_y", "anchor_x", "anchor_y"):
+                if channel in transform and not _num(transform[channel]):
+                    errs.append(f"{where}.transform.{channel}: number required")
+        if "tracks" in part:
+            _check_tracks(part["tracks"], f"{where}.tracks", errs)
+        if "depth" in part and (
+            not _num(part["depth"]) or not 0 <= part["depth"] <= 2
+        ):
+            errs.append(f"{where}.depth: number 0..2 required")
+    return errs[:MAX_ERRORS]
+
+
+def _check_exposures(exps, where, drawings, errs):
+    if not isinstance(exps, list):
+        errs.append(f"{where}: exposures must be a list")
+        return
+    spans = []
+    for i, e in enumerate(exps):
+        w = f"{where}[{i}]"
+        if not isinstance(e, dict):
+            errs.append(f"{w}: must be an object")
+            continue
+        s, n, d = e.get("start"), e.get("length"), e.get("drawing")
+        if not _int(s) or s < 0:
+            errs.append(f"{w}.start: integer >= 0 required")
+        if not _int(n) or n < 1:
+            errs.append(f"{w}.length: integer >= 1 required")
+        if d not in drawings:
+            errs.append(f"{w}.drawing: '{d}' does not exist")
+        if _int(s) and _int(n):
+            spans.append((s, s + n, i))
+    spans.sort()
+    for a, b in zip(spans, spans[1:]):
+        if b[0] < a[1]:
+            errs.append(f"{where}[{b[2]}]: overlaps exposure [{a[2]}]")
+
+
+def _check_scenes(scenes, drawings, errs):
+    if not isinstance(scenes, list) or not scenes:
+        errs.append("scenes: non-empty list required")
+        return
+    scene_ids, layer_ids = set(), set()
+    for si, sc in enumerate(scenes):
+        sw = f"scenes[{si}]"
+        if not isinstance(sc, dict):
+            errs.append(f"{sw}: must be an object")
+            continue
+        sid = sc.get("id")
+        if not isinstance(sid, str) or not ID_RE.match(sid):
+            errs.append(f"{sw}.id: invalid")
+        elif sid in scene_ids:
+            errs.append(f"{sw}.id: duplicate '{sid}'")
+        scene_ids.add(sid)
+        layers = sc.get("layers")
+        if not isinstance(layers, list):
+            errs.append(f"{sw}.layers: must be a list")
+            layers = []
+        for li, ly in enumerate(layers):
+            lw = f"{sw}.layers[{li}]"
+            if not isinstance(ly, dict):
+                errs.append(f"{lw}: must be an object")
+                continue
+            lid = ly.get("id")
+            if not isinstance(lid, str) or not ID_RE.match(lid):
+                errs.append(f"{lw}.id: invalid")
+            elif lid in layer_ids:
+                errs.append(f"{lw}.id: duplicate '{lid}'")
+            layer_ids.add(lid)
+            if ly.get("type") != "drawing":
+                errs.append(f"{lw}.type: must be 'drawing'")
+            if "depth" in ly and (not _num(ly["depth"]) or not 0 <= ly["depth"] <= 2):
+                errs.append(f"{lw}.depth: number 0..2 required")
+            character_id = ly.get("character_id")
+            part_id = ly.get("character_part_id")
+            if character_id is not None and (
+                not isinstance(character_id, str) or not ID_RE.fullmatch(character_id)
+            ):
+                errs.append(f"{lw}.character_id: invalid")
+            if part_id is not None and (
+                not isinstance(part_id, str) or not ID_RE.fullmatch(part_id)
+            ):
+                errs.append(f"{lw}.character_part_id: invalid")
+            if (character_id is None) != (part_id is None):
+                errs.append(f"{lw}: character_id and character_part_id must appear together")
+            if "opacity" in ly and (not _num(ly["opacity"]) or not 0 <= ly["opacity"] <= 1):
+                errs.append(f"{lw}.opacity: 0..1 required")
+            if "exposures" in ly:
+                _check_exposures(ly["exposures"], f"{lw}.exposures", drawings, errs)
+            if "tracks" in ly:
+                _check_tracks(ly["tracks"], f"{lw}.tracks", errs)
+        cam = sc.get("camera")
+        if cam is not None:
+            if not isinstance(cam, dict):
+                errs.append(f"{sw}.camera: must be an object")
+            else:
+                transform = cam.get("transform", {})
+                if not isinstance(transform, dict):
+                    errs.append(f"{sw}.camera.transform: must be an object")
+                else:
+                    for channel in ("x", "y"):
+                        if channel in transform and (
+                            not _num(transform[channel]) or not -8192 <= transform[channel] <= 8192
+                        ):
+                            errs.append(f"{sw}.camera.transform.{channel}: number -8192..8192 required")
+                    if "rotation" in transform and (
+                        not _num(transform["rotation"]) or not -3600 <= transform["rotation"] <= 3600
+                    ):
+                        errs.append(f"{sw}.camera.transform.rotation: number -3600..3600 required")
+                    if "scale_x" in transform and (
+                        not _num(transform["scale_x"])
+                        or not 0.05 <= transform["scale_x"] <= 32
+                    ):
+                        errs.append(f"{sw}.camera.transform.scale_x: number 0.05..32 required")
+                if "tracks" in cam:
+                    tracks = cam["tracks"]
+                    if not isinstance(tracks, dict):
+                        errs.append(f"{sw}.camera.tracks: tracks must be an object")
+                    else:
+                        for channel in tracks:
+                            if channel not in {"x", "y", "rotation", "scale_x"}:
+                                errs.append(f"{sw}.camera.tracks.{channel}: unknown camera channel")
+                        _check_tracks(tracks, f"{sw}.camera.tracks", errs)
+                        for channel, keyframes in tracks.items():
+                            if channel not in {"x", "y", "rotation", "scale_x"} or not isinstance(keyframes, list):
+                                continue
+                            if channel == "scale_x":
+                                lo, hi = 0.05, 32
+                            elif channel == "rotation":
+                                lo, hi = -3600, 3600
+                            else:
+                                lo, hi = -8192, 8192
+                            for index, keyframe in enumerate(keyframes):
+                                if (
+                                    isinstance(keyframe, dict)
+                                    and _num(keyframe.get("v"))
+                                    and not lo <= keyframe["v"] <= hi
+                                ):
+                                    errs.append(f"{sw}.camera.tracks.{channel}[{index}].v: number {lo}..{hi} required")
+        lights = sc.get("lights", [])
+        if not isinstance(lights, list):
+            errs.append(f"{sw}.lights: must be a list")
+        else:
+            light_ids = set()
+            for li, light in enumerate(lights):
+                lw = f"{sw}.lights[{li}]"
+                if not isinstance(light, dict):
+                    errs.append(f"{lw}: must be an object")
+                    continue
+                light_id = light.get("id")
+                if not isinstance(light_id, str) or not ID_RE.match(light_id):
+                    errs.append(f"{lw}.id: invalid or duplicate")
+                elif light_id in light_ids:
+                    errs.append(f"{lw}.id: invalid or duplicate")
+                else:
+                    light_ids.add(light_id)
+                for channel, low, high in (("x", -8192, 8192), ("y", -8192, 8192)):
+                    if not _num(light.get(channel)) or not low <= light[channel] <= high:
+                        errs.append(f"{lw}.{channel}: number {low}..{high} required")
+                if not _num(light.get("radius")) or not 16 <= light["radius"] <= 8192:
+                    errs.append(f"{lw}.radius: number 16..8192 required")
+                if not _num(light.get("intensity")) or not 0 <= light["intensity"] <= 1:
+                    errs.append(f"{lw}.intensity: number 0..1 required")
+                color = light.get("color")
+                if not isinstance(color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
+                    errs.append(f"{lw}.color: hex color #RRGGBB required")
+
+
+def validate_project(p):
+    errs = []
+    if not isinstance(p, dict):
+        return ["project: must be an object"]
+    if p.get("format") != "kae":
+        errs.append("format: must be 'kae'")
+    if not _int(p.get("version")) or p["version"] < 1:
+        errs.append("version: integer >= 1 required")
+    if not isinstance(p.get("id"), str) or not ID_RE.match(p["id"]):
+        errs.append("id: invalid")
+    if not isinstance(p.get("name"), str) or not p["name"].strip():
+        errs.append("name: non-empty string required")
+    _check_settings(p.get("settings"), errs)
+    _check_drawings(p.get("drawings"), errs)
+    characters = p.get("characters", [])
+    if not isinstance(characters, list):
+        errs.append("characters: must be a list")
+    else:
+        character_ids = set()
+        for index, character in enumerate(characters):
+            if isinstance(character, dict) and character.get("format") == "kae-character":
+                errs.extend(
+                    f"characters[{index}].{error.removeprefix('character.')}"
+                    for error in validate_character_document(character)
+                )
+            elif not isinstance(character, dict) or not isinstance(character.get("id"), str):
+                errs.append(f"characters[{index}]: must have a valid id")
+            character_id = character.get("id") if isinstance(character, dict) else None
+            if isinstance(character_id, str):
+                if character_id in character_ids:
+                    errs.append(f"characters[{index}].id: duplicate '{character_id}'")
+                character_ids.add(character_id)
+    drawings = p.get("drawings") if isinstance(p.get("drawings"), dict) else {}
+    _check_scenes(p.get("scenes"), drawings, errs)
+    _check_studio_data(p, errs)
+    return errs[:MAX_ERRORS]

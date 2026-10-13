@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "animation.schema.json",
+  "title": "Animation",
+  "description": "Frame-by-frame exposures plus keyframed transform tracks. Frames are 0-based integers.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "exposures": { "type": "array", "items": { "$ref": "#/$defs/exposure" } },
+    "tracks": { "$ref": "#/$defs/tracks" }
+  },
+  "$defs": {
+    "ease": {
+      "oneOf": [
+        { "enum": ["linear", "hold", "ease_in", "ease_out", "ease_in_out"] },
+        {
+          "type": "object", "required": ["bezier"], "additionalProperties": false,
+          "properties": {
+            "bezier": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "type": "number" } }
+          }
+        }
+      ]
+    },
+    "keyframe": {
+      "type": "object", "required": ["t", "v"], "additionalProperties": false,
+      "properties": {
+        "t": { "type": "integer", "minimum": 0 },
+        "v": { "type": "number" },
+        "ease": { "$ref": "#/$defs/ease", "default": "linear" }
+      }
+    },
+    "track": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/keyframe" } },
+    "tracks": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "x": { "$ref": "#/$defs/track" },
+        "y": { "$ref": "#/$defs/track" },
+        "rotation": { "$ref": "#/$defs/track" },
+        "scale_x": { "$ref": "#/$defs/track" },
+        "scale_y": { "$ref": "#/$defs/track" },
+        "opacity": { "$ref": "#/$defs/track" }
+      }
+    },
+    "exposure": {
+      "type": "object", "required": ["start", "length", "drawing"], "additionalProperties": false,
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "length": { "type": "integer", "minimum": 1 },
+        "drawing": { "type": "string" }
+      }
+    }
+  }
+}
