@@ -1,11 +1,13 @@
 import unittest
+from unittest.mock import patch
 
-from backend.services.project_service import create_project
+from backend.services.project_service import create_project, repo
 from backend.services.validation_service import validate_project
 
 
 def skinned_project():
-    project = create_project("Skin weights test")
+    with patch.object(repo, "save"):
+        project = create_project("Skin weights test")
     project["drawings"]["skin_drawing"] = {
         "id": "skin_drawing",
         "strokes": [{
