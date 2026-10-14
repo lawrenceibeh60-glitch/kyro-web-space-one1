@@ -26,7 +26,10 @@ class ProjectDemoTests(unittest.TestCase):
 
     def test_cinematic_demo_has_full_length_camera_choreography_and_front_profile_art(self):
         with patch.object(project_service.repo, "save"):
-            project = project_service.create_demo("cinematic")
+            try:
+                project = project_service.create_demo("cinematic")
+            except ApiError as error:
+                self.fail(f"cinematic validation errors: {error.details!r}")
 
         self.assertEqual(project["settings"]["duration_frames"], 200)
         scene = project["scenes"][0]
