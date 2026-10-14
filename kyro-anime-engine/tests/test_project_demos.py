@@ -68,6 +68,11 @@ class ProjectDemoTests(unittest.TestCase):
                 self.assertEqual(front["tracks"]["opacity"][-2]["v"], 0)
                 self.assertEqual(profile["tracks"]["opacity"][2]["v"], 0.5)
         rig = next(item for item in project["rigs"] if item["character_id"] == "character_walker")
+        front_turn = next(layer for layer in walker_layers if layer["id"] == "layer_walker_head_front")
+        self.assertEqual(
+            [(key["t"], key["v"]) for key in front_turn["tracks"]["rotation_y"]],
+            [(0, 0), (95, 0), (100, 90), (103, 90), (199, 90)],
+        )
         self.assertEqual(rig["animation"]["type"], "walk")
         self.assertTrue(rig["animation"]["enabled"])
         self.assertEqual(len(rig["bones"]), 10)
