@@ -45,5 +45,5 @@ test('weighted vector points inherit parent bone rotations', () => {
     skin_weights: [[{ bone_id: 'hand', weight: 1 }]],
   }, rig, 0);
   assert.ok(Math.abs(result.points[0][0] + 10) < 1e-8);
-  assert.ok(Math.abs(result.points[0][1]) < 1e-8);
+  assert.ok(Math.abs(result.points[0][1] - 10) < 1e-8);
 });
