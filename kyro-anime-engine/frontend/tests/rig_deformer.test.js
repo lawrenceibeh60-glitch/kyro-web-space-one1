@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deformStrokeForRig } from '../js/animation/rig_deformer.js';
+import { deformStrokeForRig, pathCoordinateCount } from '../js/animation/rig_deformer.js';
 import { renderFrame } from '../js/rendering/renderer.js';
 
 test('weighted vector points follow their bone transform', () => {
@@ -92,4 +92,47 @@ test('renderer uses weighted deformation instead of rigidly rotating a skinned s
   renderFrame(context, project, 'scene', 0);
   assert.ok(points.some(([x, y]) => Math.abs(x) < 1e-8 && Math.abs(y - 10) < 1e-8));
   assert.ok(points.some(([x, y]) => Math.abs(x) < 1e-8 && Math.abs(y - 20) < 1e-8));
+});
+
+test('quadratic and cubic path commands deform every control point using command skin weights', () => {
+  const rig = { bones: [
+    { id: 'arm', name: 'Arm', pivot: { x: 0, y: 0 }, rotation: 90 },
+  ] };
+  const commands = [
+    ['M', 10, 0],
+    ['L', 20, 0],
+    ['Q', 25, 5, 30, 0],
+    ['C', 35, 0, 40, 5, 45, 0],
+    ['Z'],
+  ];
+  const weights = Array.from({ length: 7 }, () => [{ bone_id: 'arm', weight: 1 }]);
+  assert.equal(pathCoordinateCount(commands), 7);
+  const result = deformStrokeForRig({ id: 'bezier', commands, command_skin_weights: weights }, rig, 0);
+  assert.deepEqual(result.commands, [
+    ['M', 0, 10],
+    ['L', 0, 20],
+    ['Q', -5, 25, 0, 30],
+    ['C', 0, 35, -5, 40, 0, 45],
+    ['Z'],
+  ]);
+  assert.deepEqual(commands[0], ['M', 10, 0], 'source commands are not mutated');
+});
+
+test('path coordinates without weights stay unchanged and mixed weights preserve unbound remainder', () => {
+  const rig = { bones: [
+    { id: 'arm', name: 'Arm', pivot: { x: 0, y: 0 }, rotation: 90 },
+  ] };
+  const result = deformStrokeForRig({
+    id: 'partial',
+    commands: [['M', 10, 0], ['Q', 20, 0, 30, 0]],
+    command_skin_weights: [
+      [{ bone_id: 'arm', weight: 0.5 }],
+      [{ bone_id: 'arm', weight: 1 }],
+      [{ bone_id: 'arm', weight: 0.5 }],
+    ],
+  }, rig, 0);
+  assert.deepEqual(result.commands, [
+    ['M', 5, 5],
+    ['Q', 0, 20, 15, 15],
+  ]);
 });
