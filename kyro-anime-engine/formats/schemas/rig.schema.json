@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "rig.schema.json",
   "title": "KAE 2D Character Rig",
-  "description": "A hierarchical 2D rotation rig attached to stable character-part IDs.",
+  "description": "A hierarchical 2D rotation rig attached to stable character-part IDs, with optional procedural clip playback.",
   "type": "object",
   "required": ["id", "name", "character_id", "bones"],
   "additionalProperties": false,
@@ -10,7 +10,22 @@
     "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "name": { "type": "string", "minLength": 1 },
     "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-    "animation": {\n      "type": "object",\n      "additionalProperties": false,\n      "properties": {\n        "type": { "enum": ["walk"] },\n        "enabled": { "type": "boolean", "default": true },\n        "start_frame": { "type": "integer", "minimum": 0 },\n        "cycle_frames": { "type": "integer", "minimum": 4, "maximum": 240, "default": 24 },\n        "speed": { "type": "number", "minimum": 0.05, "maximum": 8, "default": 1 },\n        "stride": { "type": "number", "minimum": 0, "maximum": 100, "default": 24 },\n        "bob": { "type": "number", "minimum": 0, "maximum": 30, "default": 5 },\n        "weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },\n        "loop": { "type": "boolean", "default": true }\n      }\n    },\n    "bones": {
+    "animation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["walk"] },
+        "enabled": { "type": "boolean", "default": true },
+        "start_frame": { "type": "integer", "minimum": 0 },
+        "cycle_frames": { "type": "integer", "minimum": 4, "maximum": 240, "default": 24 },
+        "speed": { "type": "number", "minimum": 0.05, "maximum": 8, "default": 1 },
+        "stride": { "type": "number", "minimum": 0, "maximum": 100, "default": 24 },
+        "bob": { "type": "number", "minimum": 0, "maximum": 30, "default": 5 },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "loop": { "type": "boolean", "default": true }
+      }
+    },
+    "bones": {
       "type": "array",
       "items": {
         "type": "object",
