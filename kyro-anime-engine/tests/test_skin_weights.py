@@ -60,6 +60,47 @@ class SkinWeightValidationTests(unittest.TestCase):
         errors = validate_project(project)
         self.assertTrue(any("rig bone not found" in error for error in errors))
 
+    def test_valid_quadratic_and_cubic_path_weights_are_accepted(self):
+        project = skinned_project()
+        stroke = {
+            "id": "bezier_stroke",
+            "commands": [
+                ["M", 0, 0], ["Q", 5, 5, 10, 0],
+                ["C", 12, 0, 14, 5, 16, 0], ["Z"],
+            ],
+            "command_skin_weights": [
+                [{"bone_id": "body_bone", "weight": 1}]
+                for _ in range(5)
+            ],
+        }
+        project["drawings"]["skin_drawing"]["strokes"] = [stroke]
+        self.assertEqual(validate_project(project), [])
+
+    def test_path_weight_count_must_match_all_control_coordinate_pairs(self):
+        project = skinned_project()
+        project["drawings"]["skin_drawing"]["strokes"] = [{
+            "id": "bezier_stroke",
+            "commands": [["M", 0, 0], ["Q", 5, 5, 10, 0], ["Z"]],
+            "command_skin_weights": [[{"bone_id": "body_bone", "weight": 1}]],
+        }]
+        errors = validate_project(project)
+        self.assertTrue(any("one influence list per path coordinate pair required (3 expected)" in error
+                            for error in errors))
+
+    def test_path_weights_must_reference_existing_bones(self):
+        project = skinned_project()
+        project["drawings"]["skin_drawing"]["strokes"] = [{
+            "id": "bezier_stroke",
+            "commands": [["M", 0, 0], ["L", 10, 0]],
+            "command_skin_weights": [
+                [{"bone_id": "missing_bone", "weight": 1}],
+                [{"bone_id": "body_bone", "weight": 1}],
+            ],
+        }]
+        errors = validate_project(project)
+        self.assertTrue(any("command_skin_weights[0][0].bone_id: rig bone not found" in error
+                            for error in errors))
+
     def test_skin_weights_cannot_exceed_one_or_be_empty(self):
         project = skinned_project()
         weights = project["drawings"]["skin_drawing"]["strokes"][0]["skin_weights"]
