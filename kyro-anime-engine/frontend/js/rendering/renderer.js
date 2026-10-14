@@ -146,6 +146,70 @@ function drawRigOverlay(ctx, project, scene, camera, frame, width, height) {
   ctx.restore();
 }
 
+// Screen-space influence overlay for the dedicated weight-paint tool.
+export function drawWeightOverlay(ctx, project, sceneId, layerId, frame, boneId, zoom = 1) {
+  if (!boneId) return;
+  const scene = project.scenes?.find(item => item.id === sceneId);
+  const layer = scene?.layers?.find(item => item.id === layerId);
+  const exposure = layer && findExposure(layer, frame);
+  const drawing = exposure && project.drawings?.[exposure.drawing];
+  const rig = layer?.character_id
+    ? (project.rigs || []).find(item => item.character_id === layer.character_id)
+    : null;
+  if (!layer || !drawing || !rig) return;
+  const pose = evaluateRigAnimation(rig, frame, { layer, layerTransform: getLayerTransform(layer, frame) });
+  const transform = getLayerTransform(layer, frame);
+  ctx.save();
+  ctx.translate(transform.x || 0, transform.y || 0);
+  ctx.rotate((transform.rotation || 0) * Math.PI / 180);
+  ctx.scale(transform.scale_x ?? 1, transform.scale_y ?? 1);
+  ctx.translate(-(transform.anchor_x || 0), -(transform.anchor_y || 0));
+  const radius = Math.max(2, 5 / Math.max(0.1, zoom));
+  ctx.lineWidth = 1 / Math.max(0.1, zoom);
+  for (const sourceStroke of drawing.strokes || []) {
+    const isWeighted = Array.isArray(sourceStroke.skin_weights)
+      || Array.isArray(sourceStroke.command_skin_weights);
+    const stroke = isWeighted ? deformStrokeForRig(sourceStroke, rig, frame, pose) : sourceStroke;
+    ctx.save();
+    if (!isWeighted) drawRigPose(ctx, project, layer, frame, pose);
+    const points = [];
+    if (Array.isArray(stroke.points)) {
+      stroke.points.forEach((point, index) => {
+        const influences = stroke.skin_weights?.[index] || [];
+        const weight = influences.filter(item => item?.bone_id === boneId)
+          .reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
+        points.push({ x: point[0], y: point[1], weight });
+      });
+    } else if (Array.isArray(stroke.commands)) {
+      let index = 0;
+      for (const command of stroke.commands) {
+        if (!Array.isArray(command) || command[0] === 'Z') continue;
+        for (let offset = 1; offset + 1 < command.length; offset += 2) {
+          const influences = stroke.command_skin_weights?.[index] || [];
+          const weight = influences.filter(item => item?.bone_id === boneId)
+            .reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
+          points.push({ x: command[offset], y: command[offset + 1], weight });
+          index++;
+        }
+      }
+    }
+    for (const point of points) {
+      const w = Math.max(0, Math.min(1, point.weight));
+      const red = Math.round(40 + 215 * w);
+      const green = Math.round(185 - 125 * w);
+      const blue = Math.round(255 - 230 * w);
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgb(${red} ${green} ${blue})`;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(10, 16, 24, .9)';
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
 export function drawStroke(ctx, s) {
   const p = s.points;
   const commands = s.commands;

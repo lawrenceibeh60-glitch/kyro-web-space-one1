@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { deformStrokeForRig, pathCoordinateCount } from '../js/animation/rig_deformer.js';
-import { renderFrame } from '../js/rendering/renderer.js';
+import { renderFrame, drawWeightOverlay } from '../js/rendering/renderer.js';
 
 test('weighted vector points follow their bone transform', () => {
   const rig = { bones: [
@@ -147,4 +147,44 @@ test('path coordinates without weights stay unchanged and mixed weights preserve
     ['M', 5, 5],
     ['Q', 0, 20, 15, 15],
   ]);
+});
+
+test('weight overlay draws markers for every weighted Bézier control coordinate', () => {
+  const markers = [];
+  const context = new Proxy({
+    globalAlpha: 1, globalCompositeOperation: 'source-over',
+    save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    beginPath() {}, arc(x, y, radius) { markers.push({ x, y, radius, color: this.fillStyle }); },
+    fill() {}, stroke() {}, setLineDash() {}, fillText() {},
+  }, {
+    get(target, key) {
+      if (key in target) return target[key];
+      return () => {};
+    },
+    set(target, key, value) { target[key] = value; return true; },
+  });
+  const project = {
+    settings: { width: 320, height: 240 },
+    drawings: { d: { id: 'd', strokes: [{
+      id: 'curve',
+      commands: [['M', 10, 0], ['Q', 20, 10, 30, 0], ['Z']],
+      command_skin_weights: [
+        [{ bone_id: 'arm', weight: 1 }],
+        [{ bone_id: 'arm', weight: 0.5 }],
+        [{ bone_id: 'arm', weight: 0 }],
+      ],
+    }] } },
+    rigs: [{ id: 'rig', character_id: 'hero', bones: [
+      { id: 'arm', name: 'Arm', character_part_id: 'arm', pivot: { x: 0, y: 0 } },
+    ] }],
+    scenes: [{ id: 'scene', layers: [{
+      id: 'layer', character_id: 'hero', character_part_id: 'arm',
+      exposures: [{ start: 0, length: 1, drawing: 'd' }],
+      transform: { x: 0, y: 0, scale_x: 1, scale_y: 1 },
+    }] }],
+  };
+  drawWeightOverlay(context, project, 'scene', 'layer', 0, 'arm', 1);
+  assert.equal(markers.length, 3);
+  assert.deepEqual(markers.map(({ x, y }) => [x, y]), [[10, 0], [20, 10], [30, 0]]);
+  assert.notEqual(markers[0].color, markers[2].color);
 });

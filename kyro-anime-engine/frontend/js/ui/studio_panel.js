@@ -269,6 +269,8 @@ export function initStudioPanel({ onCharacterImported }) {
     if (!select) return;
     const bones = rig?.bones || [];
     selectOptions(select, bones.map(bone => [bone.id, bone.name || bone.id]), select.value, 'Add a bone first');
+    if (state.weightBoneId && bones.some(bone => bone.id === state.weightBoneId)) select.value = state.weightBoneId;
+    setState({ weightBoneId: select.value || null });
     const info = activeDrawingInfo();
     const usable = !!rig && !!info && bones.length > 0;
     $('skinAutoWeight').disabled = !usable;
@@ -591,6 +593,10 @@ export function initStudioPanel({ onCharacterImported }) {
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
   $('skinAssign').onclick = () => writeWeightedDrawing('assign');
   $('skinClear').onclick = () => writeWeightedDrawing('clear');
+  $('skinBone')?.addEventListener('change', event => {
+    setState({ weightBoneId: event.target.value || null });
+    updateSkinStatus(`Weight paint target: ${event.target.selectedOptions[0]?.textContent || 'none'}`);
+  });
   $('weightRadius')?.addEventListener('input', event => {
     $('weightRadiusValue').textContent = event.target.value;
   });
