@@ -275,6 +275,8 @@ def _create_studio_demo(template):
             },
         ]
         for layer in layers:
+            if layer["id"] == "layer_walker":
+                continue
             for exposure in layer.get("exposures", []):
                 exposure["length"] = duration
         camera_tracks = {
