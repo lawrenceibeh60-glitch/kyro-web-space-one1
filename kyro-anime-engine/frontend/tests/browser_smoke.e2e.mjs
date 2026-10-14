@@ -33,9 +33,8 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#rigCreate').click();
     await page.waitForFunction(() => document.querySelector('#rigEditor')?.hidden === false);
     await page.waitForFunction(() => document.querySelectorAll('#bonePart option').length > 1);
-    await page.locator('#boneName').fill('Root');
-    await page.locator('#boneAdd').click();
-    await page.waitForFunction(() => document.querySelectorAll('#boneList .studio-bone').length === 1);
+    await page.locator('#rigAuto').click();
+    await page.waitForFunction(() => document.querySelectorAll('#boneList .studio-bone').length > 1);
 
     await page.locator('[data-tool="weight"]').click();
     await page.locator('#weightRadius').waitFor({ state: 'visible' });
