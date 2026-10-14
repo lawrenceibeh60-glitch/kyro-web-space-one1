@@ -50,53 +50,12 @@
     },
     "effects": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "scene_id", "type"],
-        "additionalProperties": false,
-        "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "scene_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "type": { "enum": ["lightning", "particles", "speed_lines", "camera_shake"] },
-          "enabled": { "type": "boolean", "default": true },
-          "start_frame": { "type": "integer", "minimum": 0 },
-          "end_frame": { "type": "integer", "minimum": 0 },
-          "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
-          "count": { "type": "integer", "minimum": 1, "maximum": 200 },
-          "speed": { "type": "number", "minimum": 0, "maximum": 20 },
-          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
-        }
-      }
+      "items": { "$ref": "effects.schema.json" }
     },
-    "rigs": {
+        "rigs": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "name", "character_id", "bones"],
-        "additionalProperties": false,
-        "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "name": { "type": "string", "minLength": 1 },
-          "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "bones": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["id", "name", "character_part_id", "pivot"],
-              "additionalProperties": false,
-              "properties": {
-                "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-                "name": { "type": "string", "minLength": 1 },
-                "parent_id": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-                "character_part_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-                "rotation": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0 },
-                "pivot": {
-                  "type": "object", "required": ["x", "y"], "additionalProperties": false,
-                  "properties": {
-                    "x": { "type": "number", "minimum": -8192, "maximum": 8192 },
-                    "y": { "type": "number", "minimum": -8192, "maximum": 8192 }
-                  }
-                },
+      "items": { "$ref": "rig.schema.json" }
+    },
                 "tracks": {
                   "type": "object", "additionalProperties": false,
                   "properties": {
