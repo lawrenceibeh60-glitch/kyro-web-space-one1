@@ -35,6 +35,12 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.waitForFunction(() => document.querySelectorAll('#bonePart option').length > 1);
     await page.locator('#rigAuto').click();
     await page.waitForFunction(() => document.querySelectorAll('#boneList .studio-bone').length > 1);
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      const names = new Set((rig?.bones || []).map(bone => bone.name));
+      return ['Left Thigh', 'Left Shin', 'Left Foot', 'Left Upper Arm', 'Left Forearm', 'Left Hand']
+        .every(name => names.has(name));
+    });
     await page.locator('#rigWalkEnabled').check();
     await page.locator('#rigWalkCycle').fill('32');
     await page.locator('#rigWalkStride').evaluate(input => {
@@ -48,6 +54,16 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return rig?.animation?.type === 'walk' && rig.animation.enabled === true
         && rig.animation.cycle_frames === 32 && rig.animation.stride === 30;
     });
+    const motion = await page.evaluate(async () => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      const { evaluateRigAnimation } = await import('/js/animation/animation_clips.js');
+      const thigh = rig.bones.find(bone => bone.character_part_id === 'left_thigh');
+      const first = evaluateRigAnimation(rig, 0).bones[thigh.id];
+      const later = evaluateRigAnimation(rig, 20).bones[thigh.id];
+      return { first, later };
+    });
+    assert.ok(Number.isFinite(motion.first) && Number.isFinite(motion.later));
+    assert.notEqual(motion.first, motion.later, 'the generated thigh bone must actually animate');
 
     await page.locator('[data-tool="weight"]').click();
     await page.locator('#weightRadius').waitFor({ state: 'visible' });
@@ -96,9 +112,25 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return Array.isArray(stroke?.[field]) && stroke[field].some(influences =>
         Array.isArray(influences) && influences.some(item => item.bone_id === window.kae.state.weightBoneId));
     }, target);
+    const pixelSignature = () => page.evaluate(() => {
+      const canvas = document.querySelector('#canvas');
+      const context = canvas.getContext('2d');
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let hash = 2166136261;
+      for (let index = 0; index < pixels.length; index += 4) {
+        hash ^= pixels[index]; hash = Math.imul(hash, 16777619);
+        hash ^= pixels[index + 1]; hash = Math.imul(hash, 16777619);
+        hash ^= pixels[index + 2]; hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    });
     const firstFrame = await page.locator('#frameReadout').textContent();
+    const firstPixels = await pixelSignature();
     await page.locator('#play').click();
     await page.waitForFunction(initial => document.querySelector('#frameReadout')?.textContent !== initial, firstFrame, { timeout: 5000 });
+    await page.waitForTimeout(100);
+    const laterPixels = await pixelSignature();
+    assert.notEqual(firstPixels, laterPixels, 'playing the rigged character must change rendered canvas pixels');
     await page.locator('#play').click();
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();

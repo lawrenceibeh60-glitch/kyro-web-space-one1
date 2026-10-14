@@ -66,6 +66,32 @@ class CharacterImportTests(unittest.TestCase):
         self.assertEqual(save.call_count, 2)
         self.assertEqual(validate_project(updated), [])
 
+    def test_generated_character_has_separate_articulated_limb_parts(self):
+        project = deepcopy(self.project)
+        options = {
+            "id": "articulated_hero",
+            "name": "Articulated Hero",
+            "hairstyle": "long",
+            "expression": "determined",
+        }
+        with patch.object(character_service.repo, "load", return_value=project), \
+             patch.object(character_service.repo, "save"):
+            result = character_service.generate_character(project["id"], options)
+
+        character = result["character"]
+        part_ids = {part["id"] for part in character["parts"]}
+        expected = {
+            "left_thigh", "left_shin", "left_foot",
+            "right_thigh", "right_shin", "right_foot",
+            "arm_left", "forearm_left", "hand_left",
+            "arm_right", "forearm_right", "hand_right",
+            "neck", "body", "head", "hair_back", "hair_front",
+        }
+        self.assertTrue(expected.issubset(part_ids))
+        self.assertNotIn("legs", part_ids)
+        self.assertTrue(all(part["strokes"] for part in character["parts"]))
+        self.assertEqual(validate_character_document(character), [])
+
     def test_import_api_persists_and_returns_updated_project(self):
         project = deepcopy(self.project)
         app = create_app()

@@ -303,28 +303,54 @@ def generate_character(pid, options):
     ]
     parts = [
         {"id": "hair_back", "name": "Hair Back", "strokes": hair_back, "depth": 0.9},
-        {"id": "legs", "name": "Legs", "strokes": [
-            poly("left-leg", [(-72, 354), (-8, 354), (-12, 568), (-18, 628),
-                              (-92, 628), (-84, 560)], outline, outfit, 7),
-            poly("right-leg", [(8, 354), (72, 354), (84, 560), (92, 628),
-                               (18, 628), (12, 568)], outline, outfit, 7),
+        {"id": "left_thigh", "name": "Left Thigh", "strokes": [
+            poly("left-thigh", [(-72, 354), (-8, 354), (-12, 438), (-18, 482),
+                                (-80, 482), (-84, 438)], outline, outfit, 7),
+        ]},
+        {"id": "right_thigh", "name": "Right Thigh", "strokes": [
+            poly("right-thigh", [(8, 354), (72, 354), (84, 438), (80, 482),
+                                 (18, 482), (12, 438)], outline, outfit, 7),
+        ]},
+        {"id": "left_shin", "name": "Left Shin", "strokes": [
+            poly("left-shin", [(-80, 474), (-18, 474), (-18, 568), (-18, 628),
+                               (-92, 628), (-84, 560)], outline, outfit, 7),
+        ]},
+        {"id": "right_shin", "name": "Right Shin", "strokes": [
+            poly("right-shin", [(18, 474), (80, 474), (84, 560), (92, 628),
+                                (18, 628), (18, 568)], outline, outfit, 7),
+        ]},
+        {"id": "left_foot", "name": "Left Foot", "strokes": [
             poly("left-shoe", [(-92, 619), (-20, 619), (-12, 652), (-111, 652)], outline, "#493d4b", 5),
+        ]},
+        {"id": "right_foot", "name": "Right Foot", "strokes": [
             poly("right-shoe", [(20, 619), (92, 619), (111, 652), (12, 652)], outline, "#493d4b", 5),
         ]},
-        {"id": "arm_left", "name": "Left Arm", "strokes": [
-            poly("sleeve", [(-88, 192), (-126, 209), (-174, 326), (-145, 344),
-                            (-118, 323), (-83, 247)], outline, outfit, 7),
-            poly("hand", [(-174, 326), (-145, 344), (-134, 375), (-151, 385),
-                          (-171, 365), (-184, 344)], outline, skin, 5),
+        {"id": "arm_left", "name": "Left Upper Arm", "strokes": [
+            poly("left-upper-arm", [(-88, 192), (-126, 209), (-151, 267),
+                                    (-122, 284), (-101, 260), (-83, 247)], outline, outfit, 7),
         ]},
-        {"id": "arm_right", "name": "Right Arm", "strokes": [
-            poly("sleeve", [(88, 192), (126, 209), (174, 326), (145, 344),
-                            (118, 323), (83, 247)], outline, outfit, 7),
-            poly("hand", [(174, 326), (145, 344), (134, 375), (151, 385),
-                          (171, 365), (184, 344)], outline, skin, 5),
+        {"id": "forearm_left", "name": "Left Forearm", "strokes": [
+            poly("left-forearm", [(-151, 267), (-174, 326), (-145, 344), (-122, 284)], outline, outfit, 7),
+        ]},
+        {"id": "hand_left", "name": "Left Hand", "strokes": [
+            poly("left-hand", [(-174, 326), (-145, 344), (-134, 375), (-151, 385),
+                               (-171, 365), (-184, 344)], outline, skin, 5),
+        ]},
+        {"id": "arm_right", "name": "Right Upper Arm", "strokes": [
+            poly("right-upper-arm", [(88, 192), (126, 209), (151, 267),
+                                     (122, 284), (101, 260), (83, 247)], outline, outfit, 7),
+        ]},
+        {"id": "forearm_right", "name": "Right Forearm", "strokes": [
+            poly("right-forearm", [(151, 267), (174, 326), (145, 344), (122, 284)], outline, outfit, 7),
+        ]},
+        {"id": "hand_right", "name": "Right Hand", "strokes": [
+            poly("right-hand", [(174, 326), (145, 344), (134, 375), (151, 385),
+                                (171, 365), (184, 344)], outline, skin, 5),
+        ]},
+        {"id": "neck", "name": "Neck", "strokes": [
+            poly("neck", [(-28, 138), (28, 138), (34, 178), (-34, 178)], outline, skin, 5),
         ]},
         {"id": "body", "name": "Outfit", "strokes": [
-            poly("neck", [(-28, 138), (28, 138), (34, 178), (-34, 178)], outline, skin, 5),
             poly("torso", [(-36, 164), (-102, 193), (-139, 310), (-106, 377),
                            (106, 377), (139, 310), (102, 193), (36, 164)], outline, outfit, 8),
             poly("collar", [(-38, 169), (0, 204), (38, 169), (20, 237), (-20, 237)], outline, "#f5e8dd", 4),
