@@ -27,7 +27,7 @@ test('builds perspective yaw and crossfade keys while preserving unrelated track
   const front = result.layers.find(layer => layer.id === 'front_torso');
   const profile = result.layers.find(layer => layer.id === 'profile_torso');
   assert.deepEqual(front.tracks.rotation_y.map(key => [key.t, key.v]), [[20, 0], [26, 45], [32, 90]]);
-  assert.deepEqual(front.tracks.opacity.map(key => [key.t, key.v]), [[0, 1], [20, 1], [26, 0.5], [32, 0]]);
+  assert.deepEqual(front.tracks.opacity.map(key => [key.t, key.v]), [[0, 1], [20, 1], [26, 0.5], [32, 0], [100, 1]]);
   assert.deepEqual(profile.tracks.opacity.map(key => [key.t, key.v]), [[0, 0], [20, 0], [26, 0.5], [32, 1], [100, 1]]);
   assert.deepEqual(front.tracks.x, layers[0].tracks.x, 'unrelated tracks remain untouched');
   assert.deepEqual(layers[0].tracks.opacity, [{ t: 0, v: 1 }, { t: 100, v: 1 }], 'source project is immutable');
