@@ -154,24 +154,38 @@
             "type": "array",
             "minItems": 1,
             "items": {
-              "type": "object",
-              "required": [
-                "bone_id",
-                "weight"
-              ],
-              "additionalProperties": false,
-              "properties": {
-                "bone_id": {
-                  "$ref": "#/$defs/id"
-                },
-                "weight": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                }
-              }
+              "$ref": "#/$defs/skinInfluence"
             }
           }
+        },
+        "command_skin_weights": {
+          "type": "array",
+          "description": "One influence list for each coordinate pair in commands, in command order: M/L one, Q two, C three, Z none.",
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/skinInfluence"
+            }
+          }
+        }
+      }
+    },
+    "skinInfluence": {
+      "type": "object",
+      "required": [
+        "bone_id",
+        "weight"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "bone_id": {
+          "$ref": "#/$defs/id"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     }
