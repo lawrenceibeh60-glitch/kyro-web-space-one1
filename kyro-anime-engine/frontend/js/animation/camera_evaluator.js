@@ -23,7 +23,7 @@ export function applyCameraTransform(ctx, width, height, camera, frame) {
   ctx.rotate(rotation * Math.PI / 180);
   ctx.scale(zoom, zoomY);
   ctx.translate(-width / 2, -height / 2);
-  return { x, y, zoom };
+  return { x, y, zoom, zoomY };
 }
 
 export function applyCameraDepthTransform(ctx, width, height, camera, frame, depth = 1) {
