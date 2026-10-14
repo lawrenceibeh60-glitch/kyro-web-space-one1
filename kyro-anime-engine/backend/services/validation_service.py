@@ -593,24 +593,25 @@ def _check_scenes(scenes, drawings, errs):
                         not _num(transform["rotation"]) or not -3600 <= transform["rotation"] <= 3600
                     ):
                         errs.append(f"{sw}.camera.transform.rotation: number -3600..3600 required")
-                    if "scale_x" in transform and (
-                        not _num(transform["scale_x"])
-                        or not 0.05 <= transform["scale_x"] <= 32
-                    ):
-                        errs.append(f"{sw}.camera.transform.scale_x: number 0.05..32 required")
+                    for channel in ("scale_x", "scale_y"):
+                        if channel in transform and (
+                            not _num(transform[channel])
+                            or not 0.05 <= transform[channel] <= 32
+                        ):
+                            errs.append(f"{sw}.camera.transform.{channel}: number 0.05..32 required")
                 if "tracks" in cam:
                     tracks = cam["tracks"]
                     if not isinstance(tracks, dict):
                         errs.append(f"{sw}.camera.tracks: tracks must be an object")
                     else:
                         for channel in tracks:
-                            if channel not in {"x", "y", "rotation", "scale_x"}:
+                            if channel not in {"x", "y", "rotation", "scale_x", "scale_y"}:
                                 errs.append(f"{sw}.camera.tracks.{channel}: unknown camera channel")
                         _check_tracks(tracks, f"{sw}.camera.tracks", errs)
                         for channel, keyframes in tracks.items():
-                            if channel not in {"x", "y", "rotation", "scale_x"} or not isinstance(keyframes, list):
+                            if channel not in {"x", "y", "rotation", "scale_x", "scale_y"} or not isinstance(keyframes, list):
                                 continue
-                            if channel == "scale_x":
+                            if channel in {"scale_x", "scale_y"}:
                                 lo, hi = 0.05, 32
                             elif channel == "rotation":
                                 lo, hi = -3600, 3600
