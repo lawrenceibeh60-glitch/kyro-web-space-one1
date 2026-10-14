@@ -54,6 +54,16 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return rig?.animation?.type === 'walk' && rig.animation.enabled === true
         && rig.animation.cycle_frames === 32 && rig.animation.stride === 30;
     });
+    const motion = await page.evaluate(async () => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      const { evaluateRigAnimation } = await import('/js/animation/animation_clips.js');
+      const thigh = rig.bones.find(bone => bone.character_part_id === 'left_thigh');
+      const first = evaluateRigAnimation(rig, 0).bones[thigh.id];
+      const later = evaluateRigAnimation(rig, 8).bones[thigh.id];
+      return { first, later };
+    });
+    assert.ok(Number.isFinite(motion.first) && Number.isFinite(motion.later));
+    assert.notEqual(motion.first, motion.later, 'the generated thigh bone must actually animate');
 
     await page.locator('[data-tool="weight"]').click();
     await page.locator('#weightRadius').waitFor({ state: 'visible' });
