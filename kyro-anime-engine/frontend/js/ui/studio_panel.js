@@ -329,6 +329,53 @@ export function initStudioPanel({ onCharacterImported }) {
       : `${mode === 'auto' ? 'Auto-weighted' : 'Assigned bone weights to'} ${vertices} point/control-point coordinates.`);
   }
 
+  function renderWalkControls(rig) {
+    const animation = rig?.animation || {};
+    $('rigWalkEnabled').checked = animation.type === 'walk' && animation.enabled !== false;
+    $('rigWalkCycle').value = animation.cycle_frames ?? 24;
+    $('rigWalkSpeed').value = animation.speed ?? 1;
+    $('rigWalkStride').value = animation.stride ?? 24;
+    $('rigWalkBob').value = animation.bob ?? 5;
+    $('rigWalkWeight').value = animation.weight ?? 1;
+    $('rigWalkLoop').checked = animation.loop !== false;
+    $('rigWalkCycle').disabled = !rig;
+    $('rigWalkSpeed').disabled = !rig;
+    $('rigWalkStride').disabled = !rig;
+    $('rigWalkBob').disabled = !rig;
+    $('rigWalkWeight').disabled = !rig;
+    $('rigWalkLoop').disabled = !rig;
+    $('rigWalkEnabled').disabled = !rig;
+    $('rigWalkApply').disabled = !rig;
+    $('rigWalkStatus').textContent = !rig
+      ? 'Create a rig before applying a procedural clip.'
+      : animation.type === 'walk' && animation.enabled !== false
+        ? `Walk cycle active · ${animation.cycle_frames ?? 24} frames · ${animation.speed ?? 1}× speed`
+        : 'Walk cycle disabled. Enable it to animate this rig.';
+  }
+
+  function applyWalkControls() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    const animation = {
+      ...(rig.animation || {}),
+      type: 'walk',
+      enabled: $('rigWalkEnabled').checked,
+      cycle_frames: Math.max(4, Math.min(240, Math.round(Number($('rigWalkCycle').value) || 24))),
+      speed: Math.max(0.05, Math.min(8, Number($('rigWalkSpeed').value) || 1)),
+      stride: Math.max(0, Math.min(100, Number($('rigWalkStride').value) || 0)),
+      bob: Math.max(0, Math.min(30, Number($('rigWalkBob').value) || 0)),
+      weight: Math.max(0, Math.min(1, Number($('rigWalkWeight').value) || 0)),
+      loop: $('rigWalkLoop').checked,
+    };
+    updateRig({ ...clone(rig), animation });
+    $('rigWalkStrideValue').textContent = String(animation.stride);
+    $('rigWalkBobValue').textContent = String(animation.bob);
+    $('rigWalkWeightValue').textContent = animation.weight.toFixed(2);
+    $('rigWalkStatus').textContent = animation.enabled
+      ? `Walk cycle active · ${animation.cycle_frames} frames · ${animation.speed}× speed`
+      : 'Walk cycle disabled.';
+  }
+
   function renderRig() {
     if (!state.project) return;
     const characters = state.project.characters || [];
@@ -351,6 +398,7 @@ export function initStudioPanel({ onCharacterImported }) {
     const boneOptions = (rig?.bones || []).map(bone => [bone.id, bone.name || bone.id]);
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
     renderSkinTools(rig);
+    renderWalkControls(rig);
     const list = $('boneList');
     list.replaceChildren();
     for (const bone of rig?.bones || []) {
@@ -610,6 +658,16 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rigCreate').onclick = createRig;
   $('rigDelete').onclick = deleteRig;
   $('rigAuto').onclick = autoRig;
+  $('rigWalkApply').onclick = applyWalkControls;
+  for (const id of ['rigWalkStride', 'rigWalkBob', 'rigWalkWeight']) {
+    $(id).addEventListener('input', () => {
+      const value = Number($(id).value);
+      const suffix = id === 'rigWalkWeight' ? value.toFixed(2) : String(value);
+      const outputId = id === 'rigWalkStride' ? 'rigWalkStrideValue'
+        : id === 'rigWalkBob' ? 'rigWalkBobValue' : 'rigWalkWeightValue';
+      $(outputId).textContent = suffix;
+    });
+  }
   $('boneAdd').onclick = addBone;
   $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
