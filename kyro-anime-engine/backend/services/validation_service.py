@@ -470,8 +470,8 @@ def _check_studio_data(project, errs):
                 if not isinstance(stroke.get(weight_field), list):
                     continue
                 for point_index, influences in enumerate(stroke[weight_field]):
-                if not isinstance(influences, list):
-                    continue
+                    if not isinstance(influences, list):
+                        continue
                     for influence_index, influence in enumerate(influences):
                         if not isinstance(influence, dict):
                             continue
