@@ -6,6 +6,7 @@ import { evaluateTrack } from '../animation/interpolation.js';
 import { toLocal } from '../rendering/geometry.js';
 import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weights.js';
 import { buildAutoRig } from '../animation/auto_rig.js';
+import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreography.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -376,6 +377,39 @@ export function initStudioPanel({ onCharacterImported }) {
       : 'Walk cycle disabled.';
   }
 
+  function renderTurnControls() {
+    const scene = state.project?.scenes?.find(item => item.id === state.sceneId) || state.project?.scenes?.[0];
+    const pairs = scene ? countTurnPairs(scene.layers, selectedCharacterId) : 0;
+    $('rigTurnApply').disabled = pairs === 0;
+    if (document.activeElement !== $('turnStartFrame')) $('turnStartFrame').value = state.frame ?? 0;
+    $('rigTurnStatus').textContent = pairs
+      ? `${pairs} matching front/profile part pair(s) found.`
+      : 'This character has no matching front/profile layer pairs. Add alternate pose drawings first.';
+  }
+
+  function applyTurnChoreography() {
+    const project = state.project;
+    const sceneIndex = (project.scenes || []).findIndex(item => item.id === state.sceneId);
+    const scene = project.scenes?.[sceneIndex];
+    if (!scene) return;
+    try {
+      const result = buildTurnChoreography(
+        scene.layers,
+        selectedCharacterId,
+        Number($('turnStartFrame').value),
+        Number($('turnDuration').value),
+        project.settings.duration_frames - 1,
+      );
+      execute(setValue(['scenes', sceneIndex, 'layers'], result.layers, 'Build front/profile turn'));
+      $('rigTurnStatus').textContent =
+        `Turn applied to ${result.pairCount} part pair(s), frames ${result.startFrame}–${result.endFrame}.`;
+      toast('Front/profile turn keyframes created.', 'ok');
+    } catch (error) {
+      $('rigTurnStatus').textContent = error.message || 'Could not build the turn.';
+      toast(error.message || 'Could not build the turn.', 'err');
+    }
+  }
+
   function renderRig() {
     if (!state.project) return;
     const characters = state.project.characters || [];
@@ -399,6 +433,7 @@ export function initStudioPanel({ onCharacterImported }) {
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
     renderSkinTools(rig);
     renderWalkControls(rig);
+    renderTurnControls();
     const list = $('boneList');
     list.replaceChildren();
     for (const bone of rig?.bones || []) {
@@ -659,6 +694,7 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rigDelete').onclick = deleteRig;
   $('rigAuto').onclick = autoRig;
   $('rigWalkApply').onclick = applyWalkControls;
+  $('rigTurnApply').onclick = applyTurnChoreography;
   for (const id of ['rigWalkStride', 'rigWalkBob', 'rigWalkWeight']) {
     $(id).addEventListener('input', () => {
       const value = Number($(id).value);
