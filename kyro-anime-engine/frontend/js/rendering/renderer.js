@@ -3,6 +3,7 @@
 import { evaluateTransform, evaluateOpacity } from '../animation/pose_evaluator.js';
 import { evaluateTrack } from '../animation/interpolation.js';
 import { evaluateRigAnimation } from '../animation/animation_clips.js';
+import { deformStrokeForRig } from '../animation/rig_deformer.js';
 import { applyCameraDepthTransform, applyCameraTransform } from '../animation/camera_evaluator.js';
 import { applyCameraShake } from '../effects/camera_shake.js';
 import { drawLightning } from '../effects/lightning.js';
@@ -237,10 +238,19 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     ctx.rotate((t.rotation || 0) * Math.PI / 180);
     ctx.scale(t.scale_x ?? 1, t.scale_y ?? 1);
     ctx.translate(-(t.anchor_x || 0), -(t.anchor_y || 0));
-    drawRigPose(ctx, project, layer, frame, rigPose);
     const hide = pv && pv.drawingId === ex?.drawing ? pv.hidden : null;
-    for (const s of strokes) if (!hide?.has(s.id)) drawStroke(ctx, s);
-    if (pv?.stroke) drawStroke(ctx, pv.stroke);
+    const drawRiggedStroke = stroke => {
+      ctx.save();
+      if (rig && Array.isArray(stroke.skin_weights)) {
+        drawStroke(ctx, deformStrokeForRig(stroke, rig, frame, rigPose));
+      } else {
+        drawRigPose(ctx, project, layer, frame, rigPose);
+        drawStroke(ctx, stroke);
+      }
+      ctx.restore();
+    };
+    for (const stroke of strokes) if (!hide?.has(stroke.id)) drawRiggedStroke(stroke);
+    if (pv?.stroke) drawRiggedStroke(pv.stroke);
     ctx.restore();
   }
   if (scene?.lights?.length) {
