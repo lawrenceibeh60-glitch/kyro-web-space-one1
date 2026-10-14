@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { deformStrokeForRig, pathCoordinateCount } from '../js/animation/rig_deformer.js';
-import { renderFrame, drawWeightOverlay } from '../js/rendering/renderer.js';
+import { renderFrame, drawWeightOverlay, projectStrokeForYaw } from '../js/rendering/renderer.js';
 
 test('weighted vector points follow their bone transform', () => {
   const rig = { bones: [
@@ -187,4 +187,52 @@ test('weight overlay draws markers for every weighted Bézier control coordinate
   assert.equal(markers.length, 3);
   assert.deepEqual(markers.map(({ x, y }) => [x, y]), [[10, 0], [20, 10], [30, 0]]);
   assert.notEqual(markers[0].color, markers[2].color);
+});
+
+test('perspective yaw turns vector artwork around the character pivot and projects Bézier controls', () => {
+  const stroke = {
+    id: 'turn',
+    points: [[540, 300, 0.8], [740, 500, 0.4]],
+    commands: [['M', 540, 300], ['Q', 640, 250, 740, 500], ['Z']],
+  };
+  assert.equal(projectStrokeForYaw(stroke, 0, 640, 360), stroke);
+  const turned = projectStrokeForYaw(stroke, 90, 640, 360);
+  assert.ok(Math.abs(turned.points[0][0] - 640) < 1e-6);
+  assert.ok(Math.abs(turned.points[1][0] - 640) < 1e-6);
+  assert.notEqual(turned.points[0][1], stroke.points[0][1]);
+  assert.equal(turned.points[0][2], 0.8);
+  assert.notDeepEqual(turned.commands[1].slice(1), stroke.commands[1].slice(1));
+  assert.deepEqual(stroke.points[0], [540, 300, 0.8], 'source geometry is not mutated');
+});
+
+test('renderer projects a layer through keyframed perspective yaw', () => {
+  const points = [];
+  const context = new Proxy({
+    globalAlpha: 1, globalCompositeOperation: 'source-over',
+    save() {}, restore() {}, beginPath() {}, rect() {}, clip() {}, fillRect() {},
+    translate() {}, rotate() {}, scale() {}, moveTo(x, y) { points.push([x, y]); },
+    lineTo(x, y) { points.push([x, y]); }, quadraticCurveTo() {}, bezierCurveTo() {},
+    closePath() {}, stroke() {}, fill() {}, arc() {}, setLineDash() {}, fillText() {},
+  }, {
+    get(target, key) {
+      if (key in target) return target[key];
+      if (key === 'createRadialGradient') return () => ({ addColorStop() {} });
+      return () => {};
+    },
+    set(target, key, value) { target[key] = value; return true; },
+  });
+  const project = {
+    settings: { width: 320, height: 240, background: '#fff', duration_frames: 10 },
+    drawings: { d: { id: 'd', strokes: [{ id: 's', points: [[80, 80], [240, 160]], width: 2 }] } },
+    rigs: [], effects: [],
+    scenes: [{ id: 'scene', layers: [{
+      id: 'layer', type: 'drawing', transform: { x: 0, y: 0 },
+      tracks: { rotation_y: [{ t: 0, v: 0 }, { t: 9, v: 90 }] },
+      exposures: [{ start: 0, length: 10, drawing: 'd' }],
+    }], camera: { transform: { x: 0, y: 0, scale_x: 1, scale_y: 1 }, tracks: {} } }],
+  };
+  renderFrame(context, project, 'scene', 9);
+  assert.equal(points.length, 2);
+  assert.ok(Math.abs(points[0][0] - 160) < 1e-6);
+  assert.ok(Math.abs(points[1][0] - 160) < 1e-6);
 });
