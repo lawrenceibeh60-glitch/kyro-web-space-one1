@@ -145,6 +145,9 @@
               <div class="xbtns"><button id="rigCreate">Create / select rig</button></div>
               <div id="rigEditor" hidden>
                 <div class="xbtns"><button id="rigDelete">Remove rig</button></div>
+                <div class="grp-title">Automatic rig setup</div>
+                <button id="rigAuto" class="primary">Auto-rig all character parts</button>
+                <div class="hint">Creates one pivoted bone per unrigged part, infers common head/torso/arm/leg parent chains, and keeps existing bones intact.</div>
                 <div class="grp-title">Add bone</div>
                 <label class="fld"><span>Bone name</span><input id="boneName" type="text" maxlength="64" value="Bone"></label>
                 <label class="fld"><span>Character part</span><select id="bonePart"></select></label>
