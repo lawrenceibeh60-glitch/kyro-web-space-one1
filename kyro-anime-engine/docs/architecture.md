@@ -44,3 +44,8 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 - Make generated art editable in the same project model as hand-drawn art.
 - Reject unsupported data with useful error paths instead of silently dropping it.
 - Keep implementation claims tied to code and tests that actually exist.
+
+
+### Perspective 2.5D plane turns
+
+Layers support an animated `rotation_y` channel in the range -180° to 180°. The renderer perspective-projects point strokes and Bézier path control points around the layer anchor (or canvas center), so a flat drawing can turn edge-on and reverse with perspective rather than using only a horizontal squash. Combine this with front/profile artwork crossfades for character turn shots. This is perspective-projected 2D artwork, not a volumetric 3D character mesh.
