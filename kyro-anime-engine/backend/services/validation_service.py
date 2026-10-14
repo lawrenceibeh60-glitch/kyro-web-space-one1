@@ -162,6 +162,40 @@ def _check_stroke(stroke, where, errs):
                     break
     if commands is not None:
         _check_path_commands(commands, f"{where}.commands", errs)
+    skin_weights = stroke.get("skin_weights")
+    if skin_weights is not None:
+        if points is None:
+            errs.append(f"{where}.skin_weights: requires point-based geometry")
+        elif not isinstance(skin_weights, list) or len(skin_weights) != len(points):
+            errs.append(f"{where}.skin_weights: one influence list per point required")
+        else:
+            for point_index, influences in enumerate(skin_weights):
+                sw = f"{where}.skin_weights[{point_index}]"
+                if not isinstance(influences, list) or not influences:
+                    errs.append(f"{sw}: non-empty influence list required")
+                    continue
+                total = 0.0
+                seen_bones = set()
+                for influence_index, influence in enumerate(influences):
+                    iw = f"{sw}[{influence_index}]"
+                    if not isinstance(influence, dict):
+                        errs.append(f"{iw}: must be an object")
+                        continue
+                    if influence.keys() - {"bone_id", "weight"}:
+                        errs.append(f"{iw}: unknown property")
+                    bone_id = influence.get("bone_id")
+                    if not isinstance(bone_id, str) or not ID_RE.fullmatch(bone_id):
+                        errs.append(f"{iw}.bone_id: invalid")
+                    elif bone_id in seen_bones:
+                        errs.append(f"{iw}.bone_id: duplicate influence")
+                    seen_bones.add(bone_id)
+                    weight = influence.get("weight")
+                    if not _num(weight) or not 0 <= weight <= 1:
+                        errs.append(f"{iw}.weight: number 0..1 required")
+                    else:
+                        total += weight
+                if total <= 0 or total > 1.000001:
+                    errs.append(f"{sw}: weights must sum to a value in (0, 1]")
     if "width" in stroke and (not _num(stroke["width"]) or stroke["width"] <= 0):
         errs.append(f"{where}.width: must be > 0")
     for field, allowed in (
@@ -369,6 +403,48 @@ def _check_studio_data(project, errs):
                         break
                     seen.add(parent_id)
                     parent_id = parent_map[parent_id]
+
+    # Weighted vector strokes must reference bones that actually exist in the project.
+    known_bone_ids = {
+        bone.get("id")
+        for rig in rigs if isinstance(rig, dict)
+        for bone in (rig.get("bones", []) if isinstance(rig.get("bones", []), list) else [])
+        if isinstance(bone, dict) and isinstance(bone.get("id"), str)
+    }
+
+    def _check_skin_references(strokes, where):
+        if not isinstance(strokes, list):
+            return
+        for stroke_index, stroke in enumerate(strokes):
+            if not isinstance(stroke, dict) or not isinstance(stroke.get("skin_weights"), list):
+                continue
+            for point_index, influences in enumerate(stroke["skin_weights"]):
+                if not isinstance(influences, list):
+                    continue
+                for influence_index, influence in enumerate(influences):
+                    if not isinstance(influence, dict):
+                        continue
+                    bone_id = influence.get("bone_id")
+                    if isinstance(bone_id, str) and bone_id not in known_bone_ids:
+                        errs.append(
+                            f"{where}[{stroke_index}].skin_weights[{point_index}]"
+                            f"[{influence_index}].bone_id: rig bone not found"
+                        )
+
+    project_drawings = project.get("drawings", {})
+    if isinstance(project_drawings, dict):
+        for drawing_id, drawing in project_drawings.items():
+            if isinstance(drawing, dict):
+                _check_skin_references(drawing.get("strokes"), f"drawings.{drawing_id}.strokes")
+    for character_index, character in enumerate(project.get("characters", [])):
+        if not isinstance(character, dict) or not isinstance(character.get("parts"), list):
+            continue
+        for part_index, part in enumerate(character["parts"]):
+            if isinstance(part, dict):
+                _check_skin_references(
+                    part.get("strokes"),
+                    f"characters[{character_index}].parts[{part_index}].strokes",
+                )
 
     audio = project.get("audio", [])
     if not isinstance(audio, list):
