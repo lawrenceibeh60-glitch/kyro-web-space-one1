@@ -1,8 +1,8 @@
 // frontend/js/animation/pose_evaluator.js - layer transform / opacity at a frame (tracks override static values)
 import { evaluateTrack } from './interpolation.js';
 
-const DEFAULTS = { x: 0, y: 0, rotation: 0, scale_x: 1, scale_y: 1, anchor_x: 0, anchor_y: 0 };
-const ANIMATED = ['x', 'y', 'rotation', 'scale_x', 'scale_y'];
+const DEFAULTS = { x: 0, y: 0, rotation: 0, rotation_y: 0, scale_x: 1, scale_y: 1, anchor_x: 0, anchor_y: 0 };
+const ANIMATED = ['x', 'y', 'rotation', 'rotation_y', 'scale_x', 'scale_y'];
 
 export function evaluateTransform(layer, frame) {
   const t = { ...DEFAULTS, ...(layer.transform || {}) };
