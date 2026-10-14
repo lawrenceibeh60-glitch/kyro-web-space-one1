@@ -30,6 +30,9 @@ function mergeInterval(track, start, end, replacement) {
 export function buildTurnChoreography(layers, characterId, startFrame, durationFrames, maxFrame = Infinity) {
   const start = Math.max(0, Math.floor(Number(startFrame) || 0));
   const maxDuration = Number.isFinite(maxFrame) ? Math.max(0, Math.floor(maxFrame) - start) : Infinity;
+  if (maxDuration < 4) {
+    throw new RangeError('The selected timeline does not have at least four frames for a turn.');
+  }
   const duration = Math.max(4, Math.min(Math.floor(Number(durationFrames) || 12), maxDuration));
   if (!Number.isFinite(duration) || duration < 4) {
     throw new RangeError('The selected timeline does not have at least four frames for a turn.');
