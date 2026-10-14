@@ -1,4 +1,6 @@
 // KAE production animation clips: deterministic procedural motion, no demo-only runtime.
+import { evaluateTransform } from './pose_evaluator.js';
+
 const TAU = Math.PI * 2;
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 const smoothstep = (a, b, value) => {
@@ -67,7 +69,7 @@ export function evaluateWalkCycle(rig, frame, overrides = {}) {
   const elapsed = Math.max(0, frame - startFrame) * speed;
   const phaseFrame = config.loop === false ? Math.min(elapsed, cycleFrames) : elapsed % cycleFrames;
   const phase = phaseFrame / cycleFrames * TAU;
-  const stride = clamp(Number(config.stride) || 24, 0, 100);
+  const stride = clamp(Number(config.stride ?? 24), 0, 100);
   const weight = clamp(Number(config.weight ?? 1), 0, 1);
   const left = Math.sin(phase);
   const right = Math.sin(phase + Math.PI);
@@ -100,24 +102,75 @@ export function evaluateWalkCycle(rig, frame, overrides = {}) {
     angles,
     rootOffset: {
       x: 0,
-      y: -Math.abs(Math.sin(phase * 2)) * clamp(Number(config.bob) || 5, 0, 30) * weight,
+      y: -Math.abs(Math.sin(phase * 2)) * clamp(Number(config.bob ?? 5), 0, 30) * weight,
     },
     footContact: { left: stanceLeft, right: stanceRight },
     contactWeight: clamp(stanceBlend, 0, 1),
   };
 }
 
-export function evaluateRigAnimation(rig, frame) {
+function distance(a, b) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function solveContactLeg(rig, pose, frame, side, layer, currentLayerTransform) {
+  if (!pose.footContact[side]) return;
+  const bones = rig.bones || [];
+  const byRole = role => bones.find(bone => inferBoneRole(bone) === role);
+  const thigh = byRole(`${side}_thigh`);
+  const shin = byRole(`${side}_shin`);
+  const foot = byRole(`${side}_foot`);
+  if (!thigh?.pivot || !shin?.pivot || !foot?.pivot) return;
+
+  const hip = thigh.pivot;
+  const knee = shin.pivot;
+  const ankle = foot.pivot;
+  const upperLength = distance(hip, knee);
+  const lowerLength = distance(knee, ankle);
+  if (upperLength < 1 || lowerLength < 1) return;
+
+  const config = rig.animation || {};
+  const cycleFrames = clamp(Number(config.cycle_frames) || 24, 4, 240);
+  const speed = clamp(Number(config.speed) || 1, 0.05, 8);
+  const startFrame = Number.isFinite(config.start_frame) ? config.start_frame : 0;
+  const elapsed = Math.max(0, frame - startFrame) * speed;
+  const cycleIndex = Math.floor(elapsed / cycleFrames);
+  const stanceStartElapsed = cycleIndex * cycleFrames + (side === 'right' ? cycleFrames / 2 : 0);
+  const stanceStartFrame = startFrame + stanceStartElapsed / speed;
+  const startTransform = layer
+    ? evaluateTransform(layer, stanceStartFrame)
+    : (currentLayerTransform || { x: 0, y: 0 });
+  const startPose = evaluateWalkCycle(rig, stanceStartFrame);
+  const currentTransform = currentLayerTransform || { x: 0, y: 0 };
+  const target = {
+    x: ankle.x + (startTransform.x || 0) - (currentTransform.x || 0),
+    y: ankle.y + (startTransform.y || 0) - (currentTransform.y || 0)
+      + startPose.rootOffset.y - pose.rootOffset.y,
+  };
+  const solved = solveTwoBoneIK(hip, target, upperLength, lowerLength, side === 'left' ? 1 : -1);
+  const restUpper = Math.atan2(knee.y - hip.y, knee.x - hip.x) * 180 / Math.PI;
+  const restLower = Math.atan2(ankle.y - knee.y, ankle.x - knee.x) * 180 / Math.PI;
+  const upperCorrection = solved.shoulder - restUpper;
+  const lowerCorrection = solved.shoulder + solved.elbow - restLower - upperCorrection;
+  const weight = clamp(Number(config.weight ?? 1), 0, 1);
+  pose.bones[thigh.id] = upperCorrection * weight;
+  pose.bones[shin.id] = lowerCorrection * weight;
+  if (foot) pose.bones[foot.id] = -(upperCorrection + lowerCorrection) * weight;
+}
+
+export function evaluateRigAnimation(rig, frame, options = {}) {
   if (!rig?.animation || rig.animation.enabled === false) return null;
   if (rig.animation.type !== 'walk') return null;
   const pose = evaluateWalkCycle(rig, frame);
-  const bones = {};
+  pose.bones = {};
   for (const bone of rig.bones || []) {
     const role = inferBoneRole(bone);
     const clipAngle = pose.angles[role];
-    if (Number.isFinite(clipAngle)) bones[bone.id] = clipAngle;
+    if (Number.isFinite(clipAngle)) pose.bones[bone.id] = clipAngle;
   }
-  return { ...pose, bones };
+  solveContactLeg(rig, pose, frame, 'left', options.layer, options.layerTransform);
+  solveContactLeg(rig, pose, frame, 'right', options.layer, options.layerTransform);
+  return pose;
 }
 
 export function blendRigRotation(baseRotation, clipRotation, weight = 1) {

@@ -99,3 +99,23 @@ test('renderer applies procedural rig motion to a real character-part layer', ()
   renderFrame(context, project, 'scene', 6);
   assert.ok(rotations.some(angle => Math.abs(angle) > 0.01), 'expected renderer to apply evaluated rig rotation');
 });
+
+test('stance IK compensates for animated layer translation to keep a planted foot anchored', async () => {
+  const rig = {
+    animation: { type: 'walk', cycle_frames: 24, stride: 28, weight: 1 },
+    bones: [
+      { id: 'left_thigh', name: 'Left thigh', character_part_id: 'left_thigh', pivot: { x: 100, y: 100 } },
+      { id: 'left_shin', name: 'Left shin', character_part_id: 'left_shin', parent_id: 'left_thigh', pivot: { x: 80, y: 155 } },
+      { id: 'left_foot', name: 'Left foot', character_part_id: 'left_foot', parent_id: 'left_shin', pivot: { x: 65, y: 205 } },
+      { id: 'right_thigh', name: 'Right thigh', character_part_id: 'right_thigh', pivot: { x: 120, y: 100 } },
+      { id: 'right_shin', name: 'Right shin', character_part_id: 'right_shin', parent_id: 'right_thigh', pivot: { x: 140, y: 155 } },
+      { id: 'right_foot', name: 'Right foot', character_part_id: 'right_foot', parent_id: 'right_shin', pivot: { x: 155, y: 205 } },
+    ],
+  };
+  const layer = { transform: { x: 0, y: 0 }, tracks: { x: [{ t: 0, v: 0 }, { t: 12, v: 12 }, { t: 24, v: 24 }] } };
+  const pose = evaluateRigAnimation(rig, 4, { layer, layerTransform: { x: 4, y: 0 } });
+  assert.equal(pose.footContact.left, true);
+  assert.ok(Number.isFinite(pose.bones.left_thigh));
+  assert.ok(Number.isFinite(pose.bones.left_shin));
+  assert.ok(Number.isFinite(pose.bones.left_foot));
+});

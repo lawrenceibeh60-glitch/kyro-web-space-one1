@@ -44,20 +44,35 @@ class ProjectDemoTests(unittest.TestCase):
             layer for layer in scene["layers"]
             if layer.get("character_id") == "character_walker"
         ]
-        self.assertEqual(len(walker_layers), 8)
-        for layer in walker_layers:
-            with self.subTest(layer=layer["id"]):
+        self.assertEqual(len(walker_layers), 20)
+        expected_parts = {
+            "left_thigh", "left_shin", "right_thigh", "right_shin",
+            "left_upper_arm", "right_upper_arm", "torso", "head", "left_foot", "right_foot",
+        }
+        for part_id in expected_parts:
+            with self.subTest(part=part_id):
+                front = next(layer for layer in walker_layers
+                             if layer["id"] == f"layer_walker_{part_id}_front")
+                profile = next(layer for layer in walker_layers
+                               if layer["id"] == f"layer_walker_{part_id}_profile")
                 self.assertEqual(
-                    [(exposure["start"], exposure["length"])
-                     for exposure in layer["exposures"]],
-                    [(0, 100), (100, 100)],
+                    [(exposure["start"], exposure["length"]) for exposure in front["exposures"]],
+                    [(0, 104)],
                 )
-                self.assertEqual(layer["character_id"], "character_walker")
-                self.assertTrue(layer.get("character_part_id"))
+                self.assertEqual(
+                    [(exposure["start"], exposure["length"]) for exposure in profile["exposures"]],
+                    [(96, 104)],
+                )
+                self.assertEqual(front["character_part_id"], part_id)
+                self.assertEqual(profile["character_part_id"], part_id)
+                self.assertEqual(front["tracks"]["opacity"][-2]["v"], 0)
+                self.assertEqual(profile["tracks"]["opacity"][2]["v"], 0.5)
         rig = next(item for item in project["rigs"] if item["character_id"] == "character_walker")
         self.assertEqual(rig["animation"]["type"], "walk")
         self.assertTrue(rig["animation"]["enabled"])
-        self.assertEqual(len(rig["bones"]), 8)
+        self.assertEqual(len(rig["bones"]), 10)
+        self.assertTrue(any(bone["id"] == "left_shin" for bone in rig["bones"]))
+        self.assertTrue(any(bone["id"] == "right_shin" for bone in rig["bones"]))
         self.assertNotIn("d_character_front", project["drawings"])
         self.assertNotIn("d_character_profile", project["drawings"])
         self.assertEqual(validate_project(project), [])
