@@ -2,7 +2,8 @@
 GET    /api/projects        list summaries
 POST   /api/projects        create {name, settings?}
 GET/POST /api/projects/demo   create the bouncing-ball demo
-GET/POST /api/projects/demo/<template> create a named demo template
+GET/POST /api/projects/templates/<template> create an editable starter scene
+Legacy /demo endpoints remain supported for older clients
 GET    /api/projects/<id>   load
 PUT    /api/projects/<id>   validate + save (full document)
 DELETE /api/projects/<id>   delete
@@ -40,6 +41,15 @@ def create_demo():
 
 @bp.route("/demo/<template>", methods=["GET", "POST"])
 def create_demo_template(template):
+    return jsonify(svc.create_demo(template)), 201
+
+@bp.route("/templates", methods=["GET", "POST"])
+def create_default_template():
+    return jsonify(svc.create_demo("bounce")), 201
+
+
+@bp.route("/templates/<template>", methods=["GET", "POST"])
+def create_template(template):
     return jsonify(svc.create_demo(template)), 201
 
 
