@@ -35,6 +35,19 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.waitForFunction(() => document.querySelectorAll('#bonePart option').length > 1);
     await page.locator('#rigAuto').click();
     await page.waitForFunction(() => document.querySelectorAll('#boneList .studio-bone').length > 1);
+    await page.locator('#rigWalkEnabled').check();
+    await page.locator('#rigWalkCycle').fill('32');
+    await page.locator('#rigWalkStride').evaluate(input => {
+      input.value = '30';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.locator('#rigWalkApply').click();
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      return rig?.animation?.type === 'walk' && rig.animation.enabled === true
+        && rig.animation.cycle_frames === 32 && rig.animation.stride === 30;
+    });
 
     await page.locator('[data-tool="weight"]').click();
     await page.locator('#weightRadius').waitFor({ state: 'visible' });
