@@ -241,7 +241,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     const hide = pv && pv.drawingId === ex?.drawing ? pv.hidden : null;
     const drawRiggedStroke = stroke => {
       ctx.save();
-      if (rig && Array.isArray(stroke.skin_weights)) {
+      if (rig && (Array.isArray(stroke.skin_weights) || Array.isArray(stroke.command_skin_weights))) {
         drawStroke(ctx, deformStrokeForRig(stroke, rig, frame, rigPose));
       } else {
         drawRigPose(ctx, project, layer, frame, rigPose);
