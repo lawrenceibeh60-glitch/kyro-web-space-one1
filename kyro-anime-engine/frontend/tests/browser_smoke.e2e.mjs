@@ -112,9 +112,25 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return Array.isArray(stroke?.[field]) && stroke[field].some(influences =>
         Array.isArray(influences) && influences.some(item => item.bone_id === window.kae.state.weightBoneId));
     }, target);
+    const pixelSignature = () => page.evaluate(() => {
+      const canvas = document.querySelector('#canvas');
+      const context = canvas.getContext('2d');
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let hash = 2166136261;
+      for (let index = 0; index < pixels.length; index += 4) {
+        hash ^= pixels[index]; hash = Math.imul(hash, 16777619);
+        hash ^= pixels[index + 1]; hash = Math.imul(hash, 16777619);
+        hash ^= pixels[index + 2]; hash = Math.imul(hash, 16777619);
+      }
+      return hash >>> 0;
+    });
     const firstFrame = await page.locator('#frameReadout').textContent();
+    const firstPixels = await pixelSignature();
     await page.locator('#play').click();
     await page.waitForFunction(initial => document.querySelector('#frameReadout')?.textContent !== initial, firstFrame, { timeout: 5000 });
+    await page.waitForTimeout(100);
+    const laterPixels = await pixelSignature();
+    assert.notEqual(firstPixels, laterPixels, 'playing the rigged character must change rendered canvas pixels');
     await page.locator('#play').click();
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
