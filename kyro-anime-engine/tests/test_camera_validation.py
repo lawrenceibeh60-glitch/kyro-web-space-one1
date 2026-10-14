@@ -37,6 +37,24 @@ class CameraValidationTests(unittest.TestCase):
         errors = validate_project(project)
         self.assertTrue(any("unknown camera channel" in error for error in errors))
 
+    def test_camera_vertical_scale_and_tracks_are_supported(self):
+        project = deepcopy(self.project)
+        camera = project["scenes"][0]["camera"]
+        camera["transform"]["scale_y"] = 1.25
+        camera["tracks"] = {
+            "scale_y": [{"t": 0, "v": 1.0}, {"t": 20, "v": 1.25, "ease": "ease_in_out"}]
+        }
+        self.assertEqual(validate_project(project), [])
+
+        camera["transform"]["scale_y"] = 0
+        errors = validate_project(project)
+        self.assertTrue(any("camera.transform.scale_y" in error for error in errors))
+
+        camera["transform"]["scale_y"] = 1
+        camera["tracks"]["scale_y"][1]["v"] = 33
+        errors = validate_project(project)
+        self.assertTrue(any("camera.tracks.scale_y[1].v" in error for error in errors))
+
     def test_camera_roll_and_roll_tracks_are_validated(self):
         project = deepcopy(self.project)
         camera = project["scenes"][0]["camera"]
