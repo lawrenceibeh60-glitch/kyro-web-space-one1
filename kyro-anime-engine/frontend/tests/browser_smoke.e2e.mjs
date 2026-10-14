@@ -146,7 +146,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
 
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.locator('[data-template="cinematic"]').click();
-    await page.waitForURL(/editor\\.html\\?project=/);
+    await page.waitForURL(/editor\.html\?project=/);
     await page.locator('[data-ws="studio"]').click();
     await page.locator('[data-studio-tab="rig"]').click();
     await page.locator('#rigCharacter').selectOption('character_walker');
