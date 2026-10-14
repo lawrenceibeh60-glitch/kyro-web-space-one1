@@ -334,7 +334,7 @@ def _create_studio_demo(template):
             *walker_layers,
         ]
         for layer in layers:
-            if layer["id"] == "layer_walker":
+            if layer.get("character_id") == "character_walker":
                 continue
             for exposure in layer.get("exposures", []):
                 exposure["length"] = duration
