@@ -91,6 +91,8 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
+    await page.locator('#exStart').fill('1');
+    await page.locator('#exEnd').fill('1');
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 20000 }),
       page.locator('#exGo').click(),
