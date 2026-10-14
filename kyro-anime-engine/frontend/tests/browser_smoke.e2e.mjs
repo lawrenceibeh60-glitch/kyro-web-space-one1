@@ -84,9 +84,19 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return Array.isArray(stroke?.[field]) && stroke[field].some(influences =>
         Array.isArray(influences) && influences.some(item => item.bone_id === window.kae.state.weightBoneId));
     }, target);
+    const firstFrame = await page.locator('#frameReadout').textContent();
+    await page.locator('#play').click();
+    await page.waitForFunction(initial => document.querySelector('#frameReadout')?.textContent !== initial, firstFrame, { timeout: 5000 });
+    await page.locator('#play').click();
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20000 }),
+      page.locator('#exGo').click(),
+    ]);
+    assert.match(download.suggestedFilename(), /\\.png$/i);
+    await page.waitForFunction(() => document.querySelector('#exMsg')?.textContent?.startsWith('Done:'), null, { timeout: 20000 });
 
     assert.deepEqual(pageErrors, [], `browser runtime errors: ${pageErrors.join('; ')}`);
   } finally {
