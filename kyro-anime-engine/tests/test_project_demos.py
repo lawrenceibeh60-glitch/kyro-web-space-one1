@@ -24,6 +24,30 @@ class ProjectDemoTests(unittest.TestCase):
         self.assertGreaterEqual(len({layer["depth"] for layer in layers}), 3)
         self.assertTrue(project["scenes"][0]["camera"]["tracks"]["x"])
 
+    def test_cinematic_demo_has_full_length_camera_choreography_and_front_profile_art(self):
+        with patch.object(project_service.repo, "save"):
+            try:
+                project = project_service.create_demo("cinematic")
+            except ApiError as error:
+                self.fail(f"cinematic validation errors: {error.details!r}")
+
+        self.assertEqual(project["settings"]["duration_frames"], 200)
+        scene = project["scenes"][0]
+        camera_tracks = scene["camera"]["tracks"]
+        for channel in ("x", "y", "rotation", "scale_x", "scale_y"):
+            with self.subTest(channel=channel):
+                keys = camera_tracks[channel]
+                self.assertEqual(keys[0]["t"], 0)
+                self.assertEqual(keys[-1]["t"], 199)
+                self.assertGreaterEqual(len(keys), 6)
+        walker = next(layer for layer in scene["layers"] if layer["id"] == "layer_walker")
+        self.assertEqual(
+            [(exposure["start"], exposure["length"], exposure["drawing"])
+             for exposure in walker["exposures"]],
+            [(0, 99, "d_character_front"), (100, 100, "d_character_profile")],
+        )
+        self.assertEqual(validate_project(project), [])
+
     def test_unknown_demo_template_is_rejected(self):
         with self.assertRaises(ApiError):
             project_service.create_demo("not-a-demo")

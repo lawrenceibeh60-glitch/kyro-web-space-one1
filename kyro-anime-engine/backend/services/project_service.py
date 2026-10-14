@@ -15,6 +15,7 @@ DEMO_TEMPLATES = {
     "parallax": ("Parallax Ridge", "#d7eff2", 48),
     "pendulum": ("Pendulum Study", "#f2eadb", 48),
     "orbit": ("Orbit Study", "#121b35", 48),
+    "cinematic": ("Cinematic Camera Move", "#111722", 200),
 }
 
 
@@ -183,6 +184,148 @@ def _create_studio_demo(template):
                                  {"t": 47, "v": -32}]})
         ]
         camera_tracks = {}
+    elif template == "cinematic":
+        # A fully editable 200-frame camera choreography study (24 fps).
+        # Camera tracks use real KAE interpolation; no runtime-only animation tricks.
+        drawings.update({
+            "d_skyline": {"id": "d_skyline", "name": "Distant skyline", "strokes": [
+                _shape("skyline", [[0, 350], [70, 350], [70, 260], [125, 260], [125, 315],
+                    [195, 315], [195, 205], [250, 205], [250, 330], [320, 330],
+                    [320, 240], [385, 240], [385, 295], [455, 295], [455, 180],
+                    [520, 180], [520, 320], [600, 320], [600, 220], [670, 220],
+                    [670, 290], [740, 290], [740, 170], [810, 170], [810, 320],
+                    [900, 320], [900, 235], [970, 235], [970, 300], [1040, 300],
+                    [1040, 195], [1110, 195], [1110, 330], [1180, 330],
+                    [1180, 250], [1280, 250], [1280, 720], [0, 720]],
+                    "#202c3b", 2, "#202c3b", True),
+            ]},
+            "d_ground": {"id": "d_ground", "name": "Wet street", "strokes": [
+                _shape("road", [[0, 520], [1280, 520], [1280, 720], [0, 720]],
+                    "#18212c", 2, "#18212c", True),
+                _shape("reflection_a", [[160, 575], [360, 575]], "#526a80", 5),
+                _shape("reflection_b", [[780, 620], [1090, 620]], "#354a5e", 4),
+                _shape("reflection_c", [[430, 675], [610, 675]], "#526a80", 3),
+                _shape("horizon", [[0, 520], [1280, 520]], "#72869a", 2),
+            ]},
+            "d_character_front": {"id": "d_character_front", "name": "Walker front pose", "strokes": [
+                _shape("coat", [[584, 325], [696, 325], [722, 475], [688, 490],
+                    [700, 555], [580, 555], [592, 490], [558, 475]],
+                    "#d8e0e9", 5, "#d8e0e9", True),
+                _shape("neck", [[615, 292], [665, 292], [665, 337], [615, 337]],
+                    "#b8c6d5", 3, "#b8c6d5", True),
+                _shape("head", _circle(640, 250, 58, 24), "#e4c9b5", 5, "#e4c9b5", True),
+                _shape("hair", [[582, 252], [584, 218], [601, 190], [637, 180],
+                    [674, 191], [696, 222], [691, 254], [672, 224], [645, 210],
+                    [615, 226], [596, 254]], "#20202b", 4, "#20202b", True),
+                _shape("eye_l", [[615, 251], [629, 251]], "#20202b", 4),
+                _shape("eye_r", [[651, 251], [665, 251]], "#20202b", 4),
+                _shape("arm_l", [[576, 352], [541, 425], [558, 450]], "#c7d2df", 16),
+                _shape("arm_r", [[704, 352], [738, 405], [718, 438]], "#c7d2df", 16),
+                _shape("leg_l", [[608, 548], [592, 638], [565, 677]], "#7f9bb4", 25),
+                _shape("leg_r", [[670, 548], [690, 620], [722, 657]], "#a7bbcd", 25),
+                _shape("shoe_l", [[565, 677], [535, 686], [590, 692]], "#d9e1ea", 8),
+                _shape("shoe_r", [[722, 657], [745, 671], [700, 675]], "#d9e1ea", 8),
+            ]},
+            "d_character_profile": {"id": "d_character_profile", "name": "Walker profile pose", "strokes": [
+                _shape("coat", [[625, 325], [690, 340], [700, 470], [680, 550],
+                    [590, 550], [610, 465]], "#d8e0e9", 5, "#d8e0e9", True),
+                _shape("neck", [[625, 290], [660, 300], [654, 337], [622, 333]],
+                    "#b8c6d5", 3, "#b8c6d5", True),
+                _shape("head", _circle(640, 250, 56, 24), "#e4c9b5", 5, "#e4c9b5", True),
+                _shape("hair", [[584, 250], [585, 215], [608, 190], [646, 183],
+                    [679, 202], [695, 235], [681, 261], [666, 226], [636, 210],
+                    [607, 228]], "#20202b", 4, "#20202b", True),
+                _shape("profile_eye", [[665, 247], [674, 250]], "#20202b", 4),
+                _shape("profile_nose", [[686, 253], [700, 263], [686, 267]], "#b78f7d", 3),
+                _shape("arm", [[632, 355], [605, 420], [628, 450]], "#c7d2df", 16),
+                _shape("leg_back", [[620, 545], [580, 610], [590, 666]], "#7f9bb4", 23),
+                _shape("leg_front", [[662, 545], [700, 604], [670, 665]], "#a7bbcd", 25),
+                _shape("shoe_back", [[590, 666], [564, 678], [610, 681]], "#d9e1ea", 8),
+                _shape("shoe_front", [[670, 665], [700, 677], [652, 682]], "#d9e1ea", 8),
+            ]},
+        })
+        layers = [
+            _layer("layer_skyline", "Distant skyline", "d_skyline", 0.22,
+                tracks={"x": [{"t": 0, "v": -8}, {"t": 199, "v": 8, "ease": "ease_in_out"}]}),
+            _layer("layer_ground", "Wet street", "d_ground", 0.72,
+                tracks={"x": [{"t": 0, "v": 20}, {"t": 199, "v": -20, "ease": "ease_in_out"}]}),
+            {
+                "id": "layer_walker", "name": "Walker (front/profile drawings)",
+                "type": "drawing", "depth": 1.15, "transform": {"x": 0, "y": 0},
+                "exposures": [
+                    {"start": 0, "length": 99, "drawing": "d_character_front"},
+                    {"start": 100, "length": 100, "drawing": "d_character_profile"},
+                ],
+                "tracks": {
+                    "x": [
+                        {"t": 0, "v": 640, "ease": "ease_in_out"},
+                        {"t": 49, "v": 640, "ease": "ease_in_out"},
+                        {"t": 99, "v": 620, "ease": "ease_in_out"},
+                        {"t": 149, "v": 610, "ease": "ease_in_out"},
+                        {"t": 199, "v": 610},
+                    ],
+                    "y": [
+                        {"t": 0, "v": 8, "ease": "ease_in_out"},
+                        {"t": 49, "v": 0, "ease": "ease_in_out"},
+                        {"t": 99, "v": 5, "ease": "ease_in_out"},
+                        {"t": 149, "v": 0, "ease": "ease_in_out"},
+                        {"t": 199, "v": 0},
+                    ],
+                },
+            },
+        ]
+        for layer in layers:
+            if layer["id"] == "layer_walker":
+                continue
+            for exposure in layer.get("exposures", []):
+                exposure["length"] = duration
+        camera_tracks = {
+            "x": [
+                {"t": 0, "v": 0, "ease": "ease_in_out"},
+                {"t": 39, "v": 0, "ease": "ease_in_out"},
+                {"t": 49, "v": 0, "ease": "ease_in_out"},
+                {"t": 99, "v": 36, "ease": "ease_in_out"},
+                {"t": 119, "v": 56, "ease": "ease_in_out"},
+                {"t": 179, "v": 95, "ease": "ease_in_out"},
+                {"t": 199, "v": 95},
+            ],
+            "y": [
+                {"t": 0, "v": 75, "ease": "ease_in_out"},
+                {"t": 39, "v": 75, "ease": "ease_in_out"},
+                {"t": 49, "v": 0, "ease": "ease_in_out"},
+                {"t": 99, "v": 0, "ease": "ease_in_out"},
+                {"t": 119, "v": -8, "ease": "ease_in_out"},
+                {"t": 179, "v": -8, "ease": "ease_in_out"},
+                {"t": 199, "v": -8},
+            ],
+            "rotation": [
+                {"t": 0, "v": -1.5, "ease": "ease_in_out"},
+                {"t": 39, "v": -1.5, "ease": "ease_in_out"},
+                {"t": 49, "v": 0, "ease": "ease_in_out"},
+                {"t": 99, "v": 0, "ease": "ease_in_out"},
+                {"t": 119, "v": 1.2, "ease": "ease_in_out"},
+                {"t": 179, "v": 0.2, "ease": "ease_in_out"},
+                {"t": 199, "v": 0},
+            ],
+            "scale_x": [
+                {"t": 0, "v": 2.25, "ease": "ease_in_out"},
+                {"t": 39, "v": 2.25, "ease": "ease_in_out"},
+                {"t": 49, "v": 1.0, "ease": "ease_in_out"},
+                {"t": 99, "v": 1.08, "ease": "ease_in_out"},
+                {"t": 119, "v": 1.16, "ease": "ease_in_out"},
+                {"t": 179, "v": 1.12, "ease": "ease_in_out"},
+                {"t": 199, "v": 1.08},
+            ],
+            "scale_y": [
+                {"t": 0, "v": 2.05, "ease": "ease_in_out"},
+                {"t": 39, "v": 2.05, "ease": "ease_in_out"},
+                {"t": 49, "v": 1.0, "ease": "ease_in_out"},
+                {"t": 99, "v": 1.04, "ease": "ease_in_out"},
+                {"t": 119, "v": 1.12, "ease": "ease_in_out"},
+                {"t": 179, "v": 1.08, "ease": "ease_in_out"},
+                {"t": 199, "v": 1.04},
+            ],
+        }
     else:
         drawings["d_orbit"] = {"id": "d_orbit", "name": "Orbit", "strokes": [
             _shape("orbit-outer", _circle(640, 360, 230), "#50658e", 3),
@@ -219,7 +362,7 @@ def _create_studio_demo(template):
     project["scenes"] = [{
         "id": "scene_1", "name": name,
         "camera": {
-            "transform": {"x": 0, "y": 0, "scale_x": 1},
+            "transform": {"x": 0, "y": 0, "scale_x": 1, "scale_y": 1},
             "tracks": camera_tracks,
         },
         "lights": [],

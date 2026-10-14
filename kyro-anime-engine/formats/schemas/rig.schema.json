@@ -1,1 +1,45 @@
-{}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rig.schema.json",
+  "title": "KAE 2D Character Rig",
+  "description": "A hierarchical 2D rotation rig attached to stable character-part IDs.",
+  "type": "object",
+  "required": ["id", "name", "character_id", "bones"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "name": { "type": "string", "minLength": 1 },
+    "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "bones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "character_part_id", "pivot"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+          "name": { "type": "string", "minLength": 1 },
+          "parent_id": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+          "character_part_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+          "rotation": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0 },
+          "pivot": {
+            "type": "object",
+            "required": ["x", "y"],
+            "additionalProperties": false,
+            "properties": {
+              "x": { "type": "number", "minimum": -8192, "maximum": 8192 },
+              "y": { "type": "number", "minimum": -8192, "maximum": 8192 }
+            }
+          },
+          "tracks": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rotation": { "$ref": "animation.schema.json#/$defs/track" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

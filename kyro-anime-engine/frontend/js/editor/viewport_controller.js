@@ -10,6 +10,7 @@ import { evaluateTransform } from '../animation/pose_evaluator.js';
 import { applyCameraTransform, evaluateCamera } from '../animation/camera_evaluator.js';
 import { execute, setValue } from '../core/command_manager.js';
 import { drawEditOverlay } from './edit_tools.js';
+import { writeCameraChannel, zoomCameraAtPoint } from '../scene/camera_controller.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -125,13 +126,14 @@ export function initViewport(canvas) {
     const scene = state.project?.scenes.find(s => s.id === state.sceneId);
     const camera = evaluateCamera(scene?.camera, state.frame);
     const depth = Math.min(2, Math.max(0, getLayer()?.depth ?? 1));
-    const cameraZoom = 1 + (camera.zoom - 1) * depth;
+    const cameraZoomX = 1 + (camera.zoom - 1) * depth;
+    const cameraZoomY = 1 + (camera.zoomY - 1) * depth;
     const { width, height } = state.project.settings;
     const radians = -camera.rotation * depth * Math.PI / 180;
     const x = (p.x - v.panX) / v.zoom - width / 2 - camera.x * depth;
     const y = (p.y - v.panY) / v.zoom - height / 2 - camera.y * depth;
-    const rotatedX = (x * Math.cos(radians) - y * Math.sin(radians)) / cameraZoom;
-    const rotatedY = (x * Math.sin(radians) + y * Math.cos(radians)) / cameraZoom;
+    const rotatedX = (x * Math.cos(radians) - y * Math.sin(radians)) / cameraZoomX;
+    const rotatedY = (x * Math.sin(radians) + y * Math.cos(radians)) / cameraZoomY;
     return {
       x: width / 2 + rotatedX,
       y: height / 2 + rotatedY,
@@ -153,36 +155,25 @@ export function initViewport(canvas) {
   }
 
   function cameraChannel(camera, channel, value) {
-    const tracks = { ...(camera.tracks || {}) };
-    if (state.autokey || tracks[channel]?.length) {
-      const keys = [...(tracks[channel] || [])];
-      const key = { t: state.frame, v: value, ease: state.keyEase || 'linear' };
-      const index = keys.findIndex(item => item.t === state.frame);
-      if (index >= 0) keys[index] = key;
-      else keys.push(key);
-      keys.sort((a, b) => a.t - b.t);
-      tracks[channel] = keys;
-    } else {
-      camera.transform = { ...(camera.transform || {}), [channel]: value };
-    }
-    camera.tracks = tracks;
+    const next = writeCameraChannel(camera, channel, value, {
+      frame: state.frame,
+      autokey: state.autokey,
+      ease: state.keyEase || 'linear',
+    });
+    camera.transform = next.transform;
+    camera.tracks = next.tracks;
   }
 
   function setCameraZoomAt(camera, localPoint, nextZoom) {
-    const evaluated = evaluateCamera(camera, state.frame);
-    const { width, height } = state.project.settings;
-    const px = (localPoint.x - state.view.panX) / state.view.zoom;
-    const py = (localPoint.y - state.view.panY) / state.view.zoom;
-    const radians = evaluated.rotation * Math.PI / 180;
-    const dx = px - width / 2 - evaluated.x;
-    const dy = py - height / 2 - evaluated.y;
-    const worldX = (dx * Math.cos(radians) + dy * Math.sin(radians)) / evaluated.zoom;
-    const worldY = (-dx * Math.sin(radians) + dy * Math.cos(radians)) / evaluated.zoom;
-    const newDx = nextZoom * (worldX * Math.cos(radians) - worldY * Math.sin(radians));
-    const newDy = nextZoom * (worldX * Math.sin(radians) + worldY * Math.cos(radians));
-    cameraChannel(camera, 'x', clamp(px - width / 2 - newDx, -8192, 8192));
-    cameraChannel(camera, 'y', clamp(py - height / 2 - newDy, -8192, 8192));
-    cameraChannel(camera, 'scale_x', nextZoom);
+    const next = zoomCameraAtPoint(camera, localPoint, nextZoom, {
+      frame: state.frame,
+      view: state.view,
+      settings: state.project.settings,
+      autokey: state.autokey,
+      ease: state.keyEase || 'linear',
+    });
+    camera.transform = next.transform;
+    camera.tracks = next.tracks;
   }
 
   function previewCamera(nextCamera) {
@@ -213,12 +204,13 @@ export function initViewport(canvas) {
     const v = state.view, scene = state.project?.scenes.find(s => s.id === state.sceneId);
     const camera = evaluateCamera(scene?.camera, state.frame);
     const depth = Math.min(2, Math.max(0, getLayer()?.depth ?? 1));
-    const cameraZoom = 1 + (camera.zoom - 1) * depth;
+    const cameraZoomX = 1 + (camera.zoom - 1) * depth;
+    const cameraZoomY = 1 + (camera.zoomY - 1) * depth;
     const { width, height } = state.project.settings;
     const radians = camera.rotation * depth * Math.PI / 180;
     const dx = worldX - width / 2, dy = worldY - height / 2;
-    const sx = width / 2 + camera.x * depth + cameraZoom * (dx * Math.cos(radians) - dy * Math.sin(radians));
-    const sy = height / 2 + camera.y * depth + cameraZoom * (dx * Math.sin(radians) + dy * Math.cos(radians));
+    const sx = width / 2 + camera.x * depth + cameraZoomX * (dx * Math.cos(radians) - dy * Math.sin(radians));
+    const sy = height / 2 + camera.y * depth + cameraZoomY * (dx * Math.sin(radians) + dy * Math.cos(radians));
     const x = Math.round((sx * v.zoom + v.panX) * dpr);
     const y = Math.round((sy * v.zoom + v.panY) * dpr);
     if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return null;
