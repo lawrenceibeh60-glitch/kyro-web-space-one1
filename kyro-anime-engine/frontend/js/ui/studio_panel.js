@@ -4,6 +4,7 @@ import { state, setState } from '../core/state_manager.js';
 import { Audio, StudioCharacters } from '../api/studio.js';
 import { evaluateTrack } from '../animation/interpolation.js';
 import { toLocal } from '../rendering/geometry.js';
+import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weights.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -148,16 +149,6 @@ export function initStudioPanel({ onCharacterImported }) {
 
   let weightPaint = null;
 
-  function paintInfluence(existing, boneId, targetWeight) {
-    const source = Array.isArray(existing) ? existing : [];
-    const others = source.filter(item => item?.bone_id !== boneId && Number(item?.weight) > 0);
-    const otherTotal = others.reduce((sum, item) => sum + Number(item.weight), 0);
-    const remainder = Math.max(0, 1 - targetWeight);
-    const normalizedOthers = otherTotal > 0
-      ? others.map(item => ({ bone_id: item.bone_id, weight: Number(item.weight) * remainder / otherTotal }))
-      : [];
-    return [...normalizedOthers, { bone_id: boneId, weight: targetWeight }];
-  }
 
   function eachGeometryCoordinate(stroke, callback) {
     if (Array.isArray(stroke.points)) {
@@ -192,7 +183,7 @@ export function initStudioPanel({ onCharacterImported }) {
     for (const stroke of weightPaint.info.drawing.strokes) {
       eachGeometryCoordinate(stroke, (coordinate, weights, index) => {
         if ((coordinate[0] - localPoint[0]) ** 2 + (coordinate[1] - localPoint[1]) ** 2 > radiusSquared) return;
-        weights[index] = paintInfluence(weights[index], weightPaint.boneId, Number($('skinWeight').value));
+        weights[index] = paintBoneInfluence(weights[index], weightPaint.boneId, Number($('skinWeight').value));
         changed++;
       });
     }
@@ -266,15 +257,6 @@ export function initStudioPanel({ onCharacterImported }) {
     return pairs;
   }
 
-  function nearestBoneWeights(point, bones) {
-    let nearest = null, best = Infinity;
-    for (const bone of bones) {
-      if (!Number.isFinite(bone.pivot?.x) || !Number.isFinite(bone.pivot?.y)) continue;
-      const distance = (point[0] - bone.pivot.x) ** 2 + (point[1] - bone.pivot.y) ** 2;
-      if (distance < best) { best = distance; nearest = bone; }
-    }
-    return nearest ? [{ bone_id: nearest.id, weight: 1 }] : [];
-  }
 
   function updateSkinStatus(message, error = false) {
     const status = $('skinStatus');
@@ -323,7 +305,7 @@ export function initStudioPanel({ onCharacterImported }) {
       const next = { ...stroke };
       if (Array.isArray(stroke.points)) {
         next.skin_weights = stroke.points.map(point => mode === 'auto'
-          ? nearestBoneWeights(point, bones)
+          ? nearestBoneInfluence(point, bones)
           : [{ bone_id: bone.id, weight }]);
       }
       if (Array.isArray(stroke.commands)) {
