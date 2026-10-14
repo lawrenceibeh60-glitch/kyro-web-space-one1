@@ -250,8 +250,37 @@ def _check_studio_data(project, errs):
             if not isinstance(rig, dict):
                 errs.append(f"{where}: must be an object")
                 continue
-            for key in rig.keys() - {"id", "name", "character_id", "bones"}:
+            for key in rig.keys() - {"id", "name", "character_id", "bones", "animation"}:
                 errs.append(f"{where}.{key}: unknown property")
+            animation = rig.get("animation")
+            if animation is not None:
+                aw = f"{where}.animation"
+                if not isinstance(animation, dict):
+                    errs.append(f"{aw}: must be an object")
+                else:
+                    for key in animation.keys() - {
+                        "type", "enabled", "start_frame", "cycle_frames", "speed",
+                        "stride", "bob", "weight", "loop",
+                    }:
+                        errs.append(f"{aw}.{key}: unknown property")
+                    if animation.get("type") != "walk":
+                        errs.append(f"{aw}.type: only 'walk' is supported")
+                    if "enabled" in animation and not isinstance(animation["enabled"], bool):
+                        errs.append(f"{aw}.enabled: boolean required")
+                    if "loop" in animation and not isinstance(animation["loop"], bool):
+                        errs.append(f"{aw}.loop: boolean required")
+                    for field, default in (("start_frame", 0), ("cycle_frames", 24)):
+                        value = animation.get(field, default)
+                        low, high = (0, None) if field == "start_frame" else (4, 240)
+                        if not _int(value) or value < low or (high is not None and value > high):
+                            errs.append(f"{aw}.{field}: invalid integer")
+                    for field, default, low, high in (
+                        ("speed", 1, 0.05, 8), ("stride", 24, 0, 100),
+                        ("bob", 5, 0, 30), ("weight", 1, 0, 1),
+                    ):
+                        value = animation.get(field, default)
+                        if not _num(value) or not low <= value <= high:
+                            errs.append(f"{aw}.{field}: number {low}..{high} required")
             rig_id = rig.get("id")
             if not isinstance(rig_id, str) or not ID_RE.fullmatch(rig_id) or rig_id in rig_ids:
                 errs.append(f"{where}.id: invalid or duplicate")
