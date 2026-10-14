@@ -5,6 +5,7 @@ import { Audio, StudioCharacters } from '../api/studio.js';
 import { evaluateTrack } from '../animation/interpolation.js';
 import { toLocal } from '../rendering/geometry.js';
 import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weights.js';
+import { buildAutoRig } from '../animation/auto_rig.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -434,6 +435,26 @@ export function initStudioPanel({ onCharacterImported }) {
     changeProjectArray('rigs', [...(state.project.rigs || []), rig], 'Create character rig');
   }
 
+  function autoRig() {
+    const character = (state.project.characters || []).find(item => item.id === selectedCharacterId);
+    const rig = (state.project.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!character || !rig) {
+      toast('Create/select a character rig before auto-rigging.', 'err');
+      return;
+    }
+    try {
+      const result = buildAutoRig(character, rig, state.project.settings);
+      if (!result.addedCount) {
+        toast('Every character part already has a bone.', 'ok');
+        return;
+      }
+      updateRig(result.rig);
+      toast(`Auto-rigged ${result.addedCount} part(s); ${result.totalCount} bones total.`, 'ok', 5000);
+    } catch (error) {
+      toast(error.message || 'Could not auto-rig this character.', 'err');
+    }
+  }
+
   function deleteRig() {
     const rigs = state.project.rigs || [];
     const rig = rigs.find(item => item.character_id === selectedCharacterId);
@@ -588,6 +609,7 @@ export function initStudioPanel({ onCharacterImported }) {
   $('showRigOverlay').onchange = event => setState({ showRigOverlay: event.target.checked });
   $('rigCreate').onclick = createRig;
   $('rigDelete').onclick = deleteRig;
+  $('rigAuto').onclick = autoRig;
   $('boneAdd').onclick = addBone;
   $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
