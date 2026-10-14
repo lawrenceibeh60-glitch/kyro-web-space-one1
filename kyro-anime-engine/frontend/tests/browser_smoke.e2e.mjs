@@ -39,6 +39,51 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
 
     await page.locator('[data-tool="weight"]').click();
     await page.locator('#weightRadius').waitFor({ state: 'visible' });
+    const target = await page.evaluate(async () => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      const layer = scene.layers.find(item => item.id === state.layerId);
+      const exposure = [...(layer.exposures || [])].reverse().find(item =>
+        state.frame >= item.start && state.frame < item.start + item.length);
+      const drawing = state.project.drawings[exposure.drawing];
+      let stroke = null, point = null, field = null, index = 0;
+      for (const item of drawing.strokes) {
+        if (Array.isArray(item.points) && item.points.length) {
+          stroke = item; point = item.points[0]; field = 'skin_weights'; break;
+        }
+        if (Array.isArray(item.commands)) {
+          for (const command of item.commands) {
+            if (command[0] !== 'Z' && command.length >= 3) {
+              stroke = item; point = [command[1], command[2]]; field = 'command_skin_weights'; break;
+            }
+          }
+          if (stroke) break;
+        }
+      }
+      if (!stroke || !point) throw new Error('Generated character drawing has no editable geometry');
+      const { evaluateTransform } = await import('/js/animation/pose_evaluator.js');
+      const { fromLocal } = await import('/js/rendering/geometry.js');
+      const transform = evaluateTransform(layer, state.frame);
+      const [worldX, worldY] = fromLocal(transform, point[0], point[1]);
+      const canvas = document.querySelector('#canvas');
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: rect.left + state.view.panX + worldX * state.view.zoom,
+        y: rect.top + state.view.panY + worldY * state.view.zoom,
+        drawingId: exposure.drawing,
+        strokeId: stroke.id,
+        field,
+      };
+    });
+    await page.mouse.move(target.x, target.y);
+    await page.mouse.down();
+    await page.mouse.move(target.x + 2, target.y + 2, { steps: 2 });
+    await page.mouse.up();
+    await page.waitForFunction(({ drawingId, strokeId, field }) => {
+      const stroke = window.kae.state.project.drawings[drawingId].strokes.find(item => item.id === strokeId);
+      return Array.isArray(stroke?.[field]) && stroke[field].some(influences =>
+        Array.isArray(influences) && influences.some(item => item.bone_id === window.kae.state.weightBoneId));
+    }, target);
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
