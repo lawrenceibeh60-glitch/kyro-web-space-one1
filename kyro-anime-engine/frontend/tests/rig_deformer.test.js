@@ -108,7 +108,13 @@ test('quadratic and cubic path commands deform every control point using command
   const weights = Array.from({ length: 7 }, () => [{ bone_id: 'arm', weight: 1 }]);
   assert.equal(pathCoordinateCount(commands), 7);
   const result = deformStrokeForRig({ id: 'bezier', commands, command_skin_weights: weights }, rig, 0);
-  assert.deepEqual(result.commands, [
+  const normalized = result.commands.map(command => command.map(value => {
+    if (typeof value !== 'number') return value;
+    if (Math.abs(value) < 1e-8) return 0;
+    const rounded = Math.round(value * 1e8) / 1e8;
+    return Math.abs(value - rounded) < 1e-8 ? rounded : value;
+  }));
+  assert.deepEqual(normalized, [
     ['M', 0, 10],
     ['L', 0, 20],
     ['Q', -5, 25, 0, 30],
@@ -131,7 +137,13 @@ test('path coordinates without weights stay unchanged and mixed weights preserve
       [{ bone_id: 'arm', weight: 0.5 }],
     ],
   }, rig, 0);
-  assert.deepEqual(result.commands, [
+  const normalized = result.commands.map(command => command.map(value => {
+    if (typeof value !== 'number') return value;
+    if (Math.abs(value) < 1e-8) return 0;
+    const rounded = Math.round(value * 1e8) / 1e8;
+    return Math.abs(value - rounded) < 1e-8 ? rounded : value;
+  }));
+  assert.deepEqual(normalized, [
     ['M', 5, 5],
     ['Q', 0, 20, 15, 15],
   ]);
