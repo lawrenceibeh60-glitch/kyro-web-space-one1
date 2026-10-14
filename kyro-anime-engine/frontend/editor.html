@@ -46,6 +46,7 @@
       <button class="tool" data-tool="eraser" title="Eraser (E)"><i data-icon="eraser"></i></button>
       <button class="tool" data-tool="grease" title="Grease pencil (G)"><i data-icon="brush"></i></button>
       <button class="tool" data-tool="edit" title="Edit points (Tab)"><i data-icon="nodes"></i></button>
+      <button class="tool" data-tool="weight" title="Paint rig weights on points and Bézier handles"><i data-icon="target"></i></button>
       <span class="shelf-sep"></span>
       <button class="tool" data-tool="line" title="Draw line (L)"><i data-icon="line"></i></button>
       <button class="tool" data-tool="rectangle" title="Draw rectangle (U)"><i data-icon="rectangle"></i></button>
@@ -226,6 +227,10 @@
           <label class="fld color"><span>Fill color</span><input type="color" id="fillColorTool" value="#4772b3"></label>
         </div>
         <div data-tools="eyedropper" class="hint">Click a color in the canvas to sample it into the active brush color.</div>
+        <div data-tools="weight">
+          <div class="hint">Paint bone influence onto nearby points and Bézier handles. Choose a bone in Studio → Rig, then drag over the character. Undo restores the previous weights.</div>
+          <label class="fld"><span>Brush radius</span><b id="weightRadiusValue">48</b><input id="weightRadius" type="range" min="4" max="180" step="2" value="48"></label>
+        </div>
         <div data-tools="edit">
           <div class="hint">Tap or drag a point to move it. Drag on empty space to box-select.</div>
           <div class="xbtns">

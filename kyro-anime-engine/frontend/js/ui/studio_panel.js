@@ -3,6 +3,9 @@ import { bus } from '../core/event_bus.js';
 import { state, setState } from '../core/state_manager.js';
 import { Audio, StudioCharacters } from '../api/studio.js';
 import { evaluateTrack } from '../animation/interpolation.js';
+import { toLocal } from '../rendering/geometry.js';
+import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weights.js';
+import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
 
@@ -144,6 +147,94 @@ export function initStudioPanel({ onCharacterImported }) {
     changeProjectArray('effects', [...(state.project.effects || []), effect], 'Add effect');
   }
 
+  let weightPaint = null;
+
+
+  function eachGeometryCoordinate(stroke, callback) {
+    if (Array.isArray(stroke.points)) {
+      if (!Array.isArray(stroke.skin_weights) || stroke.skin_weights.length !== stroke.points.length) {
+        stroke.skin_weights = stroke.points.map(() => []);
+      }
+      stroke.points.forEach((point, index) => callback(point, stroke.skin_weights, index));
+    }
+    if (Array.isArray(stroke.commands)) {
+      const coords = pathPairs(stroke.commands);
+      if (!Array.isArray(stroke.command_skin_weights)
+          || stroke.command_skin_weights.length !== pathCoordinateCount(stroke.commands)) {
+        stroke.command_skin_weights = coords.map(() => []);
+      }
+      let index = 0;
+      for (const command of stroke.commands) {
+        if (!Array.isArray(command) || command[0] === 'Z') continue;
+        for (let offset = 1; offset + 1 < command.length; offset += 2) {
+          const pair = [command[offset], command[offset + 1]];
+          callback(pair, stroke.command_skin_weights, index++);
+        }
+      }
+    }
+  }
+
+  function paintAt(point) {
+    if (!weightPaint || !state.project) return;
+    const localPoint = toLocal(weightPaint.info.layerTransform, point.x, point.y);
+    const radius = Number($('weightRadius')?.value || 48);
+    const radiusSquared = radius * radius;
+    let changed = 0;
+    for (const stroke of weightPaint.info.drawing.strokes) {
+      eachGeometryCoordinate(stroke, (coordinate, weights, index) => {
+        if ((coordinate[0] - localPoint[0]) ** 2 + (coordinate[1] - localPoint[1]) ** 2 > radiusSquared) return;
+        weights[index] = paintBoneInfluence(weights[index], weightPaint.boneId, Number($('skinWeight').value));
+        changed++;
+      });
+    }
+    if (changed) {
+      weightPaint.changed = true;
+      weightPaint.touched += changed;
+      updateSkinStatus(`Painting ${weightPaint.boneName}: ${weightPaint.touched} point/control-point touches. Release to commit.`);
+      bus.emit('preview');
+    }
+  }
+
+  function startWeightPaint(point) {
+    if (state.tool !== 'weight') return;
+    const info = activeDrawingInfo();
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const bone = rig?.bones?.find(item => item.id === $('skinBone')?.value);
+    if (!info || !bone) {
+      updateSkinStatus('Select a drawing and a bone before painting weights.', true);
+      return;
+    }
+    weightPaint = {
+      info: { ...info, layerTransform: (awaitTransform(info.layer, state.frame)) },
+      boneId: bone.id,
+      boneName: bone.name || bone.id,
+      before: clone(info.drawing.strokes),
+      changed: false,
+      touched: 0,
+    };
+    paintAt(point);
+  }
+
+  function awaitTransform(layer, frame) {
+    return evaluateLayerTransform(layer, frame);
+  }
+
+  function finishWeightPaint(commit = true) {
+    if (!weightPaint) return;
+    const active = weightPaint;
+    weightPaint = null;
+    if (!active.changed) return;
+    const after = clone(active.info.drawing.strokes);
+    active.info.drawing.strokes = active.before;
+    if (commit) {
+      execute(setValue(['drawings', active.info.drawingId, 'strokes'], after, 'Paint rig weights'));
+      updateSkinStatus(`Committed weights for ${active.touched} point/control-point touches.`);
+    } else {
+      updateSkinStatus('Weight paint cancelled.');
+      bus.emit('preview');
+    }
+  }
+
   function activeDrawingInfo() {
     const project = state.project;
     const scene = project?.scenes?.find(item => item.id === state.sceneId) || project?.scenes?.[0];
@@ -166,15 +257,6 @@ export function initStudioPanel({ onCharacterImported }) {
     return pairs;
   }
 
-  function nearestBoneWeights(point, bones) {
-    let nearest = null, best = Infinity;
-    for (const bone of bones) {
-      if (!Number.isFinite(bone.pivot?.x) || !Number.isFinite(bone.pivot?.y)) continue;
-      const distance = (point[0] - bone.pivot.x) ** 2 + (point[1] - bone.pivot.y) ** 2;
-      if (distance < best) { best = distance; nearest = bone; }
-    }
-    return nearest ? [{ bone_id: nearest.id, weight: 1 }] : [];
-  }
 
   function updateSkinStatus(message, error = false) {
     const status = $('skinStatus');
@@ -223,7 +305,7 @@ export function initStudioPanel({ onCharacterImported }) {
       const next = { ...stroke };
       if (Array.isArray(stroke.points)) {
         next.skin_weights = stroke.points.map(point => mode === 'auto'
-          ? nearestBoneWeights(point, bones)
+          ? nearestBoneInfluence(point, bones)
           : [{ bone_id: bone.id, weight }]);
       }
       if (Array.isArray(stroke.commands)) {
@@ -509,6 +591,13 @@ export function initStudioPanel({ onCharacterImported }) {
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
   $('skinAssign').onclick = () => writeWeightedDrawing('assign');
   $('skinClear').onclick = () => writeWeightedDrawing('clear');
+  $('weightRadius')?.addEventListener('input', event => {
+    $('weightRadiusValue').textContent = event.target.value;
+  });
+  bus.on('viewport:down', point => startWeightPaint(point));
+  bus.on('viewport:move', point => paintAt(point));
+  bus.on('viewport:up', () => finishWeightPaint(true));
+  bus.on('viewport:cancel', () => finishWeightPaint(false));
   $('generateCharacter').onclick = generateCharacter;
   $('audioUpload').onclick = uploadAudio;
   bus.on('project:changed', render);
