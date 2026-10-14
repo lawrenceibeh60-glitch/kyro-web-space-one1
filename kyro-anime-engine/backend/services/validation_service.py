@@ -188,7 +188,8 @@ def _check_stroke(stroke, where, errs):
                         errs.append(f"{iw}.bone_id: invalid")
                     elif bone_id in seen_bones:
                         errs.append(f"{iw}.bone_id: duplicate influence")
-                    seen_bones.add(bone_id)
+                    if isinstance(bone_id, str):
+                        seen_bones.add(bone_id)
                     weight = influence.get("weight")
                     if not _num(weight) or not 0 <= weight <= 1:
                         errs.append(f"{iw}.weight: number 0..1 required")
@@ -405,9 +406,10 @@ def _check_studio_data(project, errs):
                     parent_id = parent_map[parent_id]
 
     # Weighted vector strokes must reference bones that actually exist in the project.
+    rig_list = rigs if isinstance(rigs, list) else []
     known_bone_ids = {
         bone.get("id")
-        for rig in rigs if isinstance(rig, dict)
+        for rig in rig_list if isinstance(rig, dict)
         for bone in (rig.get("bones", []) if isinstance(rig.get("bones", []), list) else [])
         if isinstance(bone, dict) and isinstance(bone.get("id"), str)
     }
