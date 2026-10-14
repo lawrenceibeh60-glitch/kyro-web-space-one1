@@ -77,6 +77,38 @@ class ProjectDemoTests(unittest.TestCase):
         self.assertNotIn("d_character_profile", project["drawings"])
         self.assertEqual(validate_project(project), [])
 
+    def test_each_starter_template_contains_real_keyframed_motion(self):
+        with patch.object(project_service.repo, "save"):
+            for template in project_service.DEMO_TEMPLATES:
+                project = project_service.create_demo(template)
+                scene = project["scenes"][0]
+                channels = []
+                for layer in scene["layers"]:
+                    for channel, keys in layer.get("tracks", {}).items():
+                        if isinstance(keys, list) and len(keys) >= 2:
+                            values = [key["v"] for key in keys if isinstance(key, dict) and "v" in key]
+                            if any(a != b for a, b in zip(values, values[1:])):
+                                channels.append((layer["id"], channel))
+                for channel, keys in scene.get("camera", {}).get("tracks", {}).items():
+                    if isinstance(keys, list) and len(keys) >= 2:
+                        values = [key["v"] for key in keys if isinstance(key, dict) and "v" in key]
+                        if any(a != b for a, b in zip(values, values[1:])):
+                            channels.append(("camera", channel))
+                with self.subTest(template=template):
+                    self.assertTrue(channels, f"{template} must animate real project channels")
+
+    def test_starter_template_routes_return_valid_editable_projects(self):
+        app = create_app()
+        with patch.object(project_service.repo, "save"):
+            client = app.test_client()
+            for template in project_service.DEMO_TEMPLATES:
+                with self.subTest(template=template):
+                    response = client.post(f"/api/projects/templates/{template}")
+                    self.assertEqual(response.status_code, 201)
+                    project = response.get_json()
+                    self.assertEqual(validate_project(project), [])
+                    self.assertTrue(project["scenes"][0]["layers"])
+
     def test_unknown_demo_template_is_rejected(self):
         with self.assertRaises(ApiError):
             project_service.create_demo("not-a-demo")
