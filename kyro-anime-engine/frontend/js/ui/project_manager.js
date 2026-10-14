@@ -69,18 +69,18 @@ $('create').onclick = async () => {
 
 $('demo').onclick = async () => {
   try {
-    const p = await Projects.demo();
+    const p = await Projects.template('bounce');
     location.href = 'editor.html?project=' + encodeURIComponent(p.id);
   } catch (e) {
     toast(e.message, 'err');
   }
 };
 
-document.querySelectorAll('[data-demo]').forEach(button => {
+document.querySelectorAll('[data-template]').forEach(button => {
   button.onclick = async () => {
     button.disabled = true;
     try {
-      const p = await Projects.demoTemplate(button.dataset.demo);
+      const p = await Projects.template(button.dataset.template);
       location.href = 'editor.html?project=' + encodeURIComponent(p.id);
     } catch (e) {
       toast(e.message, 'err');
