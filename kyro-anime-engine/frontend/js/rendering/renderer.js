@@ -112,6 +112,25 @@ function rigPivot(bone, bones, frame) {
   return { x, y };
 }
 
+function transformLayerPoint(point, layer, frame, width, height) {
+  const transform = getLayerTransform(layer, frame);
+  const anchorX = transform.anchor_x || width / 2;
+  const anchorY = transform.anchor_y || height / 2;
+  const projected = projectStrokeForYaw(
+    { points: [[point.x, point.y]] },
+    transform.rotation_y,
+    anchorX,
+    anchorY,
+  ).points[0];
+  const sx = (projected[0] - (transform.anchor_x || 0)) * (transform.scale_x ?? 1);
+  const sy = (projected[1] - (transform.anchor_y || 0)) * (transform.scale_y ?? 1);
+  const radians = (transform.rotation || 0) * Math.PI / 180;
+  return {
+    x: (transform.x || 0) + sx * Math.cos(radians) - sy * Math.sin(radians),
+    y: (transform.y || 0) + sx * Math.sin(radians) + sy * Math.cos(radians),
+  };
+}
+
 function drawRigOverlay(ctx, project, scene, camera, frame, width, height) {
   const characterIds = new Set((scene?.layers || [])
     .filter(layer => layer.character_id)
@@ -126,11 +145,17 @@ function drawRigOverlay(ctx, project, scene, camera, frame, width, height) {
   ctx.setLineDash([5, 3]);
   for (const rig of rigs) {
     const bones = new Map((rig.bones || []).map(bone => [bone.id, bone]));
-    for (const bone of bones.values()) {
+    const characterLayers = (scene?.layers || []).filter(layer => layer.character_id === rig.character_id);
+    const pivotFor = bone => {
       const pivot = rigPivot(bone, bones, frame);
+      const layer = characterLayers.find(item => item.character_part_id === bone.character_part_id);
+      return layer ? transformLayerPoint(pivot, layer, frame, width, height) : pivot;
+    };
+    for (const bone of bones.values()) {
+      const pivot = pivotFor(bone);
       const parent = bone.parent_id ? bones.get(bone.parent_id) : null;
       if (parent) {
-        const parentPivot = rigPivot(parent, bones, frame);
+        const parentPivot = pivotFor(parent);
         ctx.beginPath();
         ctx.moveTo(parentPivot.x, parentPivot.y);
         ctx.lineTo(pivot.x, pivot.y);
