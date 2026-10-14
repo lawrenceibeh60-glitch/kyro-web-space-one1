@@ -4,82 +4,246 @@
   "title": "Scene",
   "description": "A scene: ordered layers (bottom to top), a camera, and optional lights.",
   "type": "object",
-  "required": ["id", "layers"],
+  "required": [
+    "id",
+    "layers"
+  ],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-    "name": { "type": "string" },
-    "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" } },
-    "camera": { "$ref": "#/$defs/camera" },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/layer"
+      }
+    },
+    "camera": {
+      "$ref": "#/$defs/camera"
+    },
     "lights": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "x", "y", "radius", "intensity", "color"],
+        "required": [
+          "id",
+          "x",
+          "y",
+          "radius",
+          "intensity",
+          "color"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "x": { "type": "number", "minimum": -8192, "maximum": 8192 },
-          "y": { "type": "number", "minimum": -8192, "maximum": 8192 },
-          "radius": { "type": "number", "minimum": 16, "maximum": 8192 },
-          "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
-          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "x": {
+            "type": "number",
+            "minimum": -8192,
+            "maximum": 8192
+          },
+          "y": {
+            "type": "number",
+            "minimum": -8192,
+            "maximum": 8192
+          },
+          "radius": {
+            "type": "number",
+            "minimum": 16,
+            "maximum": 8192
+          },
+          "intensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
         }
       }
     }
   },
   "$defs": {
     "transform": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "x": { "type": "number", "default": 0 },
-        "y": { "type": "number", "default": 0 },
-        "rotation": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "degrees" },
-        "scale_x": { "type": "number", "default": 1 },
-        "scale_y": { "type": "number", "default": 1 },
-        "anchor_x": { "type": "number", "default": 0 },
-        "anchor_y": { "type": "number", "default": 0 }
+        "x": {
+          "type": "number",
+          "default": 0
+        },
+        "y": {
+          "type": "number",
+          "default": 0
+        },
+        "rotation": {
+          "type": "number",
+          "minimum": -3600,
+          "maximum": 3600,
+          "default": 0,
+          "description": "degrees"
+        },
+        "scale_x": {
+          "type": "number",
+          "default": 1
+        },
+        "scale_y": {
+          "type": "number",
+          "default": 1
+        },
+        "anchor_x": {
+          "type": "number",
+          "default": 0
+        },
+        "anchor_y": {
+          "type": "number",
+          "default": 0
+        },
+        "rotation_y": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180,
+          "default": 0,
+          "description": "Perspective yaw in degrees for a 2.5D plane turn."
+        }
       }
     },
     "layer": {
-      "type": "object", "required": ["id", "type"], "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "type"
+      ],
+      "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-        "name": { "type": "string" },
-        "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$", "description": "Stable character registry ID for an imported part layer." },
-        "character_part_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-        "type": { "enum": ["drawing"] },
-        "visible": { "type": "boolean", "default": true },
-        "locked": { "type": "boolean", "default": false },
-        "opacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
-        "depth": { "type": "number", "minimum": 0, "maximum": 2, "default": 1, "description": "Camera parallax factor. 0 stays fixed, 1 follows the camera, values above 1 move faster." },
-        "blend": { "enum": ["normal", "multiply", "screen", "overlay", "add"], "default": "normal" },
-        "transform": { "$ref": "#/$defs/transform" },
-        "exposures": { "$ref": "animation.schema.json#/properties/exposures" },
-        "tracks": { "$ref": "animation.schema.json#/properties/tracks" }
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "character_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "description": "Stable character registry ID for an imported part layer."
+        },
+        "character_part_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "type": {
+          "enum": [
+            "drawing"
+          ]
+        },
+        "visible": {
+          "type": "boolean",
+          "default": true
+        },
+        "locked": {
+          "type": "boolean",
+          "default": false
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 1
+        },
+        "depth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1,
+          "description": "Camera parallax factor. 0 stays fixed, 1 follows the camera, values above 1 move faster."
+        },
+        "blend": {
+          "enum": [
+            "normal",
+            "multiply",
+            "screen",
+            "overlay",
+            "add"
+          ],
+          "default": "normal"
+        },
+        "transform": {
+          "$ref": "#/$defs/transform"
+        },
+        "exposures": {
+          "$ref": "animation.schema.json#/properties/exposures"
+        },
+        "tracks": {
+          "$ref": "animation.schema.json#/properties/tracks"
+        }
       }
     },
     "camera": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "properties": {
         "transform": {
-          "type": "object", "additionalProperties": false,
+          "type": "object",
+          "additionalProperties": false,
           "properties": {
-            "x": { "type": "number", "default": 0 },
-            "y": { "type": "number", "default": 0 },
-            "rotation": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "degrees" },
-            "scale_x": { "type": "number", "minimum": 0.05, "maximum": 32, "default": 1 },
-            "scale_y": { "type": "number", "minimum": 0.05, "maximum": 32, "default": 1 }
+            "x": {
+              "type": "number",
+              "default": 0
+            },
+            "y": {
+              "type": "number",
+              "default": 0
+            },
+            "rotation": {
+              "type": "number",
+              "minimum": -3600,
+              "maximum": 3600,
+              "default": 0,
+              "description": "degrees"
+            },
+            "scale_x": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 32,
+              "default": 1
+            },
+            "scale_y": {
+              "type": "number",
+              "minimum": 0.05,
+              "maximum": 32,
+              "default": 1
+            }
           }
         },
         "tracks": {
-          "type": "object", "additionalProperties": false,
+          "type": "object",
+          "additionalProperties": false,
           "properties": {
-            "x": { "$ref": "animation.schema.json#/$defs/track" },
-            "y": { "$ref": "animation.schema.json#/$defs/track" },
-            "rotation": { "$ref": "animation.schema.json#/$defs/track" },
-            "scale_x": { "$ref": "animation.schema.json#/$defs/track" },
-            "scale_y": { "$ref": "animation.schema.json#/$defs/track" }
+            "x": {
+              "$ref": "animation.schema.json#/$defs/track"
+            },
+            "y": {
+              "$ref": "animation.schema.json#/$defs/track"
+            },
+            "rotation": {
+              "$ref": "animation.schema.json#/$defs/track"
+            },
+            "scale_x": {
+              "$ref": "animation.schema.json#/$defs/track"
+            },
+            "scale_y": {
+              "$ref": "animation.schema.json#/$defs/track"
+            }
           }
         }
       }

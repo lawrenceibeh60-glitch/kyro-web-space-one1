@@ -101,6 +101,24 @@ class SkinWeightValidationTests(unittest.TestCase):
         self.assertTrue(any("command_skin_weights[0][0].bone_id: rig bone not found" in error
                             for error in errors))
 
+    def test_layer_perspective_yaw_transform_and_track_are_validated(self):
+        project = skinned_project()
+        layer = project["scenes"][0]["layers"][0]
+        layer["transform"] = {"rotation_y": 90}
+        layer["tracks"] = {"rotation_y": [
+            {"t": 0, "v": 0}, {"t": 12, "v": 90},
+        ]}
+        self.assertEqual(validate_project(project), [])
+
+    def test_layer_perspective_yaw_rejects_values_outside_turn_range(self):
+        project = skinned_project()
+        layer = project["scenes"][0]["layers"][0]
+        layer["transform"] = {"rotation_y": 181}
+        layer["tracks"] = {"rotation_y": [{"t": 0, "v": -181}]}
+        errors = validate_project(project)
+        self.assertTrue(any("transform.rotation_y: number -180..180 required" in error for error in errors))
+        self.assertTrue(any("tracks.rotation_y[0].v: number -180..180 required" in error for error in errors))
+
     def test_skin_weights_cannot_exceed_one_or_be_empty(self):
         project = skinned_project()
         weights = project["drawings"]["skin_drawing"]["strokes"][0]["skin_weights"]

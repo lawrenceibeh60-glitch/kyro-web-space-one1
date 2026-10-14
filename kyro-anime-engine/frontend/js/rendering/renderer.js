@@ -112,6 +112,25 @@ function rigPivot(bone, bones, frame) {
   return { x, y };
 }
 
+function transformLayerPoint(point, layer, frame, width, height) {
+  const transform = getLayerTransform(layer, frame);
+  const anchorX = transform.anchor_x || width / 2;
+  const anchorY = transform.anchor_y || height / 2;
+  const projected = projectStrokeForYaw(
+    { points: [[point.x, point.y]] },
+    transform.rotation_y,
+    anchorX,
+    anchorY,
+  ).points[0];
+  const sx = (projected[0] - (transform.anchor_x || 0)) * (transform.scale_x ?? 1);
+  const sy = (projected[1] - (transform.anchor_y || 0)) * (transform.scale_y ?? 1);
+  const radians = (transform.rotation || 0) * Math.PI / 180;
+  return {
+    x: (transform.x || 0) + sx * Math.cos(radians) - sy * Math.sin(radians),
+    y: (transform.y || 0) + sx * Math.sin(radians) + sy * Math.cos(radians),
+  };
+}
+
 function drawRigOverlay(ctx, project, scene, camera, frame, width, height) {
   const characterIds = new Set((scene?.layers || [])
     .filter(layer => layer.character_id)
@@ -126,11 +145,17 @@ function drawRigOverlay(ctx, project, scene, camera, frame, width, height) {
   ctx.setLineDash([5, 3]);
   for (const rig of rigs) {
     const bones = new Map((rig.bones || []).map(bone => [bone.id, bone]));
-    for (const bone of bones.values()) {
+    const characterLayers = (scene?.layers || []).filter(layer => layer.character_id === rig.character_id);
+    const pivotFor = bone => {
       const pivot = rigPivot(bone, bones, frame);
+      const layer = characterLayers.find(item => item.character_part_id === bone.character_part_id);
+      return layer ? transformLayerPoint(pivot, layer, frame, width, height) : pivot;
+    };
+    for (const bone of bones.values()) {
+      const pivot = pivotFor(bone);
       const parent = bone.parent_id ? bones.get(bone.parent_id) : null;
       if (parent) {
-        const parentPivot = rigPivot(parent, bones, frame);
+        const parentPivot = pivotFor(parent);
         ctx.beginPath();
         ctx.moveTo(parentPivot.x, parentPivot.y);
         ctx.lineTo(pivot.x, pivot.y);
@@ -144,6 +169,41 @@ function drawRigOverlay(ctx, project, scene, camera, frame, width, height) {
     }
   }
   ctx.restore();
+}
+
+// Perspective-project a 2D drawing plane as it yaws around the vertical axis.
+// This is a genuine perspective 2.5D plane turn; front/profile artwork can crossfade
+// over it when a character has alternate pose drawings.
+export function projectStrokeForYaw(stroke, yawDegrees, pivotX, pivotY, focalLength = 1400) {
+  if (!Number.isFinite(yawDegrees) || Math.abs(yawDegrees) < 0.001) return stroke;
+  const radians = Math.max(-180, Math.min(180, yawDegrees)) * Math.PI / 180;
+  const cosine = Math.cos(radians), sine = Math.sin(radians);
+  const projectPair = pair => {
+    const dx = pair[0] - pivotX, dy = pair[1] - pivotY;
+    const depth = dx * sine;
+    const scale = focalLength / Math.max(focalLength * 0.25, focalLength - depth);
+    return [pivotX + dx * cosine * scale, pivotY + dy * scale, ...pair.slice(2)];
+  };
+  let result = stroke;
+  if (Array.isArray(stroke?.points)) {
+    result = { ...result, points: stroke.points.map(projectPair) };
+  }
+  if (Array.isArray(stroke?.commands)) {
+    result = {
+      ...result,
+      commands: stroke.commands.map(command => {
+        if (!Array.isArray(command) || command[0] === 'Z') return [...command];
+        const next = [...command];
+        for (let index = 1; index + 1 < command.length; index += 2) {
+          const projected = projectPair([command[index], command[index + 1]]);
+          next[index] = projected[0];
+          next[index + 1] = projected[1];
+        }
+        return next;
+      }),
+    };
+  }
+  return result;
 }
 
 // Screen-space influence overlay for the dedicated weight-paint tool.
@@ -169,7 +229,10 @@ export function drawWeightOverlay(ctx, project, sceneId, layerId, frame, boneId,
   for (const sourceStroke of drawing.strokes || []) {
     const isWeighted = Array.isArray(sourceStroke.skin_weights)
       || Array.isArray(sourceStroke.command_skin_weights);
-    const stroke = isWeighted ? deformStrokeForRig(sourceStroke, rig, frame, pose) : sourceStroke;
+    const deformedStroke = isWeighted ? deformStrokeForRig(sourceStroke, rig, frame, pose) : sourceStroke;
+    const yawPivotX = transform.anchor_x || project.settings.width / 2;
+    const yawPivotY = transform.anchor_y || project.settings.height / 2;
+    const stroke = projectStrokeForYaw(deformedStroke, transform.rotation_y, yawPivotX, yawPivotY);
     ctx.save();
     if (!isWeighted) drawRigPose(ctx, project, layer, frame, pose);
     const points = [];
@@ -303,14 +366,19 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     ctx.scale(t.scale_x ?? 1, t.scale_y ?? 1);
     ctx.translate(-(t.anchor_x || 0), -(t.anchor_y || 0));
     const hide = pv && pv.drawingId === ex?.drawing ? pv.hidden : null;
-    const drawRiggedStroke = stroke => {
+    const yawPivotX = t.anchor_x || width / 2;
+    const yawPivotY = t.anchor_y || height / 2;
+    const drawRiggedStroke = sourceStroke => {
       ctx.save();
-      if (rig && (Array.isArray(stroke.skin_weights) || Array.isArray(stroke.command_skin_weights))) {
-        drawStroke(ctx, deformStrokeForRig(stroke, rig, frame, rigPose));
-      } else {
-        drawRigPose(ctx, project, layer, frame, rigPose);
-        drawStroke(ctx, stroke);
-      }
+      const isWeighted = rig && (
+        Array.isArray(sourceStroke.skin_weights) || Array.isArray(sourceStroke.command_skin_weights)
+      );
+      let stroke = isWeighted
+        ? deformStrokeForRig(sourceStroke, rig, frame, rigPose)
+        : sourceStroke;
+      stroke = projectStrokeForYaw(stroke, t.rotation_y, yawPivotX, yawPivotY);
+      if (!isWeighted) drawRigPose(ctx, project, layer, frame, rigPose);
+      drawStroke(ctx, stroke);
       ctx.restore();
     };
     for (const stroke of strokes) if (!hide?.has(stroke.id)) drawRiggedStroke(stroke);

@@ -6,7 +6,7 @@ import math
 import re
 
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-CHANNELS = {"x", "y", "rotation", "scale_x", "scale_y", "opacity"}
+CHANNELS = {"x", "y", "rotation", "rotation_y", "scale_x", "scale_y", "opacity"}
 EASES = {"linear", "hold", "ease_in", "ease_out", "ease_in_out"}
 MAX_ERRORS = 50
 
@@ -727,10 +727,20 @@ def _check_scenes(scenes, drawings, errs):
                 errs.append(f"{lw}: character_id and character_part_id must appear together")
             if "opacity" in ly and (not _num(ly["opacity"]) or not 0 <= ly["opacity"] <= 1):
                 errs.append(f"{lw}.opacity: 0..1 required")
+            transform = ly.get("transform", {})
+            if isinstance(transform, dict) and "rotation_y" in transform and (
+                not _num(transform["rotation_y"]) or not -180 <= transform["rotation_y"] <= 180
+            ):
+                errs.append(f"{lw}.transform.rotation_y: number -180..180 required")
             if "exposures" in ly:
                 _check_exposures(ly["exposures"], f"{lw}.exposures", drawings, errs)
             if "tracks" in ly:
                 _check_tracks(ly["tracks"], f"{lw}.tracks", errs)
+                tracks = ly["tracks"]
+                if isinstance(tracks, dict) and isinstance(tracks.get("rotation_y"), list):
+                    for index, keyframe in enumerate(tracks["rotation_y"]):
+                        if isinstance(keyframe, dict) and _num(keyframe.get("v")) and not -180 <= keyframe["v"] <= 180:
+                            errs.append(f"{lw}.tracks.rotation_y[{index}].v: number -180..180 required")
         cam = sc.get("camera")
         if cam is not None:
             if not isinstance(cam, dict):

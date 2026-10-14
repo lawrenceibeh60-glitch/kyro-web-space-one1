@@ -21,3 +21,8 @@ Camera tracks use the shared animation keyframe structure and must be ordered by
 Validation checks document structure, numeric limits, unique IDs, animation tracks, and references such as layer exposures to drawings. Imports and saves must pass validation before persistence. Regression coverage for legacy defaults, unsupported future versions, and large import/reload round trips is in `tests/test_project_compatibility.py`. Schema file/reference integrity and the supported camera-axis contract are covered by `tests/test_schema_integrity.py`.
 
 A new format field should be added only when its runtime behavior exists. If a future change alters existing field semantics, add an explicit migration and compatibility tests rather than silently reinterpreting saved projects.
+
+
+### Layer perspective yaw
+
+Layer transforms and keyframe tracks may include `rotation_y` from -180 to 180 degrees. The renderer projects point and Bézier coordinates with a perspective plane transform. For a convincing character turn, use separate front/profile drawings and animate their opacity through the turn. The channel adds perspective to flat artwork; it does not create hidden back-side geometry.
