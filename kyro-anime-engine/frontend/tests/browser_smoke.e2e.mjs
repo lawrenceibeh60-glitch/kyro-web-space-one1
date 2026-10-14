@@ -35,6 +35,12 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.waitForFunction(() => document.querySelectorAll('#bonePart option').length > 1);
     await page.locator('#rigAuto').click();
     await page.waitForFunction(() => document.querySelectorAll('#boneList .studio-bone').length > 1);
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      const names = new Set((rig?.bones || []).map(bone => bone.name));
+      return ['Left Thigh', 'Left Shin', 'Left Foot', 'Left Upper Arm', 'Left Forearm', 'Left Hand']
+        .every(name => names.has(name));
+    });
     await page.locator('#rigWalkEnabled').check();
     await page.locator('#rigWalkCycle').fill('32');
     await page.locator('#rigWalkStride').evaluate(input => {
