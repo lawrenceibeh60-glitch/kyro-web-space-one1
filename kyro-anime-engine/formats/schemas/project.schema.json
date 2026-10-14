@@ -52,21 +52,9 @@
       "type": "array",
       "items": { "$ref": "effects.schema.json" }
     },
-        "rigs": {
+    "rigs": {
       "type": "array",
       "items": { "$ref": "rig.schema.json" }
-    },
-                "tracks": {
-                  "type": "object", "additionalProperties": false,
-                  "properties": {
-                    "rotation": { "$ref": "animation.schema.json#/$defs/track" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
     },
     "audio": {
       "type": "array",
