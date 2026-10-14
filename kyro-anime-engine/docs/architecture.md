@@ -11,7 +11,7 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 - **Project persistence:** versioned `kae` JSON, safe legacy defaults, stable-ID imports, semantic validation, and rejection of unsupported future format versions.
 - **Drawing:** point strokes and M/L/Q/C/Z path commands; fill rules, caps, joins, editable layers, and shared viewport/export drawing logic.
 - **Animation:** exposures, transform and opacity tracks, easing, timeline/keyframe tools, and hierarchical 2D bone-rotation tracks.
-- **Camera and depth:** scene camera pan, roll, horizontal zoom, and (in the cinematic-camera repair branch) independent vertical zoom tracks; layer depth factors drive 2.5D parallax. The same camera evaluator is used by viewport and export rendering.
+- **Camera and depth:** scene camera pan, roll, independent horizontal/vertical zoom tracks, shared keyframe writing, pointer-anchored dolly, and inverse pointer mapping; layer depth factors drive 2.5D parallax. The same camera evaluator is used by viewport and export rendering.
 - **Production features:** procedural character-part generation, scene lights, deterministic scene effects, timeline audio metadata/playback, and PNG/GIF/sprite-sheet/WebM export paths.
 
 ## Known limitations (do not present these as completed features)
@@ -27,7 +27,7 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 
 ## Implementation order
 
-1. **Protect the format:** keep schema references resolvable, validate camera fields and keyframes consistently, and add compatibility tests before adding fields.
+1. **Protect the format:** keep schema references resolvable, validate camera fields and keyframes consistently, and add compatibility tests before adding fields. The current repair branch includes schema-reference integrity checks.
 2. **Unify camera behavior:** centralize camera normalization, key insertion, dolly anchoring, and inverse pointer mapping. Keep viewport, picking, lights, rig overlays, and exports aligned.
 3. **Build cinematic 2.5D:** make depth values meaningful and predictable, add camera shot presets only when their behavior is executable, and provide easing/hold controls for shot timing.
 4. **Strengthen the scene graph:** add optional drawable groups and parent-child transforms without changing the meaning of existing flat layer lists.
