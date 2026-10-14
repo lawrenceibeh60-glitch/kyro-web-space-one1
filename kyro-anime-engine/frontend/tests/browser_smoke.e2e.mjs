@@ -59,7 +59,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       const { evaluateRigAnimation } = await import('/js/animation/animation_clips.js');
       const thigh = rig.bones.find(bone => bone.character_part_id === 'left_thigh');
       const first = evaluateRigAnimation(rig, 0).bones[thigh.id];
-      const later = evaluateRigAnimation(rig, 8).bones[thigh.id];
+      const later = evaluateRigAnimation(rig, 20).bones[thigh.id];
       return { first, later };
     });
     assert.ok(Number.isFinite(motion.first) && Number.isFinite(motion.later));
