@@ -156,6 +156,17 @@
                 <div class="xrow n"><span>Pivot Y</span><input id="boneY" type="number" step="1"></div>
                 <button id="boneAdd">Add bone</button>
                 <div id="boneList" class="studio-list"></div>
+                <div class="grp-title">Procedural walk cycle</div>
+                <div class="hint">Apply a reusable walk clip to this rig. Bone names identify head, torso, upper/lower arms, thighs, shins, and feet; foot-contact IK runs when both leg chains are available.</div>
+                <label class="chk"><input id="rigWalkEnabled" type="checkbox"> Enable walk cycle</label>
+                <div class="xrow n"><span>Cycle frames</span><input id="rigWalkCycle" type="number" min="4" max="240" step="1" value="24"></div>
+                <div class="xrow n"><span>Speed</span><input id="rigWalkSpeed" type="number" min="0.05" max="8" step="0.05" value="1"></div>
+                <label class="fld"><span>Stride</span><b id="rigWalkStrideValue">24</b><input id="rigWalkStride" type="range" min="0" max="100" step="1" value="24"></label>
+                <label class="fld"><span>Body bob</span><b id="rigWalkBobValue">5</b><input id="rigWalkBob" type="range" min="0" max="30" step="1" value="5"></label>
+                <label class="fld"><span>Motion weight</span><b id="rigWalkWeightValue">1.00</b><input id="rigWalkWeight" type="range" min="0" max="1" step="0.05" value="1"></label>
+                <label class="chk"><input id="rigWalkLoop" type="checkbox" checked> Loop cycle</label>
+                <button id="rigWalkApply" class="primary">Apply walk-cycle settings</button>
+                <div id="rigWalkStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Vector skinning</div>
                 <div class="hint">Bind every point or Bézier control point in the active drawing to bones. Auto-weight assigns the nearest pivot; edit weights after for better joints.</div>
                 <label class="fld"><span>Influence bone</span><select id="skinBone"></select></label>
