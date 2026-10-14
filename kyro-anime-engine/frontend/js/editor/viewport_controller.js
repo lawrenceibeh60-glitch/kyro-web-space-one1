@@ -4,7 +4,7 @@
 // with world (project) coordinates.
 import { bus } from '../core/event_bus.js';
 import { state, setState } from '../core/state_manager.js';
-import { renderFrame } from '../rendering/renderer.js';
+import { renderFrame, drawWeightOverlay } from '../rendering/renderer.js';
 import { getLayer } from '../core/state_manager.js';
 import { evaluateTransform } from '../animation/pose_evaluator.js';
 import { applyCameraTransform, evaluateCamera } from '../animation/camera_evaluator.js';
@@ -50,6 +50,10 @@ export function initViewport(canvas) {
     const camera = applyCameraTransform(ctx, width, height, scene?.camera, state.frame);
     drawPivot(state.view.zoom * camera.zoom);
     if (state.tool === 'edit') drawEditOverlay(ctx, state.view.zoom * camera.zoom);
+    if (state.tool === 'weight') {
+      drawWeightOverlay(ctx, state.project, state.sceneId, state.layerId, state.frame,
+        state.weightBoneId, state.view.zoom * camera.zoom);
+    }
     ctx.restore();
   }
 
