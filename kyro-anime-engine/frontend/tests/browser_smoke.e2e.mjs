@@ -18,6 +18,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#canvas').waitFor({ state: 'visible' });
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
 
+    await page.locator('[data-ws="studio"]').click();
     await page.locator('[data-studio-tab="character"]').click();
     await page.locator('#generatorId').fill('browser_hero');
     await page.locator('#generatorName').fill('Browser Hero');
