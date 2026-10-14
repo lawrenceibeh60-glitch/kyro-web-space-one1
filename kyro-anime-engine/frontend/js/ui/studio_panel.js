@@ -3,6 +3,7 @@ import { bus } from '../core/event_bus.js';
 import { state, setState } from '../core/state_manager.js';
 import { Audio, StudioCharacters } from '../api/studio.js';
 import { evaluateTrack } from '../animation/interpolation.js';
+import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
 
 const $ = id => document.getElementById(id);
@@ -143,6 +144,106 @@ export function initStudioPanel({ onCharacterImported }) {
     changeProjectArray('effects', [...(state.project.effects || []), effect], 'Add effect');
   }
 
+  function activeDrawingInfo() {
+    const project = state.project;
+    const scene = project?.scenes?.find(item => item.id === state.sceneId) || project?.scenes?.[0];
+    const layer = scene?.layers?.find(item => item.id === state.layerId);
+    if (!layer) return null;
+    let exposure = null;
+    for (const item of [...(layer.exposures || [])].reverse()) {
+      if (state.frame >= item.start && state.frame < item.start + item.length) { exposure = item; break; }
+    }
+    const drawing = exposure && project.drawings?.[exposure.drawing];
+    return drawing ? { drawing, drawingId: exposure.drawing, layer, scene } : null;
+  }
+
+  function pathPairs(commands) {
+    const pairs = [];
+    for (const command of commands || []) {
+      if (!Array.isArray(command) || command[0] === 'Z') continue;
+      for (let i = 1; i + 1 < command.length; i += 2) pairs.push([command[i], command[i + 1]]);
+    }
+    return pairs;
+  }
+
+  function nearestBoneWeights(point, bones) {
+    let nearest = null, best = Infinity;
+    for (const bone of bones) {
+      if (!Number.isFinite(bone.pivot?.x) || !Number.isFinite(bone.pivot?.y)) continue;
+      const distance = (point[0] - bone.pivot.x) ** 2 + (point[1] - bone.pivot.y) ** 2;
+      if (distance < best) { best = distance; nearest = bone; }
+    }
+    return nearest ? [{ bone_id: nearest.id, weight: 1 }] : [];
+  }
+
+  function updateSkinStatus(message, error = false) {
+    const status = $('skinStatus');
+    status.textContent = message;
+    status.style.color = error ? 'var(--danger, #ff6b6b)' : '';
+  }
+
+  function renderSkinTools(rig) {
+    const select = $('skinBone');
+    if (!select) return;
+    const bones = rig?.bones || [];
+    selectOptions(select, bones.map(bone => [bone.id, bone.name || bone.id]), select.value, 'Add a bone first');
+    const info = activeDrawingInfo();
+    const usable = !!rig && !!info && bones.length > 0;
+    $('skinAutoWeight').disabled = !usable;
+    $('skinAssign').disabled = !usable;
+    $('skinClear').disabled = !info;
+    if (!info) updateSkinStatus('Select a layer with a drawing exposed at the current frame.', true);
+    else if (!rig) updateSkinStatus('Create/select a rig for the selected character.');
+    else if (!bones.length) updateSkinStatus('Add at least one bone before assigning weights.');
+    else {
+      const count = info.drawing.strokes.filter(stroke =>
+        (Array.isArray(stroke.points) && stroke.points.length)
+        || (Array.isArray(stroke.commands) && pathCoordinateCount(stroke.commands) > 0)
+      ).length;
+      updateSkinStatus(`${info.drawing.name || info.drawingId}: ${count} drawable stroke(s) ready for weighting.`);
+    }
+  }
+
+  function writeWeightedDrawing(mode) {
+    const project = state.project;
+    const info = activeDrawingInfo();
+    const rig = (project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const bone = rig?.bones?.find(item => item.id === $('skinBone').value);
+    if (!info) { updateSkinStatus('No active drawing. Select an exposed drawing layer.', true); return; }
+    if (mode !== 'clear' && !rig?.bones?.length) { updateSkinStatus('The selected rig has no bones.', true); return; }
+    const weight = Number($('skinWeight').value);
+    const bones = rig?.bones || [];
+    const nextStrokes = info.drawing.strokes.map(stroke => {
+      if (mode === 'clear') {
+        const next = { ...stroke };
+        delete next.skin_weights;
+        delete next.command_skin_weights;
+        return next;
+      }
+      const next = { ...stroke };
+      if (Array.isArray(stroke.points)) {
+        next.skin_weights = stroke.points.map(point => mode === 'auto'
+          ? nearestBoneWeights(point, bones)
+          : [{ bone_id: bone.id, weight }]);
+      }
+      if (Array.isArray(stroke.commands)) {
+        const coords = pathPairs(stroke.commands);
+        next.command_skin_weights = coords.map(point => mode === 'auto'
+          ? nearestBoneWeights(point, bones)
+          : [{ bone_id: bone.id, weight }]);
+      }
+      return next;
+    });
+    const nextDrawing = { ...info.drawing, strokes: nextStrokes };
+    execute(setValue(['drawings', info.drawingId], nextDrawing,
+      mode === 'auto' ? 'Auto-weight vector drawing' : mode === 'assign' ? 'Assign vector bone weights' : 'Clear vector weights'));
+    const vertices = nextStrokes.reduce((total, stroke) =>
+      total + (stroke.points?.length || 0) + pathCoordinateCount(stroke.commands), 0);
+    updateSkinStatus(mode === 'clear'
+      ? `Cleared skin weights from ${nextStrokes.length} stroke(s).`
+      : `${mode === 'auto' ? 'Auto-weighted' : 'Assigned bone weights to'} ${vertices} point/control-point coordinates.`);
+  }
+
   function renderRig() {
     if (!state.project) return;
     const characters = state.project.characters || [];
@@ -164,6 +265,7 @@ export function initStudioPanel({ onCharacterImported }) {
     selectOptions($('bonePart'), partOptions, $('bonePart').value, 'No character parts');
     const boneOptions = (rig?.bones || []).map(bone => [bone.id, bone.name || bone.id]);
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
+    renderSkinTools(rig);
     const list = $('boneList');
     list.replaceChildren();
     for (const bone of rig?.bones || []) {
@@ -403,6 +505,10 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rigCreate').onclick = createRig;
   $('rigDelete').onclick = deleteRig;
   $('boneAdd').onclick = addBone;
+  $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
+  $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
+  $('skinAssign').onclick = () => writeWeightedDrawing('assign');
+  $('skinClear').onclick = () => writeWeightedDrawing('clear');
   $('generateCharacter').onclick = generateCharacter;
   $('audioUpload').onclick = uploadAudio;
   bus.on('project:changed', render);
