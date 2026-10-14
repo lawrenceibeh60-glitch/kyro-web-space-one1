@@ -69,7 +69,7 @@ export function evaluateWalkCycle(rig, frame, overrides = {}) {
   const elapsed = Math.max(0, frame - startFrame) * speed;
   const phaseFrame = config.loop === false ? Math.min(elapsed, cycleFrames) : elapsed % cycleFrames;
   const phase = phaseFrame / cycleFrames * TAU;
-  const stride = clamp(Number(config.stride) || 24, 0, 100);
+  const stride = clamp(Number(config.stride ?? 24), 0, 100);
   const weight = clamp(Number(config.weight ?? 1), 0, 1);
   const left = Math.sin(phase);
   const right = Math.sin(phase + Math.PI);
@@ -102,7 +102,7 @@ export function evaluateWalkCycle(rig, frame, overrides = {}) {
     angles,
     rootOffset: {
       x: 0,
-      y: -Math.abs(Math.sin(phase * 2)) * clamp(Number(config.bob) || 5, 0, 30) * weight,
+      y: -Math.abs(Math.sin(phase * 2)) * clamp(Number(config.bob ?? 5), 0, 30) * weight,
     },
     footContact: { left: stanceLeft, right: stanceRight },
     contactWeight: clamp(stanceBlend, 0, 1),
