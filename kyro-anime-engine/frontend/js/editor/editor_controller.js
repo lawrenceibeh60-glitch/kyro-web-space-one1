@@ -29,7 +29,7 @@ import { svg, setIcon, hydrate } from '../ui/icons.js';
 import { toast } from '../ui/notifications.js';
 
 const $ = id => document.getElementById(id);
-const TOOL_NAMES = { pan: 'Hand', camera: 'Camera', brush: 'Brush', grease: 'Grease Pencil', eraser: 'Eraser', edit: 'Edit', line: 'Line', rectangle: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', fill: 'Fill', eyedropper: 'Eyedropper', move: 'Move', rotate: 'Rotate', scale: 'Scale' };
+const TOOL_NAMES = { pan: 'Hand', camera: 'Camera', brush: 'Brush', grease: 'Grease Pencil', eraser: 'Eraser', edit: 'Edit', weight: 'Weight Paint', line: 'Line', rectangle: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', fill: 'Fill', eyedropper: 'Eyedropper', move: 'Move', rotate: 'Rotate', scale: 'Scale' };
 let prevTool = 'brush';
 const SLIDERS = [['optSize', 'size', 1], ['optOpacity', 'opacity', 100], ['optSmooth', 'smoothing', 100], ['optEraser', 'eraserSize', 1]];
 const FIELDS = ['x', 'y', 'rotation', 'scale_x', 'scale_y', 'opacity'];

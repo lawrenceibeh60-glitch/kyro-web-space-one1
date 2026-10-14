@@ -157,6 +157,7 @@
                 <div class="hint">Bind every point or Bézier control point in the active drawing to bones. Auto-weight assigns the nearest pivot; edit weights after for better joints.</div>
                 <label class="fld"><span>Influence bone</span><select id="skinBone"></select></label>
                 <label class="fld"><span>Weight</span><b id="skinWeightValue">1.00</b><input id="skinWeight" type="range" min="0.05" max="1" step="0.05" value="1"></label>
+                <label class="fld"><span>Brush radius</span><b id="weightRadiusValue">48</b><input id="weightRadius" type="range" min="4" max="180" step="2" value="48"></label>
                 <div class="xbtns">
                   <button id="skinAutoWeight" class="primary">Auto-weight drawing</button>
                   <button id="skinAssign">Assign bone</button>
@@ -229,7 +230,6 @@
         <div data-tools="eyedropper" class="hint">Click a color in the canvas to sample it into the active brush color.</div>
         <div data-tools="weight">
           <div class="hint">Paint bone influence onto nearby points and Bézier handles. Choose a bone in Studio → Rig, then drag over the character. Undo restores the previous weights.</div>
-          <label class="fld"><span>Brush radius</span><b id="weightRadiusValue">48</b><input id="weightRadius" type="range" min="4" max="180" step="2" value="48"></label>
         </div>
         <div data-tools="edit">
           <div class="hint">Tap or drag a point to move it. Drag on empty space to box-select.</div>
