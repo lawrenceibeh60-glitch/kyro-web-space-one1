@@ -56,7 +56,12 @@ function chooseParent(part, parts) {
   if (includesAny(label, ['eye', 'hair', 'face', 'brow', 'nose', 'mouth'])) return head || neck || torso;
   if (includesAny(label, ['head'])) return neck || torso;
   if (includesAny(label, ['neck'])) return torso;
-  if (includesAny(label, ['hand', 'wrist', 'forearm', 'lower arm'])) return sameSide(['upper arm', 'arm', 'shoulder']) || torso;
+  if (includesAny(label, ['hand', 'wrist'])) {
+    return sameSide(['forearm', 'lower arm']) || sameSide(['upper arm', 'arm', 'shoulder']) || torso;
+  }
+  if (includesAny(label, ['forearm', 'lower arm', 'elbow'])) {
+    return sameSide(['upper arm', 'shoulder', 'arm']) || torso;
+  }
   if (includesAny(label, ['upper arm', 'shoulder', 'arm'])) return torso;
   if (includesAny(label, ['foot', 'shoe', 'ankle'])) return sameSide(['shin', 'calf', 'lower leg']) || sameSide(['thigh', 'upper leg', 'leg']) || torso;
   if (includesAny(label, ['shin', 'calf', 'lower leg', 'knee'])) return sameSide(['thigh', 'upper leg', 'leg']) || torso;
