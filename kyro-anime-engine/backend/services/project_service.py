@@ -274,6 +274,9 @@ def _create_studio_demo(template):
                 },
             },
         ]
+        for layer in layers:
+            for exposure in layer.get("exposures", []):
+                exposure["length"] = duration
         camera_tracks = {
             "x": [
                 {"t": 0, "v": 0, "ease": "ease_in_out"},
