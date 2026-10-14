@@ -229,15 +229,15 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     const rig = layer.character_id
       ? (project.rigs || []).find(item => item.character_id === layer.character_id)
       : null;
-    const rigPose = rig ? evaluateRigAnimation(rig, frame) : null;
-    if (rigPose?.rootOffset) ctx.translate(rigPose.rootOffset.x, rigPose.rootOffset.y);
-    drawRigPose(ctx, project, layer, frame, rigPose);
+    const rigPose = rig ? evaluateRigAnimation(rig, frame, { layer, layerTransform: t }) : null;
     ctx.globalAlpha = evaluateOpacity(layer, frame);
     ctx.globalCompositeOperation = BLEND[layer.blend] || 'source-over';
-    ctx.translate(t.x || 0, t.y || 0);
+    ctx.translate((t.x || 0) + (rigPose?.rootOffset?.x || 0),
+      (t.y || 0) + (rigPose?.rootOffset?.y || 0));
     ctx.rotate((t.rotation || 0) * Math.PI / 180);
     ctx.scale(t.scale_x ?? 1, t.scale_y ?? 1);
     ctx.translate(-(t.anchor_x || 0), -(t.anchor_y || 0));
+    drawRigPose(ctx, project, layer, frame, rigPose);
     const hide = pv && pv.drawingId === ex?.drawing ? pv.hidden : null;
     for (const s of strokes) if (!hide?.has(s.id)) drawStroke(ctx, s);
     if (pv?.stroke) drawStroke(ctx, pv.stroke);
