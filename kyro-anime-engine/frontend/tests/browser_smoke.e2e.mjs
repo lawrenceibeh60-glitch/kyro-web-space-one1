@@ -97,7 +97,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       page.waitForEvent('download', { timeout: 20000 }),
       page.locator('#exGo').click(),
     ]);
-    assert.match(download.suggestedFilename(), /\\.png$/i);
+    assert.match(download.suggestedFilename(), /\\.zip$/i);
     await page.waitForFunction(() => document.querySelector('#exMsg')?.textContent?.startsWith('Done:'), null, { timeout: 20000 });
 
     assert.deepEqual(pageErrors, [], `browser runtime errors: ${pageErrors.join('; ')}`);
