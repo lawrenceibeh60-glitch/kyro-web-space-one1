@@ -13,6 +13,7 @@ test('auto-rig creates one bone per part with geometry-derived pivots and useful
       part('head', 'Head', [[42, 0], [58, 20]]),
       part('left_upper_arm', 'Left upper arm', [[20, 30], [40, 60]]),
       part('left_forearm', 'Left forearm', [[5, 60], [20, 90]]),
+      part('left_hand', 'Left hand', [[0, 90], [5, 100]]),
       part('left_thigh', 'Left thigh', [[42, 100], [48, 140]]),
       part('left_shin', 'Left shin', [[40, 140], [45, 180]]),
       part('left_foot', 'Left foot', [[20, 180], [45, 190]]),
@@ -29,6 +30,7 @@ test('auto-rig creates one bone per part with geometry-derived pivots and useful
   assert.equal(bones.get('accessory').pivot.y, 360);
   assert.equal(bones.get('head').parent_id, bones.get('torso').id);
   assert.equal(bones.get('left_forearm').parent_id, bones.get('left_upper_arm').id);
+  assert.equal(bones.get('left_hand').parent_id, bones.get('left_forearm').id);
   assert.equal(bones.get('left_shin').parent_id, bones.get('left_thigh').id);
   assert.equal(bones.get('left_foot').parent_id, bones.get('left_shin').id);
 });
