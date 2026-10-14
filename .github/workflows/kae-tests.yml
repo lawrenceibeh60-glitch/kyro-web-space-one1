@@ -84,4 +84,4 @@ jobs:
           cat /tmp/kae-browser-smoke.log
           exit 1
       - name: Run real-browser editor and rig smoke test
-        run: node --test frontend/tests/browser_smoke.test.js
+        run: node --test frontend/tests/browser_smoke.e2e.mjs
