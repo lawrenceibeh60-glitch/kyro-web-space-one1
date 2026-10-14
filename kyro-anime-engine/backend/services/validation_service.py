@@ -197,6 +197,52 @@ def _check_stroke(stroke, where, errs):
                         total += weight
                 if total <= 0 or total > 1.000001:
                     errs.append(f"{sw}: weights must sum to a value in (0, 1]")
+    command_skin_weights = stroke.get("command_skin_weights")
+    if command_skin_weights is not None:
+        if commands is None:
+            errs.append(f"{where}.command_skin_weights: requires command-based geometry")
+        else:
+            coordinate_count = sum(
+                1 if command[0] in {"M", "L"} else
+                2 if command[0] == "Q" else
+                3 if command[0] == "C" else 0
+                for command in commands
+                if isinstance(command, list) and command and isinstance(command[0], str)
+            )
+            if not isinstance(command_skin_weights, list) or len(command_skin_weights) != coordinate_count:
+                errs.append(
+                    f"{where}.command_skin_weights: one influence list per path coordinate pair required "
+                    f"({coordinate_count} expected)"
+                )
+            else:
+                for point_index, influences in enumerate(command_skin_weights):
+                    sw = f"{where}.command_skin_weights[{point_index}]"
+                    if not isinstance(influences, list) or not influences:
+                        errs.append(f"{sw}: non-empty influence list required")
+                        continue
+                    total = 0.0
+                    seen_bones = set()
+                    for influence_index, influence in enumerate(influences):
+                        iw = f"{sw}[{influence_index}]"
+                        if not isinstance(influence, dict):
+                            errs.append(f"{iw}: must be an object")
+                            continue
+                        if influence.keys() - {"bone_id", "weight"}:
+                            errs.append(f"{iw}: unknown property")
+                        bone_id = influence.get("bone_id")
+                        if not isinstance(bone_id, str) or not ID_RE.fullmatch(bone_id):
+                            errs.append(f"{iw}.bone_id: invalid")
+                        elif bone_id in seen_bones:
+                            errs.append(f"{iw}.bone_id: duplicate influence")
+                        if isinstance(bone_id, str):
+                            seen_bones.add(bone_id)
+                        weight = influence.get("weight")
+                        if not _num(weight) or not 0 <= weight <= 1:
+                            errs.append(f"{iw}.weight: number 0..1 required")
+                        else:
+                            total += weight
+                    if total <= 0 or total > 1.000001:
+                        errs.append(f"{sw}: weights must sum to a value in (0, 1]")
     if "width" in stroke and (not _num(stroke["width"]) or stroke["width"] <= 0):
         errs.append(f"{where}.width: must be > 0")
     for field, allowed in (
@@ -418,20 +464,23 @@ def _check_studio_data(project, errs):
         if not isinstance(strokes, list):
             return
         for stroke_index, stroke in enumerate(strokes):
-            if not isinstance(stroke, dict) or not isinstance(stroke.get("skin_weights"), list):
+            if not isinstance(stroke, dict):
                 continue
-            for point_index, influences in enumerate(stroke["skin_weights"]):
+            for weight_field in ("skin_weights", "command_skin_weights"):
+                if not isinstance(stroke.get(weight_field), list):
+                    continue
+                for point_index, influences in enumerate(stroke[weight_field]):
                 if not isinstance(influences, list):
                     continue
-                for influence_index, influence in enumerate(influences):
-                    if not isinstance(influence, dict):
-                        continue
-                    bone_id = influence.get("bone_id")
-                    if isinstance(bone_id, str) and bone_id not in known_bone_ids:
-                        errs.append(
-                            f"{where}[{stroke_index}].skin_weights[{point_index}]"
-                            f"[{influence_index}].bone_id: rig bone not found"
-                        )
+                    for influence_index, influence in enumerate(influences):
+                        if not isinstance(influence, dict):
+                            continue
+                        bone_id = influence.get("bone_id")
+                        if isinstance(bone_id, str) and bone_id not in known_bone_ids:
+                            errs.append(
+                                f"{where}[{stroke_index}].{weight_field}[{point_index}]"
+                                f"[{influence_index}].bone_id: rig bone not found"
+                            )
 
     project_drawings = project.get("drawings", {})
     if isinstance(project_drawings, dict):
