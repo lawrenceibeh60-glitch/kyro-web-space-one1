@@ -330,6 +330,13 @@ def _create_studio_demo(template):
                     "exposures": [{"start": 0, "length": 104, "drawing": front_drawing}],
                     "tracks": {
                         **motion_tracks,
+                        "rotation_y": [
+                            {"t": 0, "v": 0},
+                            {"t": 95, "v": 0, "ease": "ease_in_out"},
+                            {"t": 100, "v": 90, "ease": "ease_in_out"},
+                            {"t": 103, "v": 90},
+                            {"t": 199, "v": 90},
+                        ],
                         "opacity": [
                             {"t": 0, "v": 1}, {"t": 95, "v": 1},
                             {"t": 100, "v": 0.5, "ease": "ease_in_out"},
