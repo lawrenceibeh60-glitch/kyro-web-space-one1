@@ -2,6 +2,7 @@
 // Exposures + animated layer transform/opacity (keyframe tracks).
 import { evaluateTransform, evaluateOpacity } from '../animation/pose_evaluator.js';
 import { evaluateTrack } from '../animation/interpolation.js';
+import { evaluateRigAnimation } from '../animation/animation_clips.js';
 import { applyCameraDepthTransform, applyCameraTransform } from '../animation/camera_evaluator.js';
 import { applyCameraShake } from '../effects/camera_shake.js';
 import { drawLightning } from '../effects/lightning.js';
@@ -61,7 +62,7 @@ function drawEffects(ctx, effects, width, height, frame) {
   }
 }
 
-function drawRigPose(ctx, project, layer, frame) {
+function drawRigPose(ctx, project, layer, frame, pose = null) {
   if (!layer.character_id || !layer.character_part_id) return;
   const rig = (project.rigs || []).find(item => item.character_id === layer.character_id);
   const bone = rig?.bones?.find(item => item.character_part_id === layer.character_part_id);
@@ -76,7 +77,7 @@ function drawRigPose(ctx, project, layer, frame) {
     current = current.parent_id ? bones.get(current.parent_id) : null;
   }
   for (const item of chain) {
-    const angle = boneRotation(item, frame);
+    const angle = boneRotation(item, frame, pose);
     if (!angle) continue;
     ctx.translate(item.pivot.x, item.pivot.y);
     ctx.rotate(angle * Math.PI / 180);
@@ -84,10 +85,11 @@ function drawRigPose(ctx, project, layer, frame) {
   }
 }
 
-function boneRotation(bone, frame) {
-  return bone.tracks?.rotation?.length
+function boneRotation(bone, frame, pose = null) {
+  const base = bone.tracks?.rotation?.length
     ? evaluateTrack(bone.tracks.rotation, frame)
     : (bone.rotation ?? 0);
+  return base + (Number.isFinite(pose?.bones?.[bone.id]) ? pose.bones[bone.id] : 0);
 }
 
 function rigPivot(bone, bones, frame) {
@@ -224,7 +226,12 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     const t = getLayerTransform(layer, frame);
     ctx.save();
     applyCameraDepthTransform(ctx, width, height, camera, frame, layer.depth ?? 1);
-    drawRigPose(ctx, project, layer, frame);
+    const rig = layer.character_id
+      ? (project.rigs || []).find(item => item.character_id === layer.character_id)
+      : null;
+    const rigPose = rig ? evaluateRigAnimation(rig, frame) : null;
+    if (rigPose?.rootOffset) ctx.translate(rigPose.rootOffset.x, rigPose.rootOffset.y);
+    drawRigPose(ctx, project, layer, frame, rigPose);
     ctx.globalAlpha = evaluateOpacity(layer, frame);
     ctx.globalCompositeOperation = BLEND[layer.blend] || 'source-over';
     ctx.translate(t.x || 0, t.y || 0);
