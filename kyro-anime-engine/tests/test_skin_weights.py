@@ -70,7 +70,7 @@ class SkinWeightValidationTests(unittest.TestCase):
             ],
             "command_skin_weights": [
                 [{"bone_id": "body_bone", "weight": 1}]
-                for _ in range(5)
+                for _ in range(6)
             ],
         }
         project["drawings"]["skin_drawing"]["strokes"] = [stroke]
