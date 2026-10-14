@@ -250,20 +250,53 @@ def _create_studio_demo(template):
         # flattened illustration.
         front_source = {stroke["id"]: stroke for stroke in drawings["d_character_front"]["strokes"]}
         profile_source = {stroke["id"]: stroke for stroke in drawings["d_character_profile"]["strokes"]}
+        # Split the original leg strokes at the knee so the two-bone IK solver can
+        # preserve planted feet while the upper and lower legs articulate separately.
+        front_source.update({
+            "left_thigh": _shape("left_thigh", [[608, 548], [592, 612]], "#7f9bb4", 25),
+            "left_shin": _shape("left_shin", [[592, 612], [565, 677]], "#7f9bb4", 25),
+            "right_thigh": _shape("right_thigh", [[670, 548], [690, 604]], "#a7bbcd", 25),
+            "right_shin": _shape("right_shin", [[690, 604], [722, 657]], "#a7bbcd", 25),
+        })
+        profile_source.update({
+            "left_thigh": _shape("left_thigh_profile", [[620, 545], [580, 610]], "#7f9bb4", 23),
+            "left_shin": _shape("left_shin_profile", [[580, 610], [590, 666]], "#7f9bb4", 23),
+            "right_thigh": _shape("right_thigh_profile", [[662, 545], [700, 604]], "#a7bbcd", 25),
+            "right_shin": _shape("right_shin_profile", [[700, 604], [670, 665]], "#a7bbcd", 25),
+        })
+        # Back-to-front painter order: legs and arms behind the coat, then head and shoes.
         part_specs = [
+            ("left_thigh", "Left thigh", ["left_thigh"], ["left_thigh"], (608, 548), "torso"),
+            ("left_shin", "Left shin", ["left_shin"], ["left_shin"], (592, 612), "left_thigh"),
+            ("right_thigh", "Right thigh", ["right_thigh"], ["right_thigh"], (670, 548), "torso"),
+            ("right_shin", "Right shin", ["right_shin"], ["right_shin"], (690, 604), "right_thigh"),
+            ("left_upper_arm", "Left arm", ["arm_l"], ["arm"], (575, 352), "torso"),
+            ("right_upper_arm", "Right arm", ["arm_r"], [], (705, 352), "torso"),
             ("torso", "Torso", ["coat", "neck"], ["coat", "neck"], (640, 420), None),
             ("head", "Head", ["head", "hair", "eye_l", "eye_r"],
              ["head", "hair", "profile_eye", "profile_nose"], (640, 250), "torso"),
-            ("left_upper_arm", "Left arm", ["arm_l"], ["arm"], (575, 352), "torso"),
-            ("right_upper_arm", "Right arm", ["arm_r"], [], (705, 352), "torso"),
-            ("left_thigh", "Left leg", ["leg_l"], ["leg_back"], (608, 548), "torso"),
-            ("right_thigh", "Right leg", ["leg_r"], ["leg_front"], (670, 548), "torso"),
-            ("left_foot", "Left shoe", ["shoe_l"], ["shoe_back"], (565, 677), "left_thigh"),
-            ("right_foot", "Right shoe", ["shoe_r"], ["shoe_front"], (722, 657), "right_thigh"),
+            ("left_foot", "Left shoe", ["shoe_l"], ["shoe_back"], (565, 677), "left_shin"),
+            ("right_foot", "Right shoe", ["shoe_r"], ["shoe_front"], (722, 657), "right_shin"),
         ]
         walker_parts = []
         walker_bones = []
         walker_layers = []
+        motion_tracks = {
+            "x": [
+                {"t": 0, "v": 0, "ease": "ease_in_out"},
+                {"t": 49, "v": 0, "ease": "ease_in_out"},
+                {"t": 99, "v": -20, "ease": "ease_in_out"},
+                {"t": 149, "v": -30, "ease": "ease_in_out"},
+                {"t": 199, "v": -30},
+            ],
+            "y": [
+                {"t": 0, "v": 8, "ease": "ease_in_out"},
+                {"t": 49, "v": 0, "ease": "ease_in_out"},
+                {"t": 99, "v": 5, "ease": "ease_in_out"},
+                {"t": 149, "v": 0, "ease": "ease_in_out"},
+                {"t": 199, "v": 0},
+            ],
+        }
         for part_id, part_name, front_ids, profile_ids, pivot, parent_id in part_specs:
             front_strokes = [front_source[key] for key in front_ids]
             profile_strokes = [profile_source[key] for key in profile_ids]
@@ -285,31 +318,39 @@ def _create_studio_demo(template):
             if parent_id:
                 bone["parent_id"] = parent_id
             walker_bones.append(bone)
-            walker_layers.append({
-                "id": f"layer_walker_{part_id}", "name": f"Walker / {part_name}",
+            common = {
                 "type": "drawing", "depth": 1.15, "character_id": "character_walker",
                 "character_part_id": part_id, "transform": {"x": 0, "y": 0},
-                "exposures": [
-                    {"start": 0, "length": 100, "drawing": front_drawing},
-                    {"start": 100, "length": 100, "drawing": profile_drawing},
-                ],
-                "tracks": {
-                    "x": [
-                        {"t": 0, "v": 0, "ease": "ease_in_out"},
-                        {"t": 49, "v": 0, "ease": "ease_in_out"},
-                        {"t": 99, "v": -20, "ease": "ease_in_out"},
-                        {"t": 149, "v": -30, "ease": "ease_in_out"},
-                        {"t": 199, "v": -30},
-                    ],
-                    "y": [
-                        {"t": 0, "v": 8, "ease": "ease_in_out"},
-                        {"t": 49, "v": 0, "ease": "ease_in_out"},
-                        {"t": 99, "v": 5, "ease": "ease_in_out"},
-                        {"t": 149, "v": 0, "ease": "ease_in_out"},
-                        {"t": 199, "v": 0},
-                    ],
+                "tracks": motion_tracks,
+            }
+            walker_layers.extend([
+                {
+                    **common, "id": f"layer_walker_{part_id}_front",
+                    "name": f"Walker / {part_name} (front)",
+                    "exposures": [{"start": 0, "length": 104, "drawing": front_drawing}],
+                    "tracks": {
+                        **motion_tracks,
+                        "opacity": [
+                            {"t": 0, "v": 1}, {"t": 95, "v": 1},
+                            {"t": 100, "v": 0.5, "ease": "ease_in_out"},
+                            {"t": 103, "v": 0}, {"t": 199, "v": 0},
+                        ],
+                    },
                 },
-            })
+                {
+                    **common, "id": f"layer_walker_{part_id}_profile",
+                    "name": f"Walker / {part_name} (profile)",
+                    "exposures": [{"start": 96, "length": 104, "drawing": profile_drawing}],
+                    "tracks": {
+                        **motion_tracks,
+                        "opacity": [
+                            {"t": 0, "v": 0}, {"t": 96, "v": 0},
+                            {"t": 100, "v": 0.5, "ease": "ease_in_out"},
+                            {"t": 104, "v": 1}, {"t": 199, "v": 1},
+                        ],
+                    },
+                },
+            ])
         drawings.pop("d_character_front")
         drawings.pop("d_character_profile")
         project["characters"] = [{
