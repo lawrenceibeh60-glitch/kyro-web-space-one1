@@ -144,6 +144,25 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     assert.match(download.suggestedFilename(), /\.zip$/i);
     await page.waitForFunction(() => document.querySelector('#exMsg')?.textContent?.startsWith('Done:'), null, { timeout: 20000 });
 
+    await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.locator('[data-template="cinematic"]').click();
+    await page.waitForURL(/editor\.html\?project=/);
+    await page.locator('[data-ws="studio"]').click();
+    await page.locator('[data-studio-tab="rig"]').click();
+    await page.locator('#rigCharacter').selectOption('character_walker');
+    await page.waitForFunction(() => !document.querySelector('#rigTurnApply')?.disabled);
+    await page.locator('#turnStartFrame').fill('20');
+    await page.locator('#turnDuration').fill('12');
+    await page.locator('#rigTurnApply').click();
+    await page.waitForFunction(() => {
+      const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
+      const front = scene.layers.find(layer => layer.id === 'layer_walker_head_front');
+      const profile = scene.layers.find(layer => layer.id === 'layer_walker_head_profile');
+      return front?.tracks?.rotation_y?.some(key => key.t === 26 && key.v === 45)
+        && front?.tracks?.opacity?.some(key => key.t === 32 && key.v === 0)
+        && profile?.tracks?.opacity?.some(key => key.t === 32 && key.v === 1);
+    });
+
     assert.deepEqual(pageErrors, [], `browser runtime errors: ${pageErrors.join('; ')}`);
   } finally {
     await browser.close();

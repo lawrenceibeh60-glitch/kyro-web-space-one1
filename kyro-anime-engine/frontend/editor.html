@@ -167,6 +167,12 @@
                 <label class="chk"><input id="rigWalkLoop" type="checkbox" checked> Loop cycle</label>
                 <button id="rigWalkApply" class="primary">Apply walk-cycle settings</button>
                 <div id="rigWalkStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Front/profile turn</div>
+                <div class="hint">For character parts with matching front and profile artwork, create a perspective yaw and opacity crossfade as one undoable edit.</div>
+                <div class="xrow n"><span>Start frame</span><input id="turnStartFrame" type="number" min="0" step="1" value="0"></div>
+                <div class="xrow n"><span>Duration</span><input id="turnDuration" type="number" min="4" max="240" step="1" value="12"></div>
+                <button id="rigTurnApply" class="primary">Build front/profile turn</button>
+                <div id="rigTurnStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Vector skinning</div>
                 <div class="hint">Bind every point or Bézier control point in the active drawing to bones. Auto-weight assigns the nearest pivot; edit weights after for better joints.</div>
                 <label class="fld"><span>Influence bone</span><select id="skinBone"></select></label>
