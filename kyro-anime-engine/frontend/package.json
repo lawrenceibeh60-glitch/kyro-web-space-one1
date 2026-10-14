@@ -1,0 +1,6 @@
+{
+  "name": "kyro-anime-engine-frontend",
+  "private": true,
+  "type": "module",
+  "description": "ES module configuration for KAE browser modules and Node-based regression tests"
+}
