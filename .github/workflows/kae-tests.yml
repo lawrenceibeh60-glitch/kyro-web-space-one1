@@ -1,0 +1,36 @@
+name: KAE tests
+
+on:
+  push:
+    paths:
+      - "kyro-anime-engine/**"
+      - ".github/workflows/kae-tests.yml"
+  pull_request:
+    paths:
+      - "kyro-anime-engine/**"
+      - ".github/workflows/kae-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kyro-anime-engine
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: kyro-anime-engine/requirements.txt
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run KAE regression suite
+        env:
+          PYTHONPATH: .
+        run: python -m unittest discover -s tests -p "test_*.py" -v
