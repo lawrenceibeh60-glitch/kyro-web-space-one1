@@ -8,7 +8,7 @@
   "additionalProperties": false,
   "properties": {
     "format": { "const": "kae" },
-    "version": { "type": "integer", "minimum": 1 },
+    "version": { "enum": [1, 2] },
     "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "name": { "type": "string", "minLength": 1 },
     "created": { "type": "string" },
@@ -26,6 +26,10 @@
       }
     },
     "palette": { "type": "array", "items": { "$ref": "drawing.schema.json#/$defs/color" } },
+    "styles": {
+      "type": "array",
+      "items": { "$ref": "style.schema.json" }
+    },
     "drawings": {
       "type": "object",
       "additionalProperties": { "$ref": "drawing.schema.json" }
@@ -54,7 +58,16 @@
     },
     "rigs": {
       "type": "array",
+<<<<<<< Updated upstream
       "items": { "$ref": "rig.schema.json" }
+=======
+      "items": {
+        "allOf": [
+          { "$ref": "rig.schema.json" },
+          { "required": ["name"] }
+        ]
+      }
+>>>>>>> Stashed changes
     },
     "audio": {
       "type": "array",

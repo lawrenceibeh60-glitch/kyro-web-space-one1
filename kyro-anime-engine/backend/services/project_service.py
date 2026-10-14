@@ -8,6 +8,8 @@ import config
 from backend.app.exceptions import ApiError
 from backend.services.validation_service import validate_project
 from backend.storage import project_repository as repo
+from engine.core.errors import ValidationError
+from engine.project.project_migration import migrate_project
 
 DEFAULT_SETTINGS = {"width": 1280, "height": 720, "fps": 12, "duration_frames": 24, "background": "#ffffff"}
 DEMO_TEMPLATES = {
@@ -44,6 +46,7 @@ def create_project(name, settings=None):
         "modified": now,
         "settings": s,
         "palette": ["#111111", "#e63946", "#457b9d", "#f1faee"],
+        "styles": [],
         "drawings": {},
         "characters": [],
         "effects": [],
@@ -104,6 +107,7 @@ def _create_studio_demo(template):
             "id": _new_id(name), "name": "Bouncing Ball (demo)",
             "created": now, "modified": now,
         })
+        project = migrate_project(project)
         project["scenes"][0]["layers"][0]["depth"] = 0.3
         project["scenes"][0]["layers"][1]["depth"] = 1.2
         project["scenes"][0]["lights"] = [{
@@ -122,7 +126,7 @@ def _create_studio_demo(template):
         "id": _new_id(name), "name": name, "created": now, "modified": now,
         "settings": {**DEFAULT_SETTINGS, "width": 1280, "height": 720,
                      "fps": 24, "duration_frames": duration, "background": background},
-        "palette": [], "drawings": {}, "characters": [], "scenes": [],
+        "palette": [], "styles": [], "drawings": {}, "characters": [], "scenes": [],
         "effects": [], "rigs": [], "audio": [],
     }
     drawings = project["drawings"]
@@ -496,13 +500,21 @@ def create_demo(template="bounce"):
 
 
 def get_project(pid):
-    return repo.load(pid)
+    project = repo.load(pid)
+    errors = validate_project(project)
+    if errors:
+        raise ApiError(422, "Project failed validation", errors)
+    return _migrate_project(project)
 
 
 def save_project(pid, data):
     if data.get("id") != pid:
         raise ApiError(400, "Document id does not match URL id")
     _check_supported_version(data)
+    errors = validate_project(data)
+    if errors:
+        raise ApiError(422, "Project failed validation", errors)
+    data = _migrate_project(data)
     errs = validate_project(data)
     if errs:
         raise ApiError(422, "Project failed validation", errs)
@@ -538,6 +550,13 @@ def _check_supported_version(data):
         )
 
 
+def _migrate_project(data):
+    try:
+        return migrate_project(data)
+    except ValidationError as error:
+        raise ApiError(422, str(error)) from error
+
+
 def import_project(data):
     if not isinstance(data, dict):
         raise ApiError(400, "Import payload must be a JSON object")
@@ -548,7 +567,7 @@ def import_project(data):
     if "format" not in data:
         data["format"] = "kae"
     if "version" not in data:
-        data["version"] = config.FORMAT_VERSION
+        data["version"] = 1
     _check_supported_version(data)
     if "settings" not in data:
         data["settings"] = dict(DEFAULT_SETTINGS)
@@ -573,6 +592,7 @@ def import_project(data):
         data["drawings"] = {}
     for field in ("palette", "characters", "effects", "rigs", "audio"):
         data.setdefault(field, [])
+    data = _migrate_project(data)
     errs = validate_project(data)
     if errs:
         raise ApiError(422, "Imported project failed validation", errs)

@@ -38,7 +38,7 @@ Choose stable IDs for a character and each part, and keep their combined generat
 
 Use **Import Files** in the Project JSON pane to select several `.json` files at once. Full project documents merge drawings, scenes, layers, characters, effects, rigs, lights, and palette colors by stable IDs; conflicting project components keep the open project's version. Character documents use their stable character ID as an upsert key, so a matching ID updates art while preserving part animation omitted from the incoming document. Audio clip metadata is not merged because the audio bytes are stored separately from project JSON; import audio files from the Audio studio tab.
 
-Project JSON uses `format: "kae"` version 1. The import endpoint supplies safe defaults for omitted legacy fields, creates a blank scene if `scenes` is omitted, and rejects versions newer than the running app supports. See [docs/project_format.md](docs/project_format.md) for compatibility and validation behavior.
+Project JSON uses `format: "kae"` version 2. Version 1 projects migrate on import/load/save; the import endpoint supplies safe defaults for omitted legacy fields, creates a blank scene if `scenes` is omitted, and rejects versions newer than the running app supports. See [docs/project_format.md](docs/project_format.md) for compatibility and validation behavior.
 
 ### Studio workspace
 

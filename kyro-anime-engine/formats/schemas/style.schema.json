@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "style.schema.json",
+  "title": "Style",
+  "description": "Reusable stroke/fill style definitions including dash patterns and gradient fills.",
+  "type": "object",
+  "required": ["id"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+    "name": { "type": "string" },
+    "dash": { "$ref": "#/$defs/dash" },
+    "gradient": { "$ref": "#/$defs/gradient" }
+  },
+  "$defs": {
+    "dash": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "array": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "type": "number", "exclusiveMinimum": 0 },
+          "description": "Alternating dash/gap lengths."
+        },
+        "offset": { "type": "number", "default": 0 }
+      },
+      "required": ["array"]
+    },
+    "gradient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "stops"],
+      "properties": {
+        "type": { "enum": ["linear", "radial"] },
+        "x0": { "type": "number", "default": 0 },
+        "y0": { "type": "number", "default": 0 },
+        "x1": { "type": "number", "default": 1 },
+        "y1": { "type": "number", "default": 1 },
+        "r0": { "type": "number", "minimum": 0, "default": 0 },
+        "r1": { "type": "number", "minimum": 0, "default": 1 },
+        "stops": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/gradient_stop" }
+        }
+      }
+    },
+    "gradient_stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "color"],
+      "properties": {
+        "offset": { "type": "number", "minimum": 0, "maximum": 1 },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$" }
+      }
+    }
+  }
+}

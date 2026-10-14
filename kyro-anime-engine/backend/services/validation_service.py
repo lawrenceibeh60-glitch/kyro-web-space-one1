@@ -5,8 +5,22 @@ Dependency-free validation of a project document against formats/schemas
 import math
 import re
 
+from backend.services.schema_validator import validator as schema_validator
+
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+<<<<<<< Updated upstream
 CHANNELS = {"x", "y", "rotation", "rotation_y", "scale_x", "scale_y", "opacity"}
+=======
+CHANNELS = {
+    "x", "y", "z", "rotation", "rotation_x", "rotation_y",
+    "scale_x", "scale_y", "scale_z", "anchor_x", "anchor_y", "anchor_z",
+    "opacity",
+}
+CAMERA_CHANNELS = {
+    "x", "y", "z", "rotation", "rotation_x", "rotation_y",
+    "scale_x", "scale_y", "fov", "focus_distance", "aperture",
+}
+>>>>>>> Stashed changes
 EASES = {"linear", "hold", "ease_in", "ease_out", "ease_in_out"}
 MAX_ERRORS = 50
 
@@ -60,13 +74,13 @@ def _check_drawings(drawings, errs):
             _check_stroke(s, sw, errs)
 
 
-def _check_tracks(tracks, where, errs):
+def _check_tracks(tracks, where, errs, channels=CHANNELS):
     if not isinstance(tracks, dict):
         errs.append(f"{where}: tracks must be an object")
         return
     for ch, kfs in tracks.items():
         w = f"{where}.{ch}"
-        if ch not in CHANNELS:
+        if ch not in channels:
             errs.append(f"{w}: unknown channel")
             continue
         if not isinstance(kfs, list) or not kfs:
@@ -254,9 +268,48 @@ def _check_stroke(stroke, where, errs):
             not isinstance(stroke[field], str) or stroke[field] not in allowed
         ):
             errs.append(f"{where}.{field}: unsupported value")
+    if "style_id" in stroke and (
+        not isinstance(stroke["style_id"], str) or not ID_RE.fullmatch(stroke["style_id"])
+    ):
+        errs.append(f"{where}.style_id: invalid")
+    dash = stroke.get("dash")
+    if dash is not None:
+        if not isinstance(dash, list) or not (1 <= len(dash) <= 16):
+            errs.append(f"{where}.dash: array of 1..16 required")
+        elif not all(_num(v) and v > 0 for v in dash):
+            errs.append(f"{where}.dash: all values must be > 0")
+    if "dash_offset" in stroke and not _num(stroke["dash_offset"]):
+        errs.append(f"{where}.dash_offset: number required")
+    holes = stroke.get("holes")
+    if holes is not None:
+        if not isinstance(holes, list) or len(holes) < 1:
+            errs.append(f"{where}.holes: non-empty array required")
+        else:
+            for i, hole in enumerate(holes):
+                if not isinstance(hole, list):
+                    errs.append(f"{where}.holes[{i}]: expected path commands array")
+                else:
+                    _check_path_commands(hole, f"{where}.holes[{i}]", errs)
 
 
 def _check_studio_data(project, errs):
+    styles = project.get("styles", [])
+    style_ids = set()
+    if not isinstance(styles, list):
+        errs.append("styles: must be a list")
+    else:
+        for index, style in enumerate(styles):
+            where = f"styles[{index}]"
+            if not isinstance(style, dict):
+                errs.append(f"{where}: must be an object")
+                continue
+            style_id = style.get("id")
+            if not isinstance(style_id, str) or not ID_RE.fullmatch(style_id):
+                errs.append(f"{where}.id: invalid")
+            elif style_id in style_ids:
+                errs.append(f"{where}.id: duplicate '{style_id}'")
+            else:
+                style_ids.add(style_id)
     scenes = project.get("scenes", [])
     scene_ids = {
         scene.get("id") for scene in scenes
@@ -331,7 +384,11 @@ def _check_studio_data(project, errs):
             if not isinstance(rig, dict):
                 errs.append(f"{where}: must be an object")
                 continue
+<<<<<<< Updated upstream
             for key in rig.keys() - {"id", "name", "character_id", "bones", "animation"}:
+=======
+            for key in rig.keys() - {"id", "name", "character_id", "bones", "constraints"}:
+>>>>>>> Stashed changes
                 errs.append(f"{where}.{key}: unknown property")
             animation = rig.get("animation")
             if animation is not None:
@@ -389,7 +446,8 @@ def _check_studio_data(project, errs):
                     errs.append(f"{bw}: must be an object")
                     continue
                 for key in bone.keys() - {
-                    "id", "name", "parent_id", "character_part_id", "pivot", "rotation", "tracks",
+                    "id", "name", "parent_id", "character_part_id", "pivot", "rotation",
+                    "length", "tracks",
                 }:
                     errs.append(f"{bw}.{key}: unknown property")
                 bone_id = bone.get("id")
@@ -417,6 +475,10 @@ def _check_studio_data(project, errs):
                     not _num(bone["rotation"]) or not -3600 <= bone["rotation"] <= 3600
                 ):
                     errs.append(f"{bw}.rotation: number -3600..3600 required")
+                if "length" in bone and (
+                    not _num(bone["length"]) or bone["length"] < 0
+                ):
+                    errs.append(f"{bw}.length: number >= 0 required")
                 pivot = bone.get("pivot")
                 if not isinstance(pivot, dict) or any(
                     not _num(pivot.get(axis)) or not -8192 <= pivot[axis] <= 8192
@@ -450,6 +512,19 @@ def _check_studio_data(project, errs):
                         break
                     seen.add(parent_id)
                     parent_id = parent_map[parent_id]
+            constraints = rig.get("constraints", [])
+            if not isinstance(constraints, list):
+                errs.append(f"{where}.constraints: must be a list")
+            else:
+                for constraint_index, constraint in enumerate(constraints):
+                    cw = f"{where}.constraints[{constraint_index}]"
+                    if not isinstance(constraint, dict):
+                        errs.append(f"{cw}: must be an object")
+                        continue
+                    for field in ("bone_id", "target_bone_id"):
+                        bone_id = constraint.get(field)
+                        if bone_id is not None and bone_id not in bone_ids:
+                            errs.append(f"{cw}.{field}: bone not found")
 
     # Weighted vector strokes must reference bones that actually exist in the project.
     rig_list = rigs if isinstance(rigs, list) else []
@@ -606,7 +681,8 @@ def validate_character_document(character):
                     continue
                 for key in stroke.keys() - {
                     "id", "tool", "color", "width", "opacity", "closed", "fill", "smoothing",
-                    "points", "commands",
+                    "points", "commands", "fill_rule", "line_cap", "line_join",
+                    "style_id", "dash", "dash_offset", "holes",
                 }:
                     errs.append(f"{stroke_where}.{key}: unknown property")
                 stroke_id = stroke.get("id")
@@ -678,6 +754,67 @@ def _check_exposures(exps, where, drawings, errs):
             errs.append(f"{where}[{b[2]}]: overlaps exposure [{a[2]}]")
 
 
+def _check_layer(ly, where, layer_ids, drawings, errs, ancestors=None):
+    """Validate a single layer recursively. ancestors tracks group IDs for cycle detection."""
+    if ancestors is None:
+        ancestors = set()
+    if not isinstance(ly, dict):
+        errs.append(f"{where}: must be an object")
+        return
+    lid = ly.get("id")
+    if not isinstance(lid, str) or not ID_RE.match(lid):
+        errs.append(f"{where}.id: invalid")
+    elif lid in layer_ids:
+        errs.append(f"{where}.id: duplicate '{lid}'")
+    else:
+        layer_ids.add(lid)
+    layer_type = ly.get("type")
+    if layer_type not in ("drawing", "group", "character_instance"):
+        errs.append(f"{where}.type: must be 'drawing', 'group', or 'character_instance'")
+    if "depth" in ly and (not _num(ly["depth"]) or not 0 <= ly["depth"] <= 2):
+        errs.append(f"{where}.depth: number 0..2 required")
+    character_id = ly.get("character_id")
+    part_id = ly.get("character_part_id")
+    if character_id is not None and (
+        not isinstance(character_id, str) or not ID_RE.fullmatch(character_id)
+    ):
+        errs.append(f"{where}.character_id: invalid")
+    if part_id is not None and (
+        not isinstance(part_id, str) or not ID_RE.fullmatch(part_id)
+    ):
+        errs.append(f"{where}.character_part_id: invalid")
+    if (character_id is None) != (part_id is None):
+        errs.append(f"{where}: character_id and character_part_id must appear together")
+    if "opacity" in ly and (not _num(ly["opacity"]) or not 0 <= ly["opacity"] <= 1):
+        errs.append(f"{where}.opacity: 0..1 required")
+    if "exposures" in ly:
+        _check_exposures(ly["exposures"], f"{where}.exposures", drawings, errs)
+    if "tracks" in ly:
+        _check_tracks(ly["tracks"], f"{where}.tracks", errs)
+    if layer_type in ("group", "character_instance"):
+        if lid in ancestors:
+            errs.append(f"{where}: cycle detected (ancestor '{lid}')")
+            return
+        children = ly.get("children")
+        if children is not None:
+            if not isinstance(children, list):
+                errs.append(f"{where}.children: must be a list")
+            else:
+                new_ancestors = ancestors | ({lid} if isinstance(lid, str) else set())
+                for ci, child in enumerate(children):
+                    _check_layer(child, f"{where}.children[{ci}]", layer_ids, drawings, errs, new_ancestors)
+    if layer_type == "character_instance":
+        overrides = ly.get("instance_overrides")
+        if overrides is not None:
+            if not isinstance(overrides, dict):
+                errs.append(f"{where}.instance_overrides: must be an object")
+            else:
+                if "opacity" in overrides and (not _num(overrides["opacity"]) or not 0 <= overrides["opacity"] <= 1):
+                    errs.append(f"{where}.instance_overrides.opacity: 0..1 required")
+                if "visible" in overrides and not isinstance(overrides["visible"], bool):
+                    errs.append(f"{where}.instance_overrides.visible: must be boolean")
+
+
 def _check_scenes(scenes, drawings, errs):
     if not isinstance(scenes, list) or not scenes:
         errs.append("scenes: non-empty list required")
@@ -699,6 +836,7 @@ def _check_scenes(scenes, drawings, errs):
             errs.append(f"{sw}.layers: must be a list")
             layers = []
         for li, ly in enumerate(layers):
+<<<<<<< Updated upstream
             lw = f"{sw}.layers[{li}]"
             if not isinstance(ly, dict):
                 errs.append(f"{lw}: must be an object")
@@ -741,6 +879,9 @@ def _check_scenes(scenes, drawings, errs):
                     for index, keyframe in enumerate(tracks["rotation_y"]):
                         if isinstance(keyframe, dict) and _num(keyframe.get("v")) and not -180 <= keyframe["v"] <= 180:
                             errs.append(f"{lw}.tracks.rotation_y[{index}].v: number -180..180 required")
+=======
+            _check_layer(ly, f"{sw}.layers[{li}]", layer_ids, drawings, errs)
+>>>>>>> Stashed changes
         cam = sc.get("camera")
         if cam is not None:
             if not isinstance(cam, dict):
@@ -771,10 +912,17 @@ def _check_scenes(scenes, drawings, errs):
                         errs.append(f"{sw}.camera.tracks: tracks must be an object")
                     else:
                         for channel in tracks:
+<<<<<<< Updated upstream
                             if channel not in {"x", "y", "rotation", "scale_x", "scale_y"}:
+=======
+                            if channel not in CAMERA_CHANNELS:
+>>>>>>> Stashed changes
                                 errs.append(f"{sw}.camera.tracks.{channel}: unknown camera channel")
-                        _check_tracks(tracks, f"{sw}.camera.tracks", errs)
+                        _check_tracks(
+                            tracks, f"{sw}.camera.tracks", errs, CAMERA_CHANNELS
+                        )
                         for channel, keyframes in tracks.items():
+<<<<<<< Updated upstream
                             if channel not in {"x", "y", "rotation", "scale_x", "scale_y"} or not isinstance(keyframes, list):
                                 continue
                             if channel in {"scale_x", "scale_y"}:
@@ -783,6 +931,20 @@ def _check_scenes(scenes, drawings, errs):
                                 lo, hi = -3600, 3600
                             else:
                                 lo, hi = -8192, 8192
+=======
+                            if channel not in CAMERA_CHANNELS or not isinstance(keyframes, list):
+                                continue
+                            bounds = {
+                                "x": (-8192, 8192), "y": (-8192, 8192),
+                                "rotation": (-3600, 3600), "rotation_x": (-3600, 3600),
+                                "rotation_y": (-3600, 3600), "scale_x": (0.05, 32),
+                                "scale_y": (0.05, 32), "fov": (1, 179),
+                                "focus_distance": (0, math.inf), "aperture": (0, 1),
+                            }
+                            if channel not in bounds:
+                                continue
+                            lo, hi = bounds[channel]
+>>>>>>> Stashed changes
                             for index, keyframe in enumerate(keyframes):
                                 if (
                                     isinstance(keyframe, dict)
@@ -823,6 +985,9 @@ def validate_project(p):
     errs = []
     if not isinstance(p, dict):
         return ["project: must be an object"]
+    schema_valid, schema_error = schema_validator.validate_project(p)
+    if not schema_valid:
+        errs.append(f"schema: {schema_error}")
     if p.get("format") != "kae":
         errs.append("format: must be 'kae'")
     if not _int(p.get("version")) or p["version"] < 1:

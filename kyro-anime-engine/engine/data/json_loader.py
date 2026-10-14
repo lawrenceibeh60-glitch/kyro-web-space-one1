@@ -36,6 +36,6 @@ def load_json(path, *, encoding="utf-8"):
 def load_project(path, *, normalize=True):
     project = load_project_document(path)
     if normalize:
-        from engine.data.normalizer import normalize_project
-        return normalize_project(project)
+        from engine.project.project_migration import migrate_project
+        return migrate_project(project)
     return project

@@ -9,7 +9,11 @@ import config
 from backend.app.application import create_app
 from backend.app.exceptions import ApiError
 from backend.services import project_service
+from backend.services.schema_validator import validator as schema_validator
 from backend.services.validation_service import validate_project
+from engine.data.json_loader import load_project
+from engine.data.json_writer import dump_project_document
+from engine.project.project_migration import migrate_project
 
 
 class ProjectCompatibilityTests(unittest.TestCase):
@@ -29,6 +33,7 @@ class ProjectCompatibilityTests(unittest.TestCase):
         self.assertEqual(legacy, {"name": "Legacy project", "settings": {"width": 640}})
         self.assertEqual(imported["format"], "kae")
         self.assertEqual(imported["version"], config.FORMAT_VERSION)
+        self.assertEqual(imported["styles"], [])
         self.assertTrue(imported["id"])
         self.assertEqual(imported["settings"]["width"], 640)
         self.assertEqual(imported["settings"]["height"], 720)
@@ -96,6 +101,120 @@ class ProjectCompatibilityTests(unittest.TestCase):
 
         self.assertEqual(len(imported["scenes"][0]["layers"]), 128)
         self.assertEqual(len(imported["drawings"][drawing_id]["strokes"]), 32)
+
+    def test_v1_migration_preserves_project_content_and_serializes_as_current(self):
+        legacy = deepcopy(self.example)
+        legacy["version"] = 1
+        migrated = migrate_project(legacy)
+
+        self.assertEqual(legacy["version"], 1)
+        self.assertNotIn("styles", legacy)
+        self.assertEqual(migrated["version"], config.FORMAT_VERSION)
+        self.assertEqual(migrated["styles"], [])
+        self.assertEqual(migrated["drawings"], legacy["drawings"])
+        self.assertEqual(
+            migrated["scenes"][0]["layers"],
+            legacy["scenes"][0]["layers"],
+        )
+        self.assertEqual(validate_project(migrated), [])
+
+        serialized = json.loads(dump_project_document(legacy))
+        self.assertEqual(serialized["version"], config.FORMAT_VERSION)
+        self.assertEqual(serialized["drawings"], legacy["drawings"])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "legacy.kae"
+            path.write_text(json.dumps(legacy), encoding="utf-8")
+            loaded = load_project(path)
+        self.assertEqual(loaded["version"], config.FORMAT_VERSION)
+        self.assertEqual(loaded["drawings"], legacy["drawings"])
+
+    def test_v1_project_api_load_and_save_migrates_to_current_version(self):
+        legacy = deepcopy(self.example)
+        legacy["id"] = "legacy_v1_project"
+        legacy["version"] = 1
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            config, "PROJECTS_DIR", Path(directory)
+        ):
+            project_service.repo.save(legacy["id"], legacy)
+            client = create_app().test_client()
+            loaded_response = client.get(f"/api/projects/{legacy['id']}")
+            self.assertEqual(loaded_response.status_code, 200)
+            loaded = loaded_response.get_json()
+            self.assertEqual(loaded["version"], config.FORMAT_VERSION)
+            self.assertEqual(loaded["styles"], [])
+
+            saved_response = client.put(
+                f"/api/projects/{legacy['id']}", json=loaded
+            )
+            self.assertEqual(saved_response.status_code, 200)
+            self.assertEqual(saved_response.get_json()["version"], config.FORMAT_VERSION)
+            persisted = json.loads(
+                (Path(directory) / legacy["id"] / "project.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(persisted["version"], config.FORMAT_VERSION)
+            self.assertEqual(persisted["drawings"], legacy["drawings"])
+
+    def test_project_schema_accepts_styles_cinematic_tracks_and_rig_constraints(self):
+        project = deepcopy(self.example)
+        project["version"] = config.FORMAT_VERSION
+        project["styles"] = [
+            {
+                "id": "ink_style",
+                "dash": {"array": [4, 2]},
+                "gradient": {
+                    "type": "linear",
+                    "stops": [
+                        {"offset": 0, "color": "#111111"},
+                        {"offset": 1, "color": "#eeeeee"},
+                    ],
+                },
+            }
+        ]
+        project["drawings"]["d_ground"]["strokes"][0]["style_id"] = "ink_style"
+        project["scenes"][0]["camera"]["transform"].update(
+            {"z": 24, "rotation_x": 5, "rotation_y": -8}
+        )
+        project["scenes"][0]["camera"]["tracks"] = {
+            "scale_y": [{"t": 0, "v": 1}, {"t": 23, "v": 1.1}],
+            "rotation_y": [{"t": 0, "v": 0}, {"t": 23, "v": 12}],
+            "fov": [{"t": 0, "v": 60}, {"t": 23, "v": 45}],
+        }
+        project["characters"] = [
+            {
+                "id": "character_1",
+                "name": "Rigged character",
+                "parts": [{"id": "torso", "name": "Torso", "strokes": []}],
+            }
+        ]
+        project["rigs"] = [
+            {
+                "id": "rig_1",
+                "name": "Character rig",
+                "character_id": "character_1",
+                "bones": [
+                    {
+                        "id": "bone_1",
+                        "name": "Torso",
+                        "character_part_id": "torso",
+                        "pivot": {"x": 0, "y": 0},
+                    }
+                ],
+                "constraints": [
+                    {
+                        "type": "rotation_limit",
+                        "bone_id": "bone_1",
+                        "min": -45,
+                        "max": 45,
+                    }
+                ],
+            }
+        ]
+
+        self.assertEqual(schema_validator.validate_project(project), (True, None))
+        self.assertEqual(validate_project(project), [])
 
 
 if __name__ == "__main__":

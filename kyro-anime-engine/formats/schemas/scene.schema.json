@@ -40,6 +40,7 @@
         ],
         "additionalProperties": false,
         "properties": {
+<<<<<<< Updated upstream
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{1,64}$"
@@ -68,6 +69,22 @@
             "type": "string",
             "pattern": "^#[0-9A-Fa-f]{6}$"
           }
+=======
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+          "type": { "enum": ["point", "directional", "spot", "ambient"], "default": "point" },
+          "x": { "type": "number", "minimum": -8192, "maximum": 8192 },
+          "y": { "type": "number", "minimum": -8192, "maximum": 8192 },
+          "z": { "type": "number", "default": 0, "description": "Depth position for 3D lighting" },
+          "radius": { "type": "number", "minimum": 16, "maximum": 8192 },
+          "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "color_temperature": { "type": "number", "minimum": 1000, "maximum": 40000, "description": "Kelvin" },
+          "cast_shadows": { "type": "boolean", "default": false },
+          "cone_angle": { "type": "number", "minimum": 1, "maximum": 180, "description": "For spot lights, degrees" },
+          "direction_x": { "type": "number", "description": "Direction vector for directional/spot" },
+          "direction_y": { "type": "number" },
+          "direction_z": { "type": "number" }
+>>>>>>> Stashed changes
         }
       }
     }
@@ -77,6 +94,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+<<<<<<< Updated upstream
         "x": {
           "type": "number",
           "default": 0
@@ -115,6 +133,20 @@
           "default": 0,
           "description": "Perspective yaw in degrees for a 2.5D plane turn."
         }
+=======
+        "x": { "type": "number", "default": 0 },
+        "y": { "type": "number", "default": 0 },
+        "z": { "type": "number", "default": 0, "description": "Depth in world units for 3D parallax/spatial positioning." },
+        "rotation": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "Z-axis rotation in degrees (roll)" },
+        "rotation_x": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "X-axis rotation in degrees (pitch)" },
+        "rotation_y": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "Y-axis rotation in degrees (yaw)" },
+        "scale_x": { "type": "number", "default": 1 },
+        "scale_y": { "type": "number", "default": 1 },
+        "scale_z": { "type": "number", "default": 1 },
+        "anchor_x": { "type": "number", "default": 0 },
+        "anchor_y": { "type": "number", "default": 0 },
+        "anchor_z": { "type": "number", "default": 0 }
+>>>>>>> Stashed changes
       }
     },
     "layer": {
@@ -125,6 +157,7 @@
       ],
       "additionalProperties": false,
       "properties": {
+<<<<<<< Updated upstream
         "id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]{1,64}$"
@@ -186,6 +219,36 @@
         "tracks": {
           "$ref": "animation.schema.json#/properties/tracks"
         }
+=======
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+        "name": { "type": "string" },
+        "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$", "description": "Stable character registry ID for an imported part layer." },
+        "character_part_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+        "type": { "enum": ["drawing", "group", "character_instance"] },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/layer" },
+          "description": "Child layers for group-type layers. Supports recursive nesting."
+        },
+        "instance_overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Per-instance transform/property overrides for character_instance layers.",
+          "properties": {
+            "transform": { "$ref": "#/$defs/transform" },
+            "opacity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "visible": { "type": "boolean" }
+          }
+        },
+        "visible": { "type": "boolean", "default": true },
+        "locked": { "type": "boolean", "default": false },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "depth": { "type": "number", "minimum": 0, "maximum": 2, "default": 1, "description": "Camera parallax factor. 0 stays fixed, 1 follows the camera, values above 1 move faster." },
+        "blend": { "enum": ["normal", "multiply", "screen", "overlay", "add"], "default": "normal" },
+        "transform": { "$ref": "#/$defs/transform" },
+        "exposures": { "$ref": "animation.schema.json#/properties/exposures" },
+        "tracks": { "$ref": "animation.schema.json#/properties/tracks" }
+>>>>>>> Stashed changes
       }
     },
     "camera": {
@@ -196,6 +259,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+<<<<<<< Updated upstream
             "x": {
               "type": "number",
               "default": 0
@@ -223,12 +287,45 @@
               "maximum": 32,
               "default": 1
             }
+=======
+            "x": { "type": "number", "default": 0 },
+            "y": { "type": "number", "default": 0 },
+            "z": { "type": "number", "default": 0 },
+            "rotation": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "Z-axis rotation (roll) in degrees" },
+            "rotation_x": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "Pitch in degrees" },
+            "rotation_y": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0, "description": "Yaw in degrees" },
+            "scale_x": { "type": "number", "minimum": 0.05, "maximum": 32, "default": 1 },
+            "scale_y": { "type": "number", "minimum": 0.05, "maximum": 32, "default": 1 }
+>>>>>>> Stashed changes
           }
+        },
+        "lens": {
+          "type": "object", "additionalProperties": false,
+          "description": "Cinematic lens and projection settings.",
+          "properties": {
+            "fov": { "type": "number", "minimum": 1, "maximum": 179, "default": 60, "description": "Vertical field of view in degrees" },
+            "focal_length": { "type": "number", "minimum": 1, "default": 50, "description": "mm equivalent" },
+            "sensor_width": { "type": "number", "minimum": 1, "default": 36, "description": "mm" },
+            "near_clip": { "type": "number", "minimum": 0.001, "default": 0.1 },
+            "far_clip": { "type": "number", "minimum": 0.01, "default": 10000 },
+            "projection": { "enum": ["perspective", "orthographic"], "default": "orthographic" }
+          }
+        },
+        "depth_of_field": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "focus_distance": { "type": "number", "minimum": 0, "default": 100 },
+            "aperture": { "type": "number", "minimum": 0, "maximum": 1, "default": 0, "description": "0 = no blur, 1 = maximum blur" }
+          }
+        },
+        "target": {
+          "type": "string", "description": "ID of layer/bone to track with look-at"
         },
         "tracks": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
+<<<<<<< Updated upstream
             "x": {
               "$ref": "animation.schema.json#/$defs/track"
             },
@@ -244,6 +341,19 @@
             "scale_y": {
               "$ref": "animation.schema.json#/$defs/track"
             }
+=======
+            "x": { "$ref": "animation.schema.json#/$defs/track" },
+            "y": { "$ref": "animation.schema.json#/$defs/track" },
+            "z": { "$ref": "animation.schema.json#/$defs/track" },
+            "rotation": { "$ref": "animation.schema.json#/$defs/track" },
+            "rotation_x": { "$ref": "animation.schema.json#/$defs/track" },
+            "rotation_y": { "$ref": "animation.schema.json#/$defs/track" },
+            "scale_x": { "$ref": "animation.schema.json#/$defs/track" },
+            "scale_y": { "$ref": "animation.schema.json#/$defs/track" },
+            "fov": { "$ref": "animation.schema.json#/$defs/track" },
+            "focus_distance": { "$ref": "animation.schema.json#/$defs/track" },
+            "aperture": { "$ref": "animation.schema.json#/$defs/track" }
+>>>>>>> Stashed changes
           }
         }
       }

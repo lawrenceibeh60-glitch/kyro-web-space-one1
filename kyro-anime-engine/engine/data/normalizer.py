@@ -12,9 +12,10 @@ def normalize_project(project):
     result.setdefault("format", "kae")
     result.setdefault("version", 1)
     result.setdefault("name", "Untitled")
-    settings = result.get("settings")
-    if settings is None:
+    if "settings" not in result:
         settings = {}
+    else:
+        settings = result["settings"]
     if not isinstance(settings, dict):
         raise ValidationError("settings must be an object")
     result["settings"] = {**DEFAULT_SETTINGS, **settings}
@@ -25,6 +26,7 @@ def normalize_project(project):
     result.setdefault("effects", [])
     result.setdefault("rigs", [])
     result.setdefault("audio", [])
+    result.setdefault("styles", [])
     if not isinstance(result["scenes"], list):
         raise ValidationError("scenes must be a list")
     for scene in result["scenes"]:

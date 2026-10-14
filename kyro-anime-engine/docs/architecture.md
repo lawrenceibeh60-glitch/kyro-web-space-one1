@@ -8,11 +8,25 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 
 ## Existing foundations
 
+<<<<<<< Updated upstream
 - **Project persistence:** versioned `kae` JSON, safe legacy defaults, stable-ID imports, semantic validation, and rejection of unsupported future format versions.
 - **Drawing:** point strokes and M/L/Q/C/Z path commands; fill rules, caps, joins, editable layers, and shared viewport/export drawing logic.
 - **Animation:** exposures, transform and opacity tracks, easing, timeline/keyframe tools, and hierarchical 2D bone-rotation tracks.
 - **Camera and depth:** scene camera pan, roll, independent horizontal/vertical zoom tracks, shared keyframe writing, pointer-anchored dolly, and inverse pointer mapping; layer depth factors drive 2.5D parallax. The same camera evaluator is used by viewport and export rendering.
 - **Production features:** procedural character-part generation, scene lights, deterministic scene effects, timeline audio metadata/playback, and PNG/GIF/sprite-sheet/WebM export paths.
+=======
+| Blueprint area | Status | Notes |
+| --- | --- | --- |
+| Project load/save, compatibility, and validation | Partial | Version 1 to 2 migration, schema validation, and semantic/reference checks exist; a general migration registry and dependency resolver remain future work. |
+| Drawing and paths | Partial | Point strokes and Bézier commands render and edit. Dedicated tessellation, robust Boolean path operations, stroke expansion, gradients, patterns, textures, masks, and clipping are not implemented. |
+| Scene graph | Partial | Ordered layers, exposures, transforms, visibility, cameras, and character rigs exist. General drawable groups and parent-child scene objects with composed world transforms do not. |
+| Procedural characters | Partial | A configurable character generator produces editable parts. It is a focused generator, not the full anatomy-guided builder suite in the blueprint. |
+| Character scenes | Partial | Characters can be imported and placed as layers; full character instances, lighting/material pipeline, and compositional scene graph are not implemented. |
+| Animation | Partial | Timeline, exposures, transform interpolation, camera animation, and bone rotation tracks exist. IK, deformation, facial animation tracks, and path deformation do not. |
+| Rendering and export | Partial | Browser Canvas renderer and several exports exist. Dedicated rasterizer/compositor, render cache, lighting/shadow pipeline, color management, and video export service are not implemented. |
+| Performance and determinism | Partial | Large timeline/import bottlenecks have targeted fixes and effects use deterministic seeds. General geometry/layer caches and invalidation tracking do not exist. |
+| Schemas | Partial | Core project, character, scene, animation, rig, effects, render, drawing, and path schemas exist. Separate style, palette, material, lighting, asset, audio, and export schemas remain roadmap work. |
+>>>>>>> Stashed changes
 
 ## Known limitations (do not present these as completed features)
 

@@ -1,11 +1,11 @@
 """Mutable project document wrapper with non-destructive accessors."""
 from copy import deepcopy
-from engine.data.normalizer import normalize_project
+from engine.project.project_migration import migrate_project
 
 
 class Project:
     def __init__(self, document):
-        self._document = normalize_project(document)
+        self._document = migrate_project(document)
 
     @property
     def id(self):
@@ -33,5 +33,5 @@ class Project:
         return self.document
 
     def replace(self, document):
-        self._document = normalize_project(document)
+        self._document = migrate_project(document)
         return self

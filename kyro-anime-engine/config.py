@@ -13,7 +13,7 @@ PORT = int(os.environ.get("KAE_PORT", "5000"))
 DEBUG = os.environ.get("KAE_DEBUG", "1") == "1"
 
 MAX_CONTENT_LENGTH = 64 * 1024 * 1024
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 MAX_EXPORT_FRAMES = 2000
 EXPORT_TTL_HOURS = 24  # old export jobs are deleted when a new one starts
 APP_VERSION = "0.1.0"

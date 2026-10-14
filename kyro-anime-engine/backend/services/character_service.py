@@ -212,17 +212,52 @@ def _oval(stroke_id, cx, cy, rx, ry, color, fill=None, width=3):
     return _shape(stroke_id, points, color, fill, width)
 
 
-def generate_character(pid, options):
-    """Build an editable anime-style vector character and import it by stable ID."""
-    if not isinstance(options, dict):
-        raise ApiError(400, "Generator options must be a JSON object")
-    project = _project(pid)
-    character_id = options.get("id")
-    name = options.get("name")
-    if not isinstance(character_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", character_id):
-        raise ApiError(400, "A valid stable character id is required")
-    if not isinstance(name, str) or not name.strip():
-        raise ApiError(400, "Character name is required")
+def build_head_strokes(cx, cy, sx, sy, skin, eyes, outline, expression):
+    """Deterministic builder for head part strokes."""
+    head = [
+        _oval("head-outline", cx, cy, 142 * sx, 164 * sy, outline, skin, 6 * sx),
+        _shape("ear-left", [[round(cx - 136 * sx, 2), round(cy + 10 * sy, 2), 1],
+                            [round(cx - 160 * sx, 2), round(cy - 2 * sy, 2), 1],
+                            [round(cx - 154 * sx, 2), round(cy + 42 * sy, 2), 1],
+                            [round(cx - 132 * sx, 2), round(cy + 50 * sy, 2), 1]], outline, skin, 5 * sx),
+        _shape("ear-right", [[round(cx + 136 * sx, 2), round(cy + 10 * sy, 2), 1],
+                             [round(cx + 160 * sx, 2), round(cy - 2 * sy, 2), 1],
+                             [round(cx + 154 * sx, 2), round(cy + 42 * sy, 2), 1],
+                             [round(cx + 132 * sx, 2), round(cy + 50 * sy, 2), 1]], outline, skin, 5 * sx),
+    ]
+    for side, x in (("left", -55), ("right", 55)):
+        head.extend([
+            _oval(f"{side}-eye-white", cx + x * sx, cy + 20 * sy, 35 * sx, 43 * sy, outline, "#fff9f0", 4 * sx),
+            _oval(f"{side}-iris", cx + x * sx, cy + 25 * sy, 20 * sx, 29 * sy, outline, eyes, 3 * sx),
+            _oval(f"{side}-pupil", cx + x * sx, cy + 29 * sy, 9 * sx, 18 * sy, outline, "#171722", 2 * sx),
+            _oval(f"{side}-glint", cx + (x - 6) * sx, cy + 14 * sy, 5 * sx, 7 * sy, "#ffffff", "#ffffff", 1 * sx),
+        ])
+    def pt(x, y):
+        return [round(cx + x * sx, 2), round(cy + y * sy, 2), 1]
+    head.extend([
+        _shape("nose", [pt(0, 47), pt(-3, 57)], "#a86f68", None, 3 * sx),
+        _shape("mouth",
+               [pt(-20, 88), pt(-10, 94), pt(0, 96), pt(10, 94), pt(20, 88)]
+               if expression == "smile" else [pt(-17, 92), pt(0, 92), pt(17, 92)],
+               outline, None, 4 * sx),
+        _shape("brow-left",
+               [pt(-82, -42), pt(-55, -34), pt(-30, -30)]
+               if expression == "determined" else [pt(-82, -31), pt(-55, -39), pt(-30, -31)],
+               outline, None, 6 * sx),
+        _shape("brow-right",
+               [pt(30, -30), pt(55, -34), pt(82, -42)]
+               if expression == "determined" else [pt(30, -31), pt(55, -39), pt(82, -31)],
+               outline, None, 6 * sx),
+    ])
+    return head
+
+
+def build_character_document(character_id, name, options, canvas_width, canvas_height):
+    """Build a deterministic kae-character document from options without side effects.
+
+    Returns a dict suitable for import_character or validate_character_document.
+    Pure function: no project mutation, no I/O.
+    """
     colors = {}
     for field, default in (
         ("hair_color", "#303b70"), ("eye_color", "#4c8ba8"),
@@ -239,55 +274,18 @@ def generate_character(pid, options):
     if expression not in {"smile", "neutral", "determined"}:
         raise ApiError(400, "expression must be smile, neutral, or determined")
 
-    width = project["settings"]["width"]
-    height = project["settings"]["height"]
-    scale = min(width / 500, height / 850, 1.0)
-    cx, cy = width / 2, height * 0.23
+    scale = min(canvas_width / 500, canvas_height / 850, 1.0)
+    cx, cy = canvas_width / 2, canvas_height * 0.23
     sx = sy = scale
-    hair, eyes, skin, outfit = (
-        colors["hair_color"], colors["eye_color"],
-        colors["skin_color"], colors["outfit_color"],
-    )
+    hair, eyes, skin, outfit = colors["hair_color"], colors["eye_color"], colors["skin_color"], colors["outfit_color"]
     outline = "#302b37"
+
     def pt(x, y):
         return [round(cx + x * sx, 2), round(cy + y * sy, 2), 1]
     def poly(stroke_id, coordinates, color, fill, stroke_width=4):
         return _shape(stroke_id, [pt(x, y) for x, y in coordinates], color, fill, stroke_width * sx)
 
-    head = [
-        _oval("head-outline", cx, cy, 142 * sx, 164 * sy, outline, skin, 6 * sx),
-        _shape("ear-left", [pt(-136, 10), pt(-160, -2), pt(-154, 42), pt(-132, 50)], outline, skin, 5 * sx),
-        _shape("ear-right", [pt(136, 10), pt(160, -2), pt(154, 42), pt(132, 50)], outline, skin, 5 * sx),
-    ]
-    for side, x in (("left", -55), ("right", 55)):
-        head.extend([
-            _oval(f"{side}-eye-white", cx + x * sx, cy + 20 * sy, 35 * sx, 43 * sy, outline, "#fff9f0", 4 * sx),
-            _oval(f"{side}-iris", cx + x * sx, cy + 25 * sy, 20 * sx, 29 * sy, outline, eyes, 3 * sx),
-            _oval(f"{side}-pupil", cx + x * sx, cy + 29 * sy, 9 * sx, 18 * sy, outline, "#171722", 2 * sx),
-            _oval(f"{side}-glint", cx + (x - 6) * sx, cy + 14 * sy, 5 * sx, 7 * sy, "#ffffff", "#ffffff", 1 * sx),
-        ])
-    head.extend([
-        _shape("nose", [pt(0, 47), pt(-3, 57)], "#a86f68", None, 3 * sx),
-        _shape(
-            "mouth",
-            [pt(-20, 88), pt(-10, 94), pt(0, 96), pt(10, 94), pt(20, 88)]
-            if expression == "smile" else
-            [pt(-17, 92), pt(0, 92), pt(17, 92)],
-            outline, None, 4 * sx,
-        ),
-        _shape(
-            "brow-left",
-            [pt(-82, -42), pt(-55, -34), pt(-30, -30)]
-            if expression == "determined" else [pt(-82, -31), pt(-55, -39), pt(-30, -31)],
-            outline, None, 6 * sx,
-        ),
-        _shape(
-            "brow-right",
-            [pt(30, -30), pt(55, -34), pt(82, -42)]
-            if expression == "determined" else [pt(30, -31), pt(55, -39), pt(82, -31)],
-            outline, None, 6 * sx,
-        ),
-    ])
+    head = build_head_strokes(cx, cy, sx, sy, skin, eyes, outline, expression)
     hair_back = [
         poly("hair-crown", [(-148, 1), (-144, -86), (-102, -148), (-38, -177),
                             (35, -172), (111, -132), (150, -64), (147, 20),
@@ -303,6 +301,7 @@ def generate_character(pid, options):
     ]
     parts = [
         {"id": "hair_back", "name": "Hair Back", "strokes": hair_back, "depth": 0.9},
+<<<<<<< Updated upstream
         {"id": "left_thigh", "name": "Left Thigh", "strokes": [
             poly("left-thigh", [(-72, 354), (-8, 354), (-12, 438), (-18, 482),
                                 (-80, 482), (-84, 438)], outline, outfit, 7),
@@ -320,11 +319,17 @@ def generate_character(pid, options):
                                 (18, 628), (18, 568)], outline, outfit, 7),
         ]},
         {"id": "left_foot", "name": "Left Foot", "strokes": [
+=======
+        {"id": "legs", "name": "Legs", "strokes": [
+            poly("left-leg", [(-72, 354), (-8, 354), (-12, 568), (-18, 628), (-92, 628), (-84, 560)], outline, outfit, 7),
+            poly("right-leg", [(8, 354), (72, 354), (84, 560), (92, 628), (18, 628), (12, 568)], outline, outfit, 7),
+>>>>>>> Stashed changes
             poly("left-shoe", [(-92, 619), (-20, 619), (-12, 652), (-111, 652)], outline, "#493d4b", 5),
         ]},
         {"id": "right_foot", "name": "Right Foot", "strokes": [
             poly("right-shoe", [(20, 619), (92, 619), (111, 652), (12, 652)], outline, "#493d4b", 5),
         ]},
+<<<<<<< Updated upstream
         {"id": "arm_left", "name": "Left Upper Arm", "strokes": [
             poly("left-upper-arm", [(-88, 192), (-126, 209), (-151, 267),
                                     (-122, 284), (-101, 260), (-83, 247)], outline, outfit, 7),
@@ -353,6 +358,19 @@ def generate_character(pid, options):
         {"id": "body", "name": "Outfit", "strokes": [
             poly("torso", [(-36, 164), (-102, 193), (-139, 310), (-106, 377),
                            (106, 377), (139, 310), (102, 193), (36, 164)], outline, outfit, 8),
+=======
+        {"id": "arm_left", "name": "Left Arm", "strokes": [
+            poly("sleeve", [(-88, 192), (-126, 209), (-174, 326), (-145, 344), (-118, 323), (-83, 247)], outline, outfit, 7),
+            poly("hand", [(-174, 326), (-145, 344), (-134, 375), (-151, 385), (-171, 365), (-184, 344)], outline, skin, 5),
+        ]},
+        {"id": "arm_right", "name": "Right Arm", "strokes": [
+            poly("sleeve", [(88, 192), (126, 209), (174, 326), (145, 344), (118, 323), (83, 247)], outline, outfit, 7),
+            poly("hand", [(174, 326), (145, 344), (134, 375), (151, 385), (171, 365), (184, 344)], outline, skin, 5),
+        ]},
+        {"id": "body", "name": "Outfit", "strokes": [
+            poly("neck", [(-28, 138), (28, 138), (34, 178), (-34, 178)], outline, skin, 5),
+            poly("torso", [(-36, 164), (-102, 193), (-139, 310), (-106, 377), (106, 377), (139, 310), (102, 193), (36, 164)], outline, outfit, 8),
+>>>>>>> Stashed changes
             poly("collar", [(-38, 169), (0, 204), (38, 169), (20, 237), (-20, 237)], outline, "#f5e8dd", 4),
         ]},
         {"id": "head", "name": "Face", "strokes": head},
@@ -365,12 +383,28 @@ def generate_character(pid, options):
         ])
     elif hairstyle == "twin_tails":
         parts[0]["strokes"].extend([
-            poly("left-tail", [(-105, -107), (-170, -125), (-204, -82), (-185, -9),
-                               (-217, 91), (-166, 117), (-134, 58), (-139, -12)], outline, hair, 6),
-            poly("right-tail", [(105, -107), (170, -125), (204, -82), (185, -9),
-                                (217, 91), (166, 117), (134, 58), (139, -12)], outline, hair, 6),
+            poly("left-tail", [(-105, -107), (-170, -125), (-204, -82), (-185, -9), (-217, 91), (-166, 117), (-134, 58), (-139, -12)], outline, hair, 6),
+            poly("right-tail", [(105, -107), (170, -125), (204, -82), (185, -9), (217, 91), (166, 117), (134, 58), (139, -12)], outline, hair, 6),
         ])
-    return import_character(pid, {
+    return {
         "format": "kae-character", "version": 1, "id": character_id,
         "name": name.strip(), "parts": parts,
-    })
+    }
+
+
+def generate_character(pid, options):
+    """Build an editable anime-style vector character and import it by stable ID."""
+    if not isinstance(options, dict):
+        raise ApiError(400, "Generator options must be a JSON object")
+    project = _project(pid)
+    character_id = options.get("id")
+    name = options.get("name")
+    if not isinstance(character_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", character_id):
+        raise ApiError(400, "A valid stable character id is required")
+    if not isinstance(name, str) or not name.strip():
+        raise ApiError(400, "Character name is required")
+    doc = build_character_document(
+        character_id, name, options,
+        project["settings"]["width"], project["settings"]["height"],
+    )
+    return import_character(pid, doc)

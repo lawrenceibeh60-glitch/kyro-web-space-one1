@@ -29,11 +29,14 @@ def write_json_document(path, payload, *, indent=2):
 
 def dump_project_document(payload, *, indent=2):
     from engine.data.serialization import dumps
-    return dumps(payload, indent=indent)
+    from engine.project.project_migration import migrate_project
+    return dumps(migrate_project(payload), indent=indent)
 
 
 def write_project_document(path, payload, *, validate=True):
+    from engine.project.project_migration import migrate_project
+    project = migrate_project(payload)
     if validate:
         from engine.project.project_validator import require_valid_project
-        require_valid_project(payload)
-    return write_json_document(path, payload)
+        require_valid_project(project)
+    return write_json_document(path, project)
