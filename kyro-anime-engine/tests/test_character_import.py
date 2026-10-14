@@ -90,6 +90,16 @@ class CharacterImportTests(unittest.TestCase):
         self.assertTrue(expected.issubset(part_ids))
         self.assertNotIn("legs", part_ids)
         self.assertTrue(all(part["strokes"] for part in character["parts"]))
+        strokes_by_part = {
+            part["id"]: {stroke["id"] for stroke in part["strokes"]}
+            for part in character["parts"]
+        }
+        self.assertTrue({"hair-sheen-left", "hair-sheen-right"}.issubset(strokes_by_part["hair_back"]))
+        self.assertIn("fringe-highlight", strokes_by_part["hair_front"])
+        self.assertTrue({"jacket-center-seam", "jacket-button-top", "jacket-button-mid", "jacket-button-low"}
+                        .issubset(strokes_by_part["body"]))
+        self.assertIn("left-shoe-sole", strokes_by_part["left_foot"])
+        self.assertIn("right-shoe-lace", strokes_by_part["right_foot"])
         self.assertEqual(validate_character_document(character), [])
 
     def test_import_api_persists_and_returns_updated_project(self):
