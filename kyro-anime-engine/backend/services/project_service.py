@@ -244,25 +244,62 @@ def _create_studio_demo(template):
                 _shape("shoe_front", [[670, 665], [700, 677], [652, 682]], "#d9e1ea", 8),
             ]},
         })
-        layers = [
-            _layer("layer_skyline", "Distant skyline", "d_skyline", 0.22,
-                tracks={"x": [{"t": 0, "v": -8}, {"t": 199, "v": 8, "ease": "ease_in_out"}]}),
-            _layer("layer_ground", "Wet street", "d_ground", 0.72,
-                tracks={"x": [{"t": 0, "v": 20}, {"t": 199, "v": -20, "ease": "ease_in_out"}]}),
-            {
-                "id": "layer_walker", "name": "Walker (front/profile drawings)",
-                "type": "drawing", "depth": 1.15, "transform": {"x": 0, "y": 0},
+
+        # Convert the hand-drawn front/profile art into independent character-part
+        # drawings so the real rig/clip renderer animates limbs instead of a single
+        # flattened illustration.
+        front_source = {stroke["id"]: stroke for stroke in drawings["d_character_front"]["strokes"]}
+        profile_source = {stroke["id"]: stroke for stroke in drawings["d_character_profile"]["strokes"]}
+        part_specs = [
+            ("torso", "Torso", ["coat", "neck"], ["coat", "neck"], (640, 420), None),
+            ("head", "Head", ["head", "hair", "eye_l", "eye_r"],
+             ["head", "hair", "profile_eye", "profile_nose"], (640, 250), "torso"),
+            ("left_upper_arm", "Left arm", ["arm_l"], ["arm"], (575, 352), "torso"),
+            ("right_upper_arm", "Right arm", ["arm_r"], [], (705, 352), "torso"),
+            ("left_thigh", "Left leg", ["leg_l"], ["leg_back"], (608, 548), "torso"),
+            ("right_thigh", "Right leg", ["leg_r"], ["leg_front"], (670, 548), "torso"),
+            ("left_foot", "Left shoe", ["shoe_l"], ["shoe_back"], (565, 677), "left_thigh"),
+            ("right_foot", "Right shoe", ["shoe_r"], ["shoe_front"], (722, 657), "right_thigh"),
+        ]
+        walker_parts = []
+        walker_bones = []
+        walker_layers = []
+        for part_id, part_name, front_ids, profile_ids, pivot, parent_id in part_specs:
+            front_strokes = [front_source[key] for key in front_ids]
+            profile_strokes = [profile_source[key] for key in profile_ids]
+            front_drawing = f"d_front_{part_id}"
+            profile_drawing = f"d_profile_{part_id}"
+            drawings[front_drawing] = {
+                "id": front_drawing, "name": f"Walker {part_name} (front)",
+                "strokes": front_strokes,
+            }
+            drawings[profile_drawing] = {
+                "id": profile_drawing, "name": f"Walker {part_name} (profile)",
+                "strokes": profile_strokes,
+            }
+            walker_parts.append({"id": part_id, "name": part_name, "strokes": front_strokes})
+            bone = {
+                "id": part_id, "name": part_name, "character_part_id": part_id,
+                "pivot": {"x": pivot[0], "y": pivot[1]},
+            }
+            if parent_id:
+                bone["parent_id"] = parent_id
+            walker_bones.append(bone)
+            walker_layers.append({
+                "id": f"layer_walker_{part_id}", "name": f"Walker / {part_name}",
+                "type": "drawing", "depth": 1.15, "character_id": "character_walker",
+                "character_part_id": part_id, "transform": {"x": 0, "y": 0},
                 "exposures": [
-                    {"start": 0, "length": 99, "drawing": "d_character_front"},
-                    {"start": 100, "length": 100, "drawing": "d_character_profile"},
+                    {"start": 0, "length": 100, "drawing": front_drawing},
+                    {"start": 100, "length": 100, "drawing": profile_drawing},
                 ],
                 "tracks": {
                     "x": [
-                        {"t": 0, "v": 640, "ease": "ease_in_out"},
-                        {"t": 49, "v": 640, "ease": "ease_in_out"},
-                        {"t": 99, "v": 620, "ease": "ease_in_out"},
-                        {"t": 149, "v": 610, "ease": "ease_in_out"},
-                        {"t": 199, "v": 610},
+                        {"t": 0, "v": 0, "ease": "ease_in_out"},
+                        {"t": 49, "v": 0, "ease": "ease_in_out"},
+                        {"t": 99, "v": -20, "ease": "ease_in_out"},
+                        {"t": 149, "v": -30, "ease": "ease_in_out"},
+                        {"t": 199, "v": -30},
                     ],
                     "y": [
                         {"t": 0, "v": 8, "ease": "ease_in_out"},
@@ -272,10 +309,32 @@ def _create_studio_demo(template):
                         {"t": 199, "v": 0},
                     ],
                 },
+            })
+        drawings.pop("d_character_front")
+        drawings.pop("d_character_profile")
+        project["characters"] = [{
+            "format": "kae-character", "version": 1, "id": "character_walker",
+            "name": "Cinematic Walker", "parts": walker_parts,
+        }]
+        project["rigs"] = [{
+            "id": "rig_walker", "name": "Cinematic Walker Rig",
+            "character_id": "character_walker",
+            "animation": {
+                "type": "walk", "enabled": True, "start_frame": 0,
+                "cycle_frames": 24, "speed": 1, "stride": 28,
+                "bob": 5, "weight": 1, "loop": True,
             },
+            "bones": walker_bones,
+        }]
+        layers = [
+            _layer("layer_skyline", "Distant skyline", "d_skyline", 0.22,
+                tracks={"x": [{"t": 0, "v": -8}, {"t": 199, "v": 8, "ease": "ease_in_out"}]}),
+            _layer("layer_ground", "Wet street", "d_ground", 0.72,
+                tracks={"x": [{"t": 0, "v": 20}, {"t": 199, "v": -20, "ease": "ease_in_out"}]}),
+            *walker_layers,
         ]
         for layer in layers:
-            if layer["id"] == "layer_walker":
+            if layer.get("character_id") == "character_walker":
                 continue
             for exposure in layer.get("exposures", []):
                 exposure["length"] = duration

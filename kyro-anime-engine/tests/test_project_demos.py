@@ -40,12 +40,26 @@ class ProjectDemoTests(unittest.TestCase):
                 self.assertEqual(keys[0]["t"], 0)
                 self.assertEqual(keys[-1]["t"], 199)
                 self.assertGreaterEqual(len(keys), 6)
-        walker = next(layer for layer in scene["layers"] if layer["id"] == "layer_walker")
-        self.assertEqual(
-            [(exposure["start"], exposure["length"], exposure["drawing"])
-             for exposure in walker["exposures"]],
-            [(0, 99, "d_character_front"), (100, 100, "d_character_profile")],
-        )
+        walker_layers = [
+            layer for layer in scene["layers"]
+            if layer.get("character_id") == "character_walker"
+        ]
+        self.assertEqual(len(walker_layers), 8)
+        for layer in walker_layers:
+            with self.subTest(layer=layer["id"]):
+                self.assertEqual(
+                    [(exposure["start"], exposure["length"])
+                     for exposure in layer["exposures"]],
+                    [(0, 100), (100, 100)],
+                )
+                self.assertEqual(layer["character_id"], "character_walker")
+                self.assertTrue(layer.get("character_part_id"))
+        rig = next(item for item in project["rigs"] if item["character_id"] == "character_walker")
+        self.assertEqual(rig["animation"]["type"], "walk")
+        self.assertTrue(rig["animation"]["enabled"])
+        self.assertEqual(len(rig["bones"]), 8)
+        self.assertNotIn("d_character_front", project["drawings"])
+        self.assertNotIn("d_character_profile", project["drawings"])
         self.assertEqual(validate_project(project), [])
 
     def test_unknown_demo_template_is_rejected(self):
