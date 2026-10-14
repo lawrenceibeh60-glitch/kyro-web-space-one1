@@ -152,6 +152,16 @@
                 <div class="xrow n"><span>Pivot Y</span><input id="boneY" type="number" step="1"></div>
                 <button id="boneAdd">Add bone</button>
                 <div id="boneList" class="studio-list"></div>
+                <div class="grp-title">Vector skinning</div>
+                <div class="hint">Bind every point or Bézier control point in the active drawing to bones. Auto-weight assigns the nearest pivot; edit weights after for better joints.</div>
+                <label class="fld"><span>Influence bone</span><select id="skinBone"></select></label>
+                <label class="fld"><span>Weight</span><b id="skinWeightValue">1.00</b><input id="skinWeight" type="range" min="0.05" max="1" step="0.05" value="1"></label>
+                <div class="xbtns">
+                  <button id="skinAutoWeight" class="primary">Auto-weight drawing</button>
+                  <button id="skinAssign">Assign bone</button>
+                  <button id="skinClear">Clear weights</button>
+                </div>
+                <div id="skinStatus" class="hint" aria-live="polite">Select a rig and a drawing layer.</div>
               </div>
             </section>
             <section data-studio-pane="character" hidden>
