@@ -12,6 +12,7 @@ def create_app():
 
     from backend.api import (
         animations,
+        ai_studio,
         audio,
         assets,
         cameras,
@@ -31,6 +32,7 @@ def create_app():
     )
 
     app.register_blueprint(health.bp, url_prefix="/api")
+    app.register_blueprint(ai_studio.bp, url_prefix="/api")
     app.register_blueprint(projects.bp, url_prefix="/api/projects")
     app.register_blueprint(exports.bp, url_prefix="/api/exports")
     app.register_blueprint(scenes.bp, url_prefix="/api/projects")
