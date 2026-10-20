@@ -50,7 +50,10 @@ export function withTwoBoneIK(constraints, {
     throw new TypeError('IK target and bend direction must be finite, and bend cannot be zero');
   }
   const remaining = (Array.isArray(constraints) ? constraints : [])
-    .filter(item => !(item.type === 'ik_two_bone' && item.id === id));
+    .filter(item => !(item.type === 'ik_two_bone' && (
+      item.id === id
+      || (item.upper_bone_id === upperBoneId && item.lower_bone_id === lowerBoneId)
+    )));
   if (enabled) remaining.push({
     type: 'ik_two_bone', id, upper_bone_id: upperBoneId, lower_bone_id: lowerBoneId,
     target: { x: targetX, y: targetY }, bend: bend < 0 ? -1 : 1, enabled: true,
