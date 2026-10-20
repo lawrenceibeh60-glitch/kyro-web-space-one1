@@ -47,6 +47,11 @@ def get_capabilities():
         {"name": "schemas.list", "method": "GET", "path": "/api/schemas", "purpose": "Discover native KAE JSON schemas."},
         {"name": "rendering", "method": "GET/POST", "path": "/api/projects/{project_id}/render", "purpose": "Use supported project rendering operations."},
         {"name": "exports", "method": "GET/POST", "path": "/api/exports", "purpose": "Use supported export operations."},
+        {"name": "ai.chat", "method": "POST", "path": "/api/ai/chat", "purpose": "Discuss KAE capabilities and the current project."},
+        {"name": "ai.video.analyze", "method": "POST", "path": "/api/ai/video/analyze", "purpose": "Analyze timestamped JPEG frames sampled locally from a reference video."},
+        {"name": "ai.video.reconstruction.plan", "method": "POST", "path": "/api/ai/video/reconstruction/plan", "purpose": "Propose bounded editable vector cels from sampled reference frames; does not mutate the project."},
+        {"name": "ai.video.reconstruction.apply", "method": "POST", "path": "/api/ai/video/reconstruction/apply", "purpose": "Validate and add vector drawings on a new layer, preserving existing project art."},
+        {"name": "ai.animation.plan", "method": "POST", "path": "/api/ai/animation/plan", "purpose": "Generate validated transform-keyframe operations for existing scene layers; does not mutate the project."},
     ]
     return {
         "engine": "Kyro Animation Engine (KAE)",
