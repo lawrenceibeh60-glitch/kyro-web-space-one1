@@ -390,6 +390,7 @@ export function initAIStudio() {
 
   addMessage('assistant', 'I am connected to KAE’s capability inventory and native project schemas. Upload a reference video to analyze its sampled frames, then tell me your creative changes. I will distinguish supported operations from features that still need implementation.');
   loadCurrentProject().finally(() => {
+    setBusy(false);
     request('GET', '/api/ai/status').then(result => {
       status.textContent = result.configured
         ? 'KAE AI connected · chat ' + result.chat_model + ' · image model ' + result.image_model
