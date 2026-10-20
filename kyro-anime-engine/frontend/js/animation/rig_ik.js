@@ -94,3 +94,36 @@ export function applySavedIKConstraints(rig, pose) {
   }
   return pose;
 }
+
+/** Return the closest enabled saved IK target within a world-space hit radius. */
+export function findIKTargetAtPoint(rig, point, radius = 16) {
+  if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)
+      || !Number.isFinite(radius) || radius < 0) return -1;
+  let bestIndex = -1;
+  let bestDistance = radius;
+  for (let index = 0; index < (rig?.constraints || []).length; index++) {
+    const item = rig.constraints[index];
+    if (item?.type !== 'ik_two_bone' || item.enabled === false
+        || !Number.isFinite(item.target?.x) || !Number.isFinite(item.target?.y)) continue;
+    const distance = Math.hypot(item.target.x - point.x, item.target.y - point.y);
+    if (distance <= bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+
+/** Immutable target move used by viewport dragging and covered by unit tests. */
+export function moveIKTarget(constraints, index, x, y) {
+  if (!Array.isArray(constraints) || !Number.isInteger(index)
+      || index < 0 || index >= constraints.length
+      || !Number.isFinite(x) || !Number.isFinite(y)
+      || constraints[index]?.type !== 'ik_two_bone') {
+    throw new TypeError('A valid IK constraint and finite target coordinates are required');
+  }
+  return constraints.map((item, itemIndex) => itemIndex === index
+    ? { ...item, target: { x, y } }
+    : item);
+}
+
