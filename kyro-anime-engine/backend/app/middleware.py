@@ -1,4 +1,4 @@
-"""KAE request middleware: API errors, optional HTTP Basic auth, and no-cache."""
+"""backend/app/middleware.py - hosted access gate and JSON error handling."""
 import hmac
 import logging
 import os
@@ -17,22 +17,22 @@ def _is_api():
 
 def install(app):
     @app.before_request
-    def _require_access_password():
-        expected = os.environ.get("KAE_ACCESS_PASSWORD", "").strip()
-        # Local development remains frictionless; hosted deployments should set this.
-        if not expected or request.path == "/api/health":
+    def _hosted_access_gate():
+        # Keep Render's health probe reachable. When configured, protect every
+        # editor/API route with HTTP Basic Auth; the password is only an env var.
+        if request.path in ("/health", "/api/health"):
             return None
-
+        expected = os.environ.get("KAE_ACCESS_PASSWORD", "")
+        if not expected:
+            return None  # Local development remains frictionless.
         auth = request.authorization
         supplied = auth.password if auth and auth.type.lower() == "basic" else ""
-        username = auth.username if auth and auth.type.lower() == "basic" else ""
-        if username == "kae" and hmac.compare_digest(supplied or "", expected):
-            return None
-
-        response = jsonify(error="Authentication required", details=["Sign in to access KYRO Animation Engine."])
-        response.status_code = 401
-        response.headers["WWW-Authenticate"] = 'Basic realm="KYRO Animation Engine", charset="UTF-8"'
-        return response
+        if not supplied or not hmac.compare_digest(supplied, expected):
+            response = jsonify(error="Authentication required")
+            response.status_code = 401
+            response.headers["WWW-Authenticate"] = 'Basic realm="KYRO Animation Engine", charset="UTF-8"'
+            return response
+        return None
 
     @app.errorhandler(ApiError)
     def _api_error(e):
