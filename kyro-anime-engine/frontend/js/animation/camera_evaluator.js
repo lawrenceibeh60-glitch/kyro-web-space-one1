@@ -12,13 +12,9 @@ export function evaluateCamera(camera, frame) {
   return {
     x: value('x', 0),
     y: value('y', 0),
-<<<<<<< Updated upstream
-    zoom: Math.min(32, Math.max(0.05, value('scale_x', 1))),
-    zoomY: Math.min(32, Math.max(0.05, value('scale_y', 1))),
-=======
     zoom,
     zoomY: Math.min(32, Math.max(0.05, value('scale_y', zoom))),
->>>>>>> Stashed changes
+
     rotation: value('rotation', 0),
   };
 }
