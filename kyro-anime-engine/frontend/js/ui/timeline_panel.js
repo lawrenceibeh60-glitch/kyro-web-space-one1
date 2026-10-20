@@ -8,10 +8,10 @@ import { setFrame, stop, isPlaying } from '../animation/playback.js';
 import { moveKeysCmd } from '../editor/transform_tools.js';
 import { execute, batch, insertAt, setValue } from '../core/command_manager.js';
 import { findExposure } from '../rendering/renderer.js';
+import { clamp, frameFromTimelineX, exposureBounds, previewExposureEdit } from '../animation/timeline.js';
 import { toast } from './notifications.js';
 
 const ROW = 20, RULER = 18, PAD = 6;
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 export function initTimelinePanel() {
   const $ = id => document.getElementById(id);
@@ -23,7 +23,7 @@ export function initTimelinePanel() {
   const rows = () => [...(getScene()?.layers || [])].reverse();
   const total = () => state.project.settings.duration_frames;
   const frameX = f => PAD + f * px + px / 2;
-  const frameAt = x => clamp(Math.floor((x - PAD) / px), 0, total() - 1);
+  const frameAt = x => frameFromTimelineX(x, PAD, px, total());
 
   function requestDraw() {
     if (queued) return;
@@ -252,11 +252,10 @@ export function initTimelinePanel() {
       selectedExposure = exposure;
       const left = PAD + exposure.start * px, right = left + exposure.length * px;
       const edge = Math.abs(p.x - left) <= 6 ? 'left' : Math.abs(p.x - right) <= 6 ? 'right' : 'move';
-      const previousEnd = exposureIndex > 0 ? exposures[exposureIndex - 1].start + exposures[exposureIndex - 1].length : 0;
-      const nextStart = exposureIndex + 1 < exposures.length ? exposures[exposureIndex + 1].start : total();
+      const bounds = exposureBounds(exposures, exposureIndex, total());
       exposureDrag = {
         layerId: layer.id, source: exposure, index: exposureIndex, original: { ...exposure }, preview: { ...exposure },
-        edge, pointerFrame: frameAt(p.x), previousEnd, nextStart,
+        edge, pointerFrame: frameAt(p.x), bounds,
       };
       mode = 'exposure'; requestDraw(); return;
     }
@@ -280,18 +279,7 @@ export function initTimelinePanel() {
     else if (drag) drag.to = frameAt(p.x);
     else if (mode === 'exposure' && exposureDrag) {
       const delta = frameAt(p.x) - exposureDrag.pointerFrame;
-      const item = exposureDrag.original;
-      const preview = { ...item };
-      if (exposureDrag.edge === 'move') {
-        preview.start = clamp(item.start + delta, exposureDrag.previousEnd, exposureDrag.nextStart - item.length);
-      } else if (exposureDrag.edge === 'left') {
-        preview.start = clamp(item.start + delta, exposureDrag.previousEnd, item.start + item.length - 1);
-        preview.length = item.start + item.length - preview.start;
-      } else {
-        const end = clamp(item.start + item.length + delta, item.start + 1, exposureDrag.nextStart);
-        preview.length = end - item.start;
-      }
-      exposureDrag.preview = preview;
+      exposureDrag.preview = previewExposureEdit(exposureDrag.original, exposureDrag.edge, delta, exposureDrag.bounds);
     }
     const vx = p.x - scroll.scrollLeft;
     if (vx > scroll.clientWidth - 24) scroll.scrollLeft += 8; else if (vx < 24) scroll.scrollLeft -= 8;
