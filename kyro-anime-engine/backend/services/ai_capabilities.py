@@ -82,10 +82,30 @@ def build_system_context(project=None):
             "name": project.get("name"),
             "version": project.get("version"),
             "settings": project.get("settings", {}),
-            "scene_count": len(project.get("scenes", [])) if isinstance(project.get("scenes"), list) else 0,
-            "drawing_count": len(project.get("drawings", {})) if isinstance(project.get("drawings"), dict) else 0,
-            "character_count": len(project.get("characters", [])) if isinstance(project.get("characters"), list) else 0,
-            "rig_count": len(project.get("rigs", [])) if isinstance(project.get("rigs"), list) else 0,
+            "scenes": [
+                {
+                    "id": scene.get("id"),
+                    "name": scene.get("name"),
+                    "layers": [
+                        {"id": layer.get("id"), "name": layer.get("name"), "type": layer.get("type")}
+                        for layer in scene.get("layers", []) if isinstance(layer, dict)
+                    ],
+                }
+                for scene in project.get("scenes", [])[:20] if isinstance(scene, dict)
+            ] if isinstance(project.get("scenes"), list) else [],
+            "drawings": [
+                {"id": drawing_id, "name": drawing.get("name")}
+                for drawing_id, drawing in list(project.get("drawings", {}).items())[:100]
+                if isinstance(drawing, dict)
+            ] if isinstance(project.get("drawings"), dict) else [],
+            "characters": [
+                {"id": c.get("id"), "name": c.get("name")}
+                for c in project.get("characters", [])[:100] if isinstance(c, dict)
+            ] if isinstance(project.get("characters"), list) else [],
+            "rigs": [
+                {"id": rig.get("id"), "name": rig.get("name")}
+                for rig in project.get("rigs", [])[:100] if isinstance(rig, dict)
+            ] if isinstance(project.get("rigs"), list) else [],
         }
         project_context = "\nCURRENT PROJECT SUMMARY:\n" + json.dumps(summary, ensure_ascii=False)
     return (
