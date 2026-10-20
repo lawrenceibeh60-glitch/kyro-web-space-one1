@@ -27,7 +27,7 @@ function boneChain(rig, boneId) {
   return chain;
 }
 
-function transformPoint(point, chain, frame, pose) {
+function transformPoint(point, chain, frame, pose, rig) {
   let result = { x: point[0], y: point[1] };
   for (const bone of chain) {
     if (!bone.pivot || !Number.isFinite(bone.pivot.x) || !Number.isFinite(bone.pivot.y)) continue;
@@ -47,7 +47,7 @@ function deformCoordinate(pair, influences, rig, frame, pose, chains) {
     if (!chains.has(boneId)) chains.set(boneId, boneChain(rig, boneId));
     const chain = chains.get(boneId);
     if (!chain.length) continue;
-    const transformed = transformPoint(pair, chain, frame, pose);
+    const transformed = transformPoint(pair, chain, frame, pose, rig);
     x += transformed.x * weight; y += transformed.y * weight; total += weight;
   }
   if (total <= 0) return [...pair];
