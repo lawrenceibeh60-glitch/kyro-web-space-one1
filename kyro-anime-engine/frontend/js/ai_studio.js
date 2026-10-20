@@ -272,6 +272,12 @@ export function initAIStudio() {
       status.textContent = 'Choose a target scene for the new reconstruction layer.';
       return;
     }
+    const direction = input.value.trim();
+    if (!direction) {
+      status.textContent = 'Tell KAE what to preserve or change in the reference before reconstructing.';
+      input.focus();
+      return;
+    }
     setBusy(true);
     status.textContent = 'Sampling the reference locally and asking the vision model for editable vector contours…';
     try {
@@ -279,6 +285,7 @@ export function initAIStudio() {
       const result = await request('POST', '/api/ai/video/reconstruction/plan', {
         frames: latestSampledFrames,
         project: projectSummary(),
+        direction,
       });
       currentVectorPlan = result;
       const frameLines = result.frames.map((frame, index) =>
