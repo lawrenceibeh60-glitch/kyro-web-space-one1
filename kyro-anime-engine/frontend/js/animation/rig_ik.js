@@ -62,3 +62,32 @@ export function removeTwoBoneIK(constraints, id) {
   return (Array.isArray(constraints) ? constraints : [])
     .filter(item => !(item.type === 'ik_two_bone' && item.id === id));
 }
+
+export function applySavedIKConstraints(rig, pose) {
+  if (!rig || !pose || !pose.bones) return pose;
+  const bones = new Map((rig.bones || []).map(bone => [bone.id, bone]));
+  for (const constraint of rig.constraints || []) {
+    if (constraint.type !== 'ik_two_bone' || constraint.enabled === false) continue;
+    const upper = bones.get(constraint.upper_bone_id);
+    const lower = bones.get(constraint.lower_bone_id);
+    const end = (rig.bones || []).find(bone => bone.parent_id === lower?.id && /hand|foot|ankle|wrist/i.test(bone.name || bone.id));
+    const root = upper?.pivot;
+    const joint = lower?.pivot;
+    const endpoint = end?.pivot;
+    const target = constraint.target;
+    if (!root || !joint || !endpoint || !target
+        || ![root.x, root.y, joint.x, joint.y, endpoint.x, endpoint.y, target.x, target.y].every(Number.isFinite)) continue;
+    const upperLength = Math.hypot(joint.x - root.x, joint.y - root.y);
+    const lowerLength = Math.hypot(endpoint.x - joint.x, endpoint.y - joint.y);
+    if (upperLength < 1e-6 || lowerLength < 1e-6) continue;
+    const solved = solveTwoBoneIK(root, target, upperLength, lowerLength, constraint.bend || 1);
+    const restUpper = Math.atan2(joint.y - root.y, joint.x - root.x) * 180 / Math.PI;
+    const restLower = Math.atan2(endpoint.y - joint.y, endpoint.x - joint.x) * 180 / Math.PI;
+    const upperCorrection = solved.shoulder - restUpper;
+    const lowerCorrection = solved.shoulder + solved.elbow - restLower - upperCorrection;
+    pose.bones[upper.id] = upperCorrection;
+    pose.bones[lower.id] = lowerCorrection;
+    if (end) pose.bones[end.id] = -(upperCorrection + lowerCorrection);
+  }
+  return pose;
+}
