@@ -3,6 +3,7 @@ import unittest
 
 from backend.app.exceptions import ApiError
 from backend.api.ai_studio import _validated_vector_frames
+from backend.services.schema_validator import validator
 
 
 class VideoReconstructionValidationTests(unittest.TestCase):
@@ -20,6 +21,8 @@ class VideoReconstructionValidationTests(unittest.TestCase):
         result = _validated_vector_frames(plan, 1920, 1080)
         self.assertEqual(result[0]["strokes"][0]["commands"], [["M", 192.0, 108.0], ["L", 384.0, 216.0]])
         self.assertGreater(result[0]["strokes"][0]["width"], 0)
+        valid, error = validator.validate_drawing({"id": "sample_drawing", "strokes": result[0]["strokes"]})
+        self.assertTrue(valid, error)
 
     def test_pixel_paths_can_be_revalidated_without_double_scaling(self):
         pixel_plan = [{
