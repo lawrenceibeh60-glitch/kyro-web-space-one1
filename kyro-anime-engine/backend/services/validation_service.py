@@ -8,9 +8,6 @@ import re
 from backend.services.schema_validator import validator as schema_validator
 
 ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-<<<<<<< Updated upstream
-CHANNELS = {"x", "y", "rotation", "rotation_y", "scale_x", "scale_y", "opacity"}
-=======
 CHANNELS = {
     "x", "y", "z", "rotation", "rotation_x", "rotation_y",
     "scale_x", "scale_y", "scale_z", "anchor_x", "anchor_y", "anchor_z",
@@ -20,7 +17,7 @@ CAMERA_CHANNELS = {
     "x", "y", "z", "rotation", "rotation_x", "rotation_y",
     "scale_x", "scale_y", "fov", "focus_distance", "aperture",
 }
->>>>>>> Stashed changes
+
 EASES = {"linear", "hold", "ease_in", "ease_out", "ease_in_out"}
 MAX_ERRORS = 50
 
@@ -384,11 +381,8 @@ def _check_studio_data(project, errs):
             if not isinstance(rig, dict):
                 errs.append(f"{where}: must be an object")
                 continue
-<<<<<<< Updated upstream
-            for key in rig.keys() - {"id", "name", "character_id", "bones", "animation"}:
-=======
             for key in rig.keys() - {"id", "name", "character_id", "bones", "constraints"}:
->>>>>>> Stashed changes
+
                 errs.append(f"{where}.{key}: unknown property")
             animation = rig.get("animation")
             if animation is not None:
@@ -836,52 +830,8 @@ def _check_scenes(scenes, drawings, errs):
             errs.append(f"{sw}.layers: must be a list")
             layers = []
         for li, ly in enumerate(layers):
-<<<<<<< Updated upstream
-            lw = f"{sw}.layers[{li}]"
-            if not isinstance(ly, dict):
-                errs.append(f"{lw}: must be an object")
-                continue
-            lid = ly.get("id")
-            if not isinstance(lid, str) or not ID_RE.match(lid):
-                errs.append(f"{lw}.id: invalid")
-            elif lid in layer_ids:
-                errs.append(f"{lw}.id: duplicate '{lid}'")
-            layer_ids.add(lid)
-            if ly.get("type") != "drawing":
-                errs.append(f"{lw}.type: must be 'drawing'")
-            if "depth" in ly and (not _num(ly["depth"]) or not 0 <= ly["depth"] <= 2):
-                errs.append(f"{lw}.depth: number 0..2 required")
-            character_id = ly.get("character_id")
-            part_id = ly.get("character_part_id")
-            if character_id is not None and (
-                not isinstance(character_id, str) or not ID_RE.fullmatch(character_id)
-            ):
-                errs.append(f"{lw}.character_id: invalid")
-            if part_id is not None and (
-                not isinstance(part_id, str) or not ID_RE.fullmatch(part_id)
-            ):
-                errs.append(f"{lw}.character_part_id: invalid")
-            if (character_id is None) != (part_id is None):
-                errs.append(f"{lw}: character_id and character_part_id must appear together")
-            if "opacity" in ly and (not _num(ly["opacity"]) or not 0 <= ly["opacity"] <= 1):
-                errs.append(f"{lw}.opacity: 0..1 required")
-            transform = ly.get("transform", {})
-            if isinstance(transform, dict) and "rotation_y" in transform and (
-                not _num(transform["rotation_y"]) or not -180 <= transform["rotation_y"] <= 180
-            ):
-                errs.append(f"{lw}.transform.rotation_y: number -180..180 required")
-            if "exposures" in ly:
-                _check_exposures(ly["exposures"], f"{lw}.exposures", drawings, errs)
-            if "tracks" in ly:
-                _check_tracks(ly["tracks"], f"{lw}.tracks", errs)
-                tracks = ly["tracks"]
-                if isinstance(tracks, dict) and isinstance(tracks.get("rotation_y"), list):
-                    for index, keyframe in enumerate(tracks["rotation_y"]):
-                        if isinstance(keyframe, dict) and _num(keyframe.get("v")) and not -180 <= keyframe["v"] <= 180:
-                            errs.append(f"{lw}.tracks.rotation_y[{index}].v: number -180..180 required")
-=======
             _check_layer(ly, f"{sw}.layers[{li}]", layer_ids, drawings, errs)
->>>>>>> Stashed changes
+
         cam = sc.get("camera")
         if cam is not None:
             if not isinstance(cam, dict):
@@ -912,26 +862,13 @@ def _check_scenes(scenes, drawings, errs):
                         errs.append(f"{sw}.camera.tracks: tracks must be an object")
                     else:
                         for channel in tracks:
-<<<<<<< Updated upstream
-                            if channel not in {"x", "y", "rotation", "scale_x", "scale_y"}:
-=======
                             if channel not in CAMERA_CHANNELS:
->>>>>>> Stashed changes
+
                                 errs.append(f"{sw}.camera.tracks.{channel}: unknown camera channel")
                         _check_tracks(
                             tracks, f"{sw}.camera.tracks", errs, CAMERA_CHANNELS
                         )
                         for channel, keyframes in tracks.items():
-<<<<<<< Updated upstream
-                            if channel not in {"x", "y", "rotation", "scale_x", "scale_y"} or not isinstance(keyframes, list):
-                                continue
-                            if channel in {"scale_x", "scale_y"}:
-                                lo, hi = 0.05, 32
-                            elif channel == "rotation":
-                                lo, hi = -3600, 3600
-                            else:
-                                lo, hi = -8192, 8192
-=======
                             if channel not in CAMERA_CHANNELS or not isinstance(keyframes, list):
                                 continue
                             bounds = {
@@ -944,7 +881,7 @@ def _check_scenes(scenes, drawings, errs):
                             if channel not in bounds:
                                 continue
                             lo, hi = bounds[channel]
->>>>>>> Stashed changes
+
                             for index, keyframe in enumerate(keyframes):
                                 if (
                                     isinstance(keyframe, dict)
