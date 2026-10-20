@@ -8,7 +8,7 @@ import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weigh
 import { buildAutoRig } from '../animation/auto_rig.js';
 import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreography.js';
 import { withRotationLimit } from '../animation/rig_constraints.js';
-import { removeTwoBoneIK, withTwoBoneIK } from '../animation/rig_ik.js';
+import { withTwoBoneIK } from '../animation/rig_ik.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -515,7 +515,13 @@ export function initStudioPanel({ onCharacterImported }) {
   function removeIKTarget() {
     const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
     if (!rig) return;
-    const constraints = removeTwoBoneIK(rig.constraints || [], selectedIKId());
+    const upperBoneId = $('ikUpperBone').value;
+    const lowerBoneId = $('ikLowerBone').value;
+    const constraints = (rig.constraints || []).filter(item => !(
+      item.type === 'ik_two_bone'
+      && item.upper_bone_id === upperBoneId
+      && item.lower_bone_id === lowerBoneId
+    ));
     updateRig({ ...clone(rig), constraints });
     $('ikStatus').textContent = 'IK target removed.';
     toast('IK target removed.', 'ok');
