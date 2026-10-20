@@ -223,8 +223,8 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
         if not isinstance(frame, dict) or not isinstance(frame.get("strokes"), list):
             raise ApiError(422, f"Vector frame {fi + 1} must contain a strokes array.")
         strokes = []
-        if len(frame["strokes"]) > 24:
-            raise ApiError(422, f"Vector frame {fi + 1} exceeds the 24-stroke limit.")
+        if not 1 <= len(frame["strokes"]) <= 24:
+            raise ApiError(422, f"Vector frame {fi + 1} must contain 1 to 24 strokes.")
         for si, stroke in enumerate(frame["strokes"]):
             if not isinstance(stroke, dict):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} is invalid.")
