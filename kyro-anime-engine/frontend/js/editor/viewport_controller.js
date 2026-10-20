@@ -45,6 +45,22 @@ export function initViewport(canvas) {
     renderFrame(ctx, state.project, state.sceneId, state.frame, state.preview, {
       transparent: true, showRigOverlay: state.showRigOverlay,
     });
+
+    if (state.rigIKDragEnabled && state.rigCharacterId) {
+      const rig = (state.project.rigs || []).find(item => item.character_id === state.rigCharacterId);
+      for (const constraint of rig?.constraints || []) {
+        if (constraint.type !== 'ik_two_bone' || constraint.enabled === false
+            || !Number.isFinite(constraint.target?.x) || !Number.isFinite(constraint.target?.y)) continue;
+        const target = constraint.target, zoom = Math.max(0.05, state.view.zoom);
+        ctx.save(); ctx.lineWidth = 2 / zoom; ctx.strokeStyle = '#ffd166';
+        ctx.fillStyle = 'rgba(255, 209, 102, 0.22)';
+        ctx.beginPath(); ctx.arc(target.x, target.y, 9 / zoom, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke(); ctx.beginPath();
+        ctx.moveTo(target.x - 13 / zoom, target.y); ctx.lineTo(target.x + 13 / zoom, target.y);
+        ctx.moveTo(target.x, target.y - 13 / zoom); ctx.lineTo(target.x, target.y + 13 / zoom);
+        ctx.stroke(); ctx.restore();
+      }
+    }
     const scene = state.project.scenes.find(s => s.id === state.sceneId);
     ctx.save();
     const camera = applyCameraTransform(ctx, width, height, scene?.camera, state.frame);
