@@ -381,7 +381,7 @@ def _check_studio_data(project, errs):
             if not isinstance(rig, dict):
                 errs.append(f"{where}: must be an object")
                 continue
-            for key in rig.keys() - {"id", "name", "character_id", "bones", "constraints"}:
+            for key in rig.keys() - {"id", "name", "character_id", "bones", "constraints", "animation"}:
 
                 errs.append(f"{where}.{key}: unknown property")
             animation = rig.get("animation")
