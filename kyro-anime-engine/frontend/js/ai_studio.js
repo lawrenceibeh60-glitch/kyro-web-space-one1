@@ -150,6 +150,17 @@ export function initAIStudio() {
 
   videoInput.addEventListener('change', () => {
     const file = videoInput.files?.[0];
+    latestSampledFrames = null;
+    latestVideoAnalysis = '';
+    latestCreativeDirection = '';
+    currentVectorPlan = null;
+    currentPlan = null;
+    vectorPreview.replaceChildren();
+    vectorPreview.hidden = true;
+    vectorSummary.hidden = true;
+    planSummary.hidden = true;
+    applyReconstruction.disabled = true;
+    applyPlan.disabled = true;
     if (videoUrl) URL.revokeObjectURL(videoUrl);
     videoUrl = null;
     analyze.disabled = true;
