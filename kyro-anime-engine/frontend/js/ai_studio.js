@@ -1,7 +1,7 @@
 import { request } from './api/client.js';
 
 const history = [];
-let reference = null, imageUrl = null, videoUrl = null, currentProject = null;
+let reference = null, imageUrl = null, videoUrl = null, currentProject = null, latestVideoAnalysis = '', currentPlan = null;
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -24,7 +24,7 @@ function projectSummary() {
     settings: currentProject.settings || {},
     scenes: Array.isArray(currentProject.scenes) ? currentProject.scenes.map(scene => ({
       id: scene.id, name: scene.name,
-      layer_count: Array.isArray(scene.layers) ? scene.layers.length : 0,
+      layers: Array.isArray(scene.layers) ? scene.layers.map(layer => ({ id: layer.id, name: layer.name, type: layer.type })) : [],
     })) : [],
     drawings: currentProject.drawings && typeof currentProject.drawings === 'object'
       ? Object.fromEntries(Object.keys(currentProject.drawings).slice(0, 100).map(id => [id, true])) : {},
@@ -73,7 +73,10 @@ export function initAIStudio() {
   const video = el('video', { class: 'ai-reference-video', controls: '', playsinline: '', preload: 'metadata', hidden: '' });
   const videoMeta = el('div', { class: 'ai-note' }, 'Choose a short reference clip. KAE samples up to 6 frames in your browser; the original video file is not sent to xKiro.');
   const analyze = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Analyze reference video');
-  videoPanel.append(videoInput, video, videoMeta, analyze);
+  const buildPlan = el('button', { type: 'button', disabled: '' }, 'Build keyframe plan from my instructions');
+  const applyPlan = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Apply keyframes to current project');
+  const planSummary = el('pre', { class: 'ai-plan-summary', hidden: '' });
+  videoPanel.append(videoInput, video, videoMeta, analyze, buildPlan, planSummary, applyPlan);
 
   const stage = el('div', { class: 'ai-image-stage' });
   const image = el('img', { alt: 'Generated anime character preview', hidden: '' });
@@ -99,7 +102,9 @@ export function initAIStudio() {
   function setBusy(value) {
     send.disabled = value;
     generate.disabled = value;
-    analyze.disabled = value || !video.files?.[0];
+    analyze.disabled = value || !videoInput.files?.[0];
+    buildPlan.disabled = value || !latestVideoAnalysis || !currentProject?.id;
+    applyPlan.disabled = value || !currentPlan?.ops?.length;
   }
 
   async function ask() {
@@ -226,6 +231,11 @@ export function initAIStudio() {
       const result = await request('POST', '/api/ai/video/analyze', { frames, project: projectSummary() });
       const analysis = result.analysis || 'The model returned no analysis.';
       addMessage('assistant', 'REFERENCE ANALYSIS (' + result.frames_analyzed + ' frames)\n\n' + analysis);
+      latestVideoAnalysis = analysis;
+      currentPlan = null;
+      planSummary.hidden = true;
+      applyPlan.disabled = true;
+      buildPlan.disabled = !currentProject?.id;
       history.push({ role: 'user', content: 'Reference video analysis follows. Use it as the source of truth for later reconstruction requests:\n' + analysis });
       history.push({ role: 'assistant', content: analysis });
       status.textContent = 'Analysis complete. Tell KAE what you want changed, then discuss the reconstruction plan.';
@@ -234,6 +244,83 @@ export function initAIStudio() {
     } catch (error) {
       status.textContent = 'Video analysis failed: ' + error.message;
       addMessage('assistant', 'Video analysis failed: ' + error.message);
+    } finally {
+      setBusy(false);
+    }
+  });
+
+
+  buildPlan.addEventListener('click', async () => {
+    const direction = input.value.trim();
+    if (!currentProject?.id) {
+      status.textContent = 'Open a saved KAE project before creating a keyframe plan.';
+      return;
+    }
+    if (!latestVideoAnalysis) {
+      status.textContent = 'Analyze a reference video first.';
+      return;
+    }
+    if (!direction) {
+      status.textContent = 'Tell KAE what changes you want in the instruction box, then build the plan.';
+      input.focus();
+      return;
+    }
+    setBusy(true);
+    status.textContent = 'Building and validating a keyframe plan against your real scenes, layers, FPS and duration…';
+    try {
+      const result = await request('POST', '/api/ai/animation/plan', {
+        project_id: currentProject.id,
+        analysis: latestVideoAnalysis,
+        direction,
+      });
+      currentPlan = result;
+      planSummary.textContent = result.summary + '\n\nValidated keyframes: ' + result.ops.length +
+        '\nProject duration: ' + result.frame_limit + ' frames' +
+        '\n\n' + result.ops.slice(0, 80).map((op, index) =>
+          (index + 1) + '. ' + op.scene_id + ' / ' + op.layer_id + ' · ' + op.channel +
+          ' = ' + op.value + ' at frame ' + op.time + ' (' + op.ease + ')'
+        ).join('\n') + (result.ops.length > 80 ? '\n…more operations omitted from preview' : '');
+      planSummary.hidden = false;
+      applyPlan.disabled = !result.ops.length;
+      addMessage('assistant', 'KEYFRAME PLAN READY — ' + result.summary + '\n' +
+        result.ops.length + ' validated keyframes. Review the plan in the reference panel. Nothing has been changed yet.');
+      status.textContent = result.ops.length
+        ? 'Plan validated. Review it, then explicitly apply it to the current project.'
+        : 'No keyframes were proposed. The request may require artwork generation or unsupported operations.';
+    } catch (error) {
+      currentPlan = null;
+      planSummary.textContent = error.message;
+      planSummary.hidden = false;
+      applyPlan.disabled = true;
+      status.textContent = 'Could not build a valid keyframe plan: ' + error.message;
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  applyPlan.addEventListener('click', async () => {
+    if (!currentPlan?.ops?.length || !currentProject?.id) return;
+    const dirty = document.getElementById('dirty');
+    if (dirty && !dirty.hidden) {
+      status.textContent = 'Save your current editor changes first. Applying the plan to the saved project now could conflict with unsaved edits.';
+      return;
+    }
+    if (!confirm('Apply ' + currentPlan.ops.length + ' keyframes to the saved KAE project? This changes the project on disk.')) return;
+    setBusy(true);
+    status.textContent = 'Applying validated keyframes to the saved project…';
+    try {
+      const result = await request('POST', '/api/projects/' + encodeURIComponent(currentProject.id) + '/timeline/script', {
+        ops: currentPlan.ops,
+      });
+      currentProject = await request('GET', '/api/projects/' + encodeURIComponent(currentProject.id));
+      addMessage('assistant', 'Applied ' + result.applied + ' keyframes to the saved project. Reload the editor to refresh the timeline and viewport.');
+      status.textContent = 'Applied ' + result.applied + ' keyframes. Reload the editor to see the saved animation changes.';
+      currentPlan = null;
+      applyPlan.disabled = true;
+      buildPlan.disabled = false;
+    } catch (error) {
+      status.textContent = 'Could not apply keyframes: ' + error.message;
+      addMessage('assistant', 'Apply failed: ' + error.message);
     } finally {
       setBusy(false);
     }
