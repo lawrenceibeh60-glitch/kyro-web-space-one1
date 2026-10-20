@@ -165,6 +165,15 @@
                 <div class="xrow n"><span>Maximum °</span><input id="rotationLimitMax" type="number" min="-360" max="360" step="1" value="90"></div>
                 <button id="rotationLimitApply">Apply joint constraint</button>
                 <div id="rotationLimitStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Interactive two-bone IK target</div>
+                <div class="hint">Choose an upper/lower bone pair and set the end-effector target in project coordinates. The saved target is evaluated during procedural rig playback.</div>
+                <label class="fld"><span>Upper bone</span><select id="ikUpperBone"></select></label>
+                <label class="fld"><span>Lower bone</span><select id="ikLowerBone"></select></label>
+                <div class="xrow n"><span>Target X</span><input id="ikTargetX" type="number" step="1" value="0"></div>
+                <div class="xrow n"><span>Target Y</span><input id="ikTargetY" type="number" step="1" value="0"></div>
+                <label class="fld"><span>Bend direction</span><select id="ikBend"><option value="1">Positive</option><option value="-1">Negative</option></select></label>
+                <div class="xbtns"><button id="ikApply" class="primary">Save IK target</button><button id="ikRemove">Remove IK target</button></div>
+                <div id="ikStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Procedural walk cycle</div>
                 <div class="hint">Apply a reusable walk clip to this rig. Bone names identify head, torso, upper/lower arms, thighs, shins, and feet; foot-contact IK runs when both leg chains are available.</div>
                 <label class="chk"><input id="rigWalkEnabled" type="checkbox"> Enable walk cycle</label>
