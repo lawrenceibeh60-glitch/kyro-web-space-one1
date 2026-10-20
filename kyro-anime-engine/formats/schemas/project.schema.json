@@ -58,16 +58,13 @@
     },
     "rigs": {
       "type": "array",
-<<<<<<< Updated upstream
-      "items": { "$ref": "rig.schema.json" }
-=======
       "items": {
         "allOf": [
           { "$ref": "rig.schema.json" },
           { "required": ["name"] }
         ]
       }
->>>>>>> Stashed changes
+
     },
     "audio": {
       "type": "array",
