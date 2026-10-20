@@ -35,6 +35,20 @@ export function solveTwoBoneIK(root, target, upperLength, lowerLength, bendDirec
   };
 }
 
+/** Return the closest enabled saved target within a project-space hit radius. */
+export function findIKTargetAtPoint(rig, point, radius = 16) {
+  if (!rig || !Number.isFinite(point?.x) || !Number.isFinite(point?.y)
+      || !Number.isFinite(radius) || radius < 0) return null;
+  let closest = null, closestDistance = radius;
+  for (const constraint of rig.constraints || []) {
+    if (constraint.type !== 'ik_two_bone' || constraint.enabled === false
+        || !Number.isFinite(constraint.target?.x) || !Number.isFinite(constraint.target?.y)) continue;
+    const distance = Math.hypot(point.x - constraint.target.x, point.y - constraint.target.y);
+    if (distance <= closestDistance) { closest = constraint; closestDistance = distance; }
+  }
+  return closest;
+}
+
 // Validate and immutably upsert a saved IK target constraint.
 // bone IDs refer to the upper and lower bones; target coordinates are in project space.
 export function withTwoBoneIK(constraints, {
