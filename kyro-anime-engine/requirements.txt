@@ -1,5 +1,7 @@
 # Core runtime stays dependency-light (Pydroid friendly)
 flask
+# Production WSGI server used by Render; local Pydroid can still use python run.py
+gunicorn
 # Needed for GIF + sprite sheet export (PNG sequence works without it)
 pillow
 
