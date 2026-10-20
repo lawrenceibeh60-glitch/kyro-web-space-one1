@@ -1,7 +1,7 @@
 import { request } from './api/client.js';
 
 const history = [];
-let reference = null, imageUrl = null, videoUrl = null, currentProject = null, latestVideoAnalysis = '', currentPlan = null, latestSampledFrames = null, currentVectorPlan = null;
+let reference = null, imageUrl = null, videoUrl = null, currentProject = null, latestVideoAnalysis = '', latestCreativeDirection = '', currentPlan = null, latestSampledFrames = null, currentVectorPlan = null;
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -121,6 +121,7 @@ export function initAIStudio() {
     addMessage('user', message);
     const previousHistory = history.slice(-12);
     history.push({ role: 'user', content: message });
+    if (latestVideoAnalysis) latestCreativeDirection = message;
     setBusy(true);
     status.textContent = 'Consulting KAE engine context and capabilities…';
     try {
@@ -240,6 +241,7 @@ export function initAIStudio() {
       const analysis = result.analysis || 'The model returned no analysis.';
       addMessage('assistant', 'REFERENCE ANALYSIS (' + result.frames_analyzed + ' frames)\n\n' + analysis);
       latestVideoAnalysis = analysis;
+      latestCreativeDirection = '';
       currentPlan = null;
       currentVectorPlan = null;
       vectorSummary.hidden = true;
@@ -300,7 +302,7 @@ export function initAIStudio() {
       status.textContent = 'Choose a target scene for the new reconstruction layer.';
       return;
     }
-    const direction = input.value.trim();
+    const direction = input.value.trim() || latestCreativeDirection;
     if (!direction) {
       status.textContent = 'Tell KAE what to preserve or change in the reference before reconstructing.';
       input.focus();
@@ -368,7 +370,7 @@ export function initAIStudio() {
   });
 
   buildPlan.addEventListener('click', async () => {
-    const direction = input.value.trim();
+    const direction = input.value.trim() || latestCreativeDirection;
     if (!currentProject?.id) {
       status.textContent = 'Open a saved KAE project before creating a keyframe plan.';
       return;
