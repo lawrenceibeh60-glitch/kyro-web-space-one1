@@ -200,7 +200,7 @@ export function initAIStudio() {
 
   async function sampleVideoFrames() {
     if (!video.duration || !Number.isFinite(video.duration)) throw new Error('Video duration is not available.');
-    const count = Math.min(6, Math.max(1, Math.ceil(video.duration / 2)));
+    const count = Math.min(6, Math.max(2, Math.ceil(video.duration / 2)));
     const originalTime = video.currentTime;
     const width = Math.min(768, video.videoWidth || 768);
     const height = Math.max(1, Math.round(width * (video.videoHeight || 432) / Math.max(1, video.videoWidth || 768)));
