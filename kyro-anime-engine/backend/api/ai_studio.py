@@ -2,6 +2,7 @@
 import json
 import math
 import os
+import re
 import uuid
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -232,7 +233,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
             commands = stroke.get("commands")
             closed = stroke.get("closed", False)
             fill = stroke.get("fill")
-            if not isinstance(color, str) or not __import__("re").fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", color):
+            if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", color):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid color.")
             if isinstance(width_norm, bool) or not isinstance(width_norm, (int, float)) or not math.isfinite(width_norm) or not 0.25 <= width_norm <= (40 if coordinates_normalized else max(width, height) * 0.04):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid width.")
