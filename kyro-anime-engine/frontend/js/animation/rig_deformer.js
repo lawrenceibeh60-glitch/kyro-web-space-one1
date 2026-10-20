@@ -1,11 +1,12 @@
 // 2D linear-blend skinning for point strokes and vector path control points.
 import { evaluateTrack } from './interpolation.js';
+import { clampBoneRotation } from './rig_constraints.js';
 
 function rotationOf(rig, bone, frame, pose) {
   const base = bone.tracks?.rotation?.length
     ? evaluateTrack(bone.tracks.rotation, frame)
     : (bone.rotation ?? 0);
-  return base + (Number.isFinite(pose?.bones?.[bone.id]) ? pose.bones[bone.id] : 0);
+  return clampBoneRotation(rig, bone, base + (Number.isFinite(pose?.bones?.[bone.id]) ? pose.bones[bone.id] : 0));
 }
 
 function rotateAround(point, pivot, degrees) {
