@@ -11,6 +11,7 @@ import { applyCameraTransform, evaluateCamera } from '../animation/camera_evalua
 import { execute, setValue } from '../core/command_manager.js';
 import { drawEditOverlay } from './edit_tools.js';
 import { writeCameraChannel, zoomCameraAtPoint } from '../scene/camera_controller.js';
+import { findIKTargetAtPoint, moveIKTarget } from '../animation/rig_ik.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -19,7 +20,7 @@ export function initViewport(canvas) {
   const workspace = getComputedStyle(document.documentElement).getPropertyValue('--workspace').trim() || '#2b2b33';
   const ptrs = new Map();
   const onionCache = new Map();
-  let dpr = 1, queued = false, navLock = false, panning = null, drawing = null, cameraDrag = null, pinch = null, showGrid = true, showOnion = false;
+  let dpr = 1, queued = false, navLock = false, panning = null, drawing = null, cameraDrag = null, ikDrag = null, pinch = null, showGrid = true, showOnion = false;
 
   function resize() {
     const r = canvas.parentElement.getBoundingClientRect();
@@ -49,6 +50,7 @@ export function initViewport(canvas) {
     ctx.save();
     const camera = applyCameraTransform(ctx, width, height, scene?.camera, state.frame);
     drawPivot(state.view.zoom * camera.zoom);
+    drawIKTargets(state.view.zoom * camera.zoom);
     if (state.tool === 'edit') drawEditOverlay(ctx, state.view.zoom * camera.zoom);
     if (state.tool === 'weight') {
       drawWeightOverlay(ctx, state.project, state.sceneId, state.layerId, state.frame,
@@ -116,6 +118,39 @@ export function initViewport(canvas) {
     ctx.moveTo(t.x - r * 1.6, t.y); ctx.lineTo(t.x + r * 1.6, t.y);
     ctx.moveTo(t.x, t.y - r * 1.6); ctx.lineTo(t.x, t.y + r * 1.6);
     ctx.stroke(); ctx.restore();
+  }
+
+  function activeIKRig() {
+    const characterId = state.activeRigCharacterId;
+    const rigs = state.project?.rigs || [];
+    const index = rigs.findIndex(rig => rig.character_id === characterId);
+    return index < 0 ? null : { rig: rigs[index], index };
+  }
+
+  function drawIKTargets(effectiveZoom = state.view.zoom) {
+    if (!state.showRigOverlay) return;
+    const active = activeIKRig();
+    if (!active) return;
+    const radius = 8 / Math.max(0.05, effectiveZoom);
+    ctx.save();
+    ctx.lineWidth = 2 / Math.max(0.05, effectiveZoom);
+    for (const constraint of active.rig.constraints || []) {
+      if (constraint?.type !== 'ik_two_bone' || constraint.enabled === false
+          || !Number.isFinite(constraint.target?.x) || !Number.isFinite(constraint.target?.y)) continue;
+      const { x, y } = constraint.target;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd54a';
+      ctx.fill();
+      ctx.strokeStyle = '#17202a';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - radius * 1.5, y); ctx.lineTo(x + radius * 1.5, y);
+      ctx.moveTo(x, y - radius * 1.5); ctx.lineTo(x, y + radius * 1.5);
+      ctx.strokeStyle = '#17202a';
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function requestRender() {
@@ -237,6 +272,20 @@ export function initViewport(canvas) {
       pinch = pinchState(); return;
     }
     if (ptrs.size > 2 || navLock) return;
+    if (state.showRigOverlay && e.button === 0 && state.project) {
+      const active = activeIKRig();
+      const world = toWorld(e);
+      const hit = active ? findIKTargetAtPoint(active.rig, world, 18 / Math.max(0.05, state.view.zoom)) : -1;
+      if (active && hit >= 0) {
+        ikDrag = {
+          pointerId: e.pointerId,
+          rigIndex: active.index,
+          originalConstraints: JSON.parse(JSON.stringify(active.rig.constraints || [])),
+          constraintIndex: hit,
+        };
+        return;
+      }
+    }
     if (state.tool === 'pan' || e.button === 1) { panning = e.pointerId; return; }
     if (state.tool === 'camera') {
       const sceneIndex = state.project.scenes.findIndex(scene => scene.id === state.sceneId);
@@ -266,7 +315,14 @@ export function initViewport(canvas) {
       pinch = n; return;
     }
     if (navLock) return;
-    if (panning === e.pointerId) {
+    if (ikDrag?.pointerId === e.pointerId) {
+      const active = state.project?.rigs?.[ikDrag.rigIndex];
+      const world = toWorld(e);
+      if (active) {
+        active.constraints = moveIKTarget(active.constraints || [], ikDrag.constraintIndex, world.x, world.y);
+        bus.emit('project:changed');
+      }
+    } else if (panning === e.pointerId) {
       const v = state.view;
       setView({ ...v, panX: v.panX + cur.x - prev.x, panY: v.panY + cur.y - prev.y });
     } else if (cameraDrag?.pointerId === e.pointerId) {
@@ -292,6 +348,20 @@ export function initViewport(canvas) {
 
   const end = e => {
     if (!ptrs.delete(e.pointerId)) return;
+    if (ikDrag?.pointerId === e.pointerId) {
+      const activeDrag = ikDrag;
+      ikDrag = null;
+      const rig = state.project?.rigs?.[activeDrag.rigIndex];
+      if (rig) {
+        const previewConstraints = JSON.parse(JSON.stringify(rig.constraints || []));
+        rig.constraints = activeDrag.originalConstraints;
+        if (e.type === 'pointercancel') {
+          bus.emit('project:changed');
+        } else {
+          execute(setValue(['rigs', activeDrag.rigIndex, 'constraints'], previewConstraints, 'Move IK target'));
+        }
+      }
+    }
     if (cameraDrag?.pointerId === e.pointerId) {
       if (e.type === 'pointercancel') cancelCamera();
       else commitCamera();
