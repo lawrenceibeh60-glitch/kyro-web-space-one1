@@ -27,7 +27,7 @@ function projectSummary() {
       layers: Array.isArray(scene.layers) ? scene.layers.map(layer => ({ id: layer.id, name: layer.name, type: layer.type })) : [],
     })) : [],
     drawings: currentProject.drawings && typeof currentProject.drawings === 'object'
-      ? Object.fromEntries(Object.keys(currentProject.drawings).slice(0, 100).map(id => [id, true])) : {},
+      ? Object.fromEntries(Object.entries(currentProject.drawings).slice(0, 100).map(([id, drawing]) => [id, { id, name: drawing?.name || id }])) : {},
     characters: Array.isArray(currentProject.characters) ? currentProject.characters.slice(0, 100).map(c => ({ id: c.id, name: c.name })) : [],
     rigs: Array.isArray(currentProject.rigs) ? currentProject.rigs.slice(0, 100).map(r => ({ id: r.id, name: r.name })) : [],
   };
