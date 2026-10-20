@@ -752,7 +752,12 @@ export function initStudioPanel({ onCharacterImported }) {
   }
   $('boneAdd').onclick = addBone;
   $('constraintBone').addEventListener('change', () => renderRotationLimitControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
-  $('rotationLimitEnabled').addEventListener('change', () => renderRotationLimitControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('rotationLimitEnabled').addEventListener('change', () => {
+    const active = $('rotationLimitEnabled').checked && !!$('constraintBone').value;
+    $('rotationLimitMin').disabled = !active;
+    $('rotationLimitMax').disabled = !active;
+    if (active) $('rotationLimitStatus').textContent = 'Set a minimum and maximum, then apply the constraint.';
+  });
   $('rotationLimitApply').onclick = applyRotationLimit;
   $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
