@@ -1,5 +1,6 @@
 """KAE AI workspace: provider-backed chat, video reference analysis and image generation."""
 import json
+import math
 import os
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -10,6 +11,8 @@ from flask import Blueprint, jsonify, request
 
 from backend.app.exceptions import ApiError
 from backend.services.ai_capabilities import build_system_context, get_capabilities
+from backend.services import timeline_service
+from backend.storage import project_repository
 
 bp = Blueprint("ai_studio", __name__)
 
@@ -193,6 +196,114 @@ def analyze_video_reference():
     )
     reply, used_model = _chat_reply(result, model)
     return jsonify(analysis=reply, model=used_model, frames_analyzed=len(frames))
+
+
+
+@bp.post("/ai/animation/plan")
+def create_animation_plan():
+    """Ask AI for a validated, previewable keyframe script without mutating the project."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError(400, "Request body must be a JSON object")
+    project_id = data.get("project_id")
+    direction = data.get("direction")
+    analysis = data.get("analysis", "")
+    if not isinstance(project_id, str) or not project_id.strip():
+        raise ApiError(400, "project_id is required to build an animation plan.")
+    if not isinstance(direction, str) or not direction.strip():
+        raise ApiError(400, "Describe the creative changes or animation you want.")
+    if len(direction) > 8000 or not isinstance(analysis, str) or len(analysis) > 16000:
+        raise ApiError(413, "Animation direction or reference analysis is too long.")
+    key, base, model, _, _ = _config()
+    if not key:
+        raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
+    project = project_repository.load(project_id)
+    settings = project.get("settings", {})
+    frame_limit = int(settings.get("duration_frames", 24))
+    scene_ids = {
+        scene.get("id"): {layer.get("id") for layer in scene.get("layers", []) if isinstance(layer, dict)}
+        for scene in project.get("scenes", []) if isinstance(scene, dict)
+    }
+    prompt = (
+        "Create a previewable animation keyframe plan for this existing KAE project. "
+        "Return ONLY one JSON object with keys summary and ops. ops must contain 1 to 200 "
+        "operations and every operation must use op=set_key with scene_id, layer_id, channel, "
+        "time, value, and optional ease. Valid channels are x, y, rotation, scale_x, scale_y, "
+        "opacity. Use only the exact scene/layer IDs supplied in the project context. Frame "
+        "times are zero-based integers and must be inside the current duration. Values must be "
+        "numbers. Use ease from linear, hold, ease_in, ease_out, ease_in_out. Animate existing "
+        "layers only; do not invent drawing IDs or claim new artwork was generated. Include "
+        "keyframes that communicate the requested motion and preserve other channels. If the "
+        "request cannot be represented with existing layers and transform keyframes, return "
+        "an empty ops array and explain the limitation in summary.\n\n"
+        "CURRENT FRAME LIMIT: " + str(frame_limit) + "\n"
+        "REFERENCE VIDEO ANALYSIS:\n" + analysis + "\n"
+        "ARTIST'S CREATIVE DIRECTION:\n" + direction
+    )
+    result = _request_json(
+        f"{base}/chat/completions",
+        method="POST",
+        payload={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": build_system_context(project)},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.1,
+        },
+        api_key=key,
+        timeout=120,
+    )
+    raw, used_model = _chat_reply(result, model)
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1]
+        if cleaned.rstrip().endswith("```"):
+            cleaned = cleaned.rstrip()[:-3].strip()
+    try:
+        plan = json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        raise ApiError(502, "AI returned an invalid animation plan. Ask it to try again.") from exc
+    if not isinstance(plan, dict) or not isinstance(plan.get("ops"), list):
+        raise ApiError(502, "AI animation plan must contain an ops array.")
+    ops = plan["ops"]
+    if len(ops) > 200:
+        raise ApiError(422, "Animation plan exceeds the 200-keyframe safety limit.")
+    valid_eases = {"linear", "hold", "ease_in", "ease_out", "ease_in_out"}
+    validated = []
+    for index, op in enumerate(ops):
+        if not isinstance(op, dict) or op.get("op") != "set_key":
+            raise ApiError(422, f"Plan operation {index + 1} is not a supported set_key operation.")
+        scene_id, layer_id = op.get("scene_id"), op.get("layer_id")
+        if scene_id not in scene_ids or layer_id not in scene_ids[scene_id]:
+            raise ApiError(422, f"Plan operation {index + 1} refers to a scene or layer that does not exist.")
+        if op.get("channel") not in timeline_service.CHANNELS:
+            raise ApiError(422, f"Plan operation {index + 1} uses an unsupported animation channel.")
+        frame = op.get("time")
+        value = op.get("value")
+        if isinstance(frame, bool) or not isinstance(frame, int) or not 0 <= frame < frame_limit:
+            raise ApiError(422, f"Plan operation {index + 1} has a frame outside the current project duration.")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ApiError(422, f"Plan operation {index + 1} must use a finite numeric value.")
+        if op["channel"] == "opacity" and not 0 <= value <= 1:
+            raise ApiError(422, f"Plan operation {index + 1} opacity must be between 0 and 1.")
+        if op["channel"] in ("scale_x", "scale_y") and not 0.01 <= abs(value) <= 100:
+            raise ApiError(422, f"Plan operation {index + 1} scale must be between 0.01 and 100 in magnitude.")
+        ease = op.get("ease", "linear")
+        if ease not in valid_eases:
+            raise ApiError(422, f"Plan operation {index + 1} uses an unsupported interpolation mode.")
+        validated.append({
+            "op": "set_key", "scene_id": scene_id, "layer_id": layer_id,
+            "channel": op["channel"], "time": frame, "value": value, "ease": ease,
+        })
+    return jsonify(
+        summary=str(plan.get("summary", "Animation keyframe plan"))[:2000],
+        ops=validated,
+        model=used_model,
+        project_id=project_id,
+        frame_limit=frame_limit,
+        applied=False,
+    )
 
 
 @bp.post("/ai/images")
