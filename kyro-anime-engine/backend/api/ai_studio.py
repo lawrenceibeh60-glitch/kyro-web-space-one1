@@ -283,6 +283,9 @@ def plan_video_reconstruction():
     frames = data.get("frames")
     if not isinstance(frames, list) or not 2 <= len(frames) <= 6:
         raise ApiError(400, "Provide between 2 and 6 sampled video frames.")
+    direction = data.get("direction", "")
+    if not isinstance(direction, str) or len(direction) > 8000:
+        raise ApiError(413, "Creative direction must be text under 8000 characters.")
     project = data.get("project")
     if not isinstance(project, dict) or not isinstance(project.get("settings"), dict):
         raise ApiError(400, "A current KAE project context is required.")
@@ -304,7 +307,8 @@ def plan_video_reconstruction():
             "Use clear contour paths and a small number of colors. Prefer continuous, stable contours between frames. "
             "Do not output prose or markdown. This is an approximation, not pixel-perfect tracing.\n"
             "Canvas aspect ratio: " + str(width) + ":" + str(height) + ".\n"
-            "Timestamps: " + json.dumps([f.get("timestamp_seconds") for f in frames if isinstance(f, dict)])
+            "Timestamps: " + json.dumps([f.get("timestamp_seconds") for f in frames if isinstance(f, dict)]) + "\\n"
+            "ARTIST'S CREATIVE DIRECTION: " + (direction.strip() or "Stay faithful to the reference action and design.")
         )
     }]
     for index, frame in enumerate(frames):
@@ -391,6 +395,8 @@ def apply_video_reconstruction():
     if errors:
         # Do not write partially valid reconstruction data to disk.
         raise ApiError(422, "Reconstruction failed native KAE project validation.", errors)
+    from datetime import datetime, timezone
+    project["modified"] = datetime.now(timezone.utc).isoformat()
     project_repository.save(project_id, project)
     return jsonify(
         applied=True,
