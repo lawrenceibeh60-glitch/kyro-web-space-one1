@@ -534,6 +534,8 @@ export function initStudioPanel({ onCharacterImported }) {
     if (!characters.some(character => character.id === selectedCharacterId)) {
       selectedCharacterId = characterOptions[0]?.[0] || '';
     }
+    // The viewport uses this selection to draw and drag the active rig's IK handles.
+    state.activeRigCharacterId = selectedCharacterId;
     selectOptions($('rigCharacter'), characterOptions, selectedCharacterId, 'Import or generate a character first');
     const character = characters.find(item => item.id === selectedCharacterId);
     const rigs = state.project.rigs || [];
