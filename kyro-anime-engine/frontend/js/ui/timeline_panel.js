@@ -8,7 +8,7 @@ import { setFrame, stop, isPlaying } from '../animation/playback.js';
 import { moveKeysCmd } from '../editor/transform_tools.js';
 import { execute, batch, insertAt, setValue } from '../core/command_manager.js';
 import { findExposure } from '../rendering/renderer.js';
-import { clamp, frameFromTimelineX, exposureBounds, previewExposureEdit } from '../animation/timeline.js';
+import { clamp, frameFromTimelineX, exposureBounds, previewExposureEdit, validateExposureTrack } from '../animation/timeline.js';
 import { toast } from './notifications.js';
 
 const ROW = 20, RULER = 18, PAD = 6;
@@ -175,6 +175,8 @@ export function initTimelinePanel() {
     const layerIndex = getScene().layers.indexOf(layer);
     if (layerIndex < 0) return;
     const ordered = [...exposures].sort((a, b) => a.start - b.start);
+    const validation = validateExposureTrack(ordered, total());
+    if (!validation.valid) { toast(validation.reason, 'err'); requestDraw(); return; }
     execute(setValue(['scenes', state.project.scenes.indexOf(getScene()), 'layers', layerIndex, 'exposures'], ordered, label));
   }
 
