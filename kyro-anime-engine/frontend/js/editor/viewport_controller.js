@@ -11,6 +11,7 @@ import { applyCameraTransform, evaluateCamera } from '../animation/camera_evalua
 import { execute, setValue } from '../core/command_manager.js';
 import { drawEditOverlay } from './edit_tools.js';
 import { writeCameraChannel, zoomCameraAtPoint } from '../scene/camera_controller.js';
+import { findIKTargetAtPoint } from '../animation/rig_ik.js';
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -19,7 +20,7 @@ export function initViewport(canvas) {
   const workspace = getComputedStyle(document.documentElement).getPropertyValue('--workspace').trim() || '#2b2b33';
   const ptrs = new Map();
   const onionCache = new Map();
-  let dpr = 1, queued = false, navLock = false, panning = null, drawing = null, cameraDrag = null, pinch = null, showGrid = true, showOnion = false;
+  let dpr = 1, queued = false, navLock = false, panning = null, drawing = null, ikPointer = null, cameraDrag = null, pinch = null, showGrid = true, showOnion = false;
 
   function resize() {
     const r = canvas.parentElement.getBoundingClientRect();
@@ -45,6 +46,22 @@ export function initViewport(canvas) {
     renderFrame(ctx, state.project, state.sceneId, state.frame, state.preview, {
       transparent: true, showRigOverlay: state.showRigOverlay,
     });
+
+    if (state.rigIKDragEnabled && state.rigCharacterId) {
+      const rig = (state.project.rigs || []).find(item => item.character_id === state.rigCharacterId);
+      for (const constraint of rig?.constraints || []) {
+        if (constraint.type !== 'ik_two_bone' || constraint.enabled === false
+            || !Number.isFinite(constraint.target?.x) || !Number.isFinite(constraint.target?.y)) continue;
+        const target = constraint.target, zoom = Math.max(0.05, state.view.zoom);
+        ctx.save(); ctx.lineWidth = 2 / zoom; ctx.strokeStyle = '#ffd166';
+        ctx.fillStyle = 'rgba(255, 209, 102, 0.22)';
+        ctx.beginPath(); ctx.arc(target.x, target.y, 9 / zoom, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke(); ctx.beginPath();
+        ctx.moveTo(target.x - 13 / zoom, target.y); ctx.lineTo(target.x + 13 / zoom, target.y);
+        ctx.moveTo(target.x, target.y - 13 / zoom); ctx.lineTo(target.x, target.y + 13 / zoom);
+        ctx.stroke(); ctx.restore();
+      }
+    }
     const scene = state.project.scenes.find(s => s.id === state.sceneId);
     ctx.save();
     const camera = applyCameraTransform(ctx, width, height, scene?.camera, state.frame);
@@ -238,6 +255,14 @@ export function initViewport(canvas) {
     }
     if (ptrs.size > 2 || navLock) return;
     if (state.tool === 'pan' || e.button === 1) { panning = e.pointerId; return; }
+    if (state.rigIKDragEnabled && state.tool !== 'weight' && state.tool !== 'camera' && state.project) {
+      const rig = (state.project.rigs || []).find(item => item.character_id === state.rigCharacterId);
+      if (findIKTargetAtPoint(rig, toWorld(e), 16 / Math.max(0.05, state.view.zoom))) {
+        ikPointer = e.pointerId;
+        bus.emit('viewport:ik-down', { ...toWorld(e), pressure: e.pressure, pointerType: e.pointerType });
+        return;
+      }
+    }
     if (state.tool === 'camera') {
       const sceneIndex = state.project.scenes.findIndex(scene => scene.id === state.sceneId);
       const camera = state.project.scenes[sceneIndex].camera || { transform: { x: 0, y: 0, scale_x: 1 } };
@@ -266,6 +291,10 @@ export function initViewport(canvas) {
       pinch = n; return;
     }
     if (navLock) return;
+    if (ikPointer === e.pointerId) {
+      bus.emit('viewport:ik-move', { ...toWorld(e), pressure: e.pressure, pointerType: e.pointerType });
+      return;
+    }
     if (panning === e.pointerId) {
       const v = state.view;
       setView({ ...v, panX: v.panX + cur.x - prev.x, panY: v.panY + cur.y - prev.y });
@@ -292,6 +321,13 @@ export function initViewport(canvas) {
 
   const end = e => {
     if (!ptrs.delete(e.pointerId)) return;
+    if (ikPointer === e.pointerId) {
+      ikPointer = null;
+      bus.emit(e.type === 'pointercancel' ? 'viewport:ik-cancel' : 'viewport:ik-up', {});
+      if (ptrs.size < 2) pinch = null;
+      if (ptrs.size === 0) navLock = false;
+      return;
+    }
     if (cameraDrag?.pointerId === e.pointerId) {
       if (e.type === 'pointercancel') cancelCamera();
       else commitCamera();

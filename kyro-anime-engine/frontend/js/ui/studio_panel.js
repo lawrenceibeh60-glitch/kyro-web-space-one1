@@ -8,7 +8,7 @@ import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weigh
 import { buildAutoRig } from '../animation/auto_rig.js';
 import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreography.js';
 import { withRotationLimit } from '../animation/rig_constraints.js';
-import { withTwoBoneIK } from '../animation/rig_ik.js';
+import { findIKTargetAtPoint, withTwoBoneIK } from '../animation/rig_ik.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -152,6 +152,45 @@ export function initStudioPanel({ onCharacterImported }) {
   }
 
   let weightPaint = null;
+  let ikTargetDrag = null;
+
+  function cloneRigArray(rigs) { return JSON.parse(JSON.stringify(rigs || [])); }
+  function rigForViewportIK() {
+    return (state.project?.rigs || []).find(item => item.character_id === state.rigCharacterId) || null;
+  }
+  function startIKTargetDrag(point) {
+    if (!state.rigIKDragEnabled || !state.project || state.tool === 'weight'
+        || state.tool === 'pan' || state.tool === 'camera') return;
+    const rig = rigForViewportIK();
+    if (!rig) return;
+    const nearest = findIKTargetAtPoint(rig, point, 16 / Math.max(0.05, state.view.zoom));
+    if (!nearest) return;
+    ikTargetDrag = { rigId: rig.id, constraintId: nearest.id, before: cloneRigArray(state.project.rigs) };
+    $('ikStatus').textContent = 'Dragging IK target — release to commit, or press Escape to cancel.';
+  }
+  function moveIKTargetDrag(point) {
+    if (!ikTargetDrag || !state.project) return;
+    const rig = (state.project.rigs || []).find(item => item.id === ikTargetDrag.rigId);
+    const constraint = rig?.constraints?.find(item => item.type === 'ik_two_bone' && item.id === ikTargetDrag.constraintId);
+    if (!constraint) return;
+    constraint.target = { x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 };
+    $('ikTargetX').value = constraint.target.x; $('ikTargetY').value = constraint.target.y;
+    $('ikStatus').textContent = `Dragging target · X ${constraint.target.x} · Y ${constraint.target.y}`;
+    bus.emit('project:changed');
+  }
+  function finishIKTargetDrag(commit = true) {
+    if (!ikTargetDrag || !state.project) return;
+    const active = ikTargetDrag; ikTargetDrag = null;
+    const after = cloneRigArray(state.project.rigs);
+    state.project.rigs = active.before;
+    if (commit) {
+      execute(setValue(['rigs'], after, 'Move IK target'));
+      $('ikStatus').textContent = 'IK target moved and saved as one undoable edit.';
+    } else {
+      bus.emit('project:changed');
+      $('ikStatus').textContent = 'IK target drag cancelled.';
+    }
+  }
 
 
   function eachGeometryCoordinate(stroke, callback) {
@@ -535,6 +574,7 @@ export function initStudioPanel({ onCharacterImported }) {
       selectedCharacterId = characterOptions[0]?.[0] || '';
     }
     selectOptions($('rigCharacter'), characterOptions, selectedCharacterId, 'Import or generate a character first');
+    if (state.rigCharacterId !== selectedCharacterId) setState({ rigCharacterId: selectedCharacterId });
     const character = characters.find(item => item.id === selectedCharacterId);
     const rigs = state.project.rigs || [];
     const rig = rigs.find(item => item.character_id === selectedCharacterId);
@@ -835,6 +875,14 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rotationLimitApply').onclick = applyRotationLimit;
   $('ikUpperBone').addEventListener('change', () => renderIKControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
   $('ikLowerBone').addEventListener('change', () => renderIKControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('ikViewportDrag').checked = !!state.rigIKDragEnabled;
+  $('ikViewportDrag').onchange = event => {
+    setState({ rigIKDragEnabled: event.target.checked });
+    $('ikStatus').textContent = event.target.checked
+      ? 'Viewport IK drag enabled. Drag a yellow target marker on the canvas.'
+      : 'Viewport IK drag disabled.';
+    bus.emit('preview');
+  };
   $('ikApply').onclick = applyIKTarget;
   $('ikRemove').onclick = removeIKTarget;
   $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
@@ -852,6 +900,13 @@ export function initStudioPanel({ onCharacterImported }) {
   bus.on('viewport:move', point => paintAt(point));
   bus.on('viewport:up', () => finishWeightPaint(true));
   bus.on('viewport:cancel', () => finishWeightPaint(false));
+  bus.on('viewport:ik-down', point => startIKTargetDrag(point));
+  bus.on('viewport:ik-move', point => moveIKTargetDrag(point));
+  bus.on('viewport:ik-up', () => finishIKTargetDrag(true));
+  bus.on('viewport:ik-cancel', () => finishIKTargetDrag(false));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && ikTargetDrag) finishIKTargetDrag(false);
+  });
   $('generateCharacter').onclick = generateCharacter;
   $('audioUpload').onclick = uploadAudio;
   bus.on('project:changed', render);

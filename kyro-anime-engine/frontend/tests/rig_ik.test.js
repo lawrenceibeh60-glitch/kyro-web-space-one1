@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySavedIKConstraints, removeTwoBoneIK, solveTwoBoneIK, withTwoBoneIK } from '../js/animation/rig_ik.js';
+import { applySavedIKConstraints, findIKTargetAtPoint, removeTwoBoneIK, solveTwoBoneIK, withTwoBoneIK } from '../js/animation/rig_ik.js';
 
 test('two-bone IK solves a reachable target and reports the reachable endpoint', () => {
   const result = solveTwoBoneIK({ x: 0, y: 0 }, { x: 6, y: 8 }, 6, 6);
@@ -75,4 +75,15 @@ test('saving the same bone pair replaces an imported IK target instead of duplic
   });
   assert.equal(updated.filter(item => item.type === 'ik_two_bone').length, 1);
   assert.deepEqual(updated[0].target, { x: 30, y: 40 });
+});
+
+test('viewport hit-testing selects the nearest enabled IK target and respects radius', () => {
+  const rig = { constraints: [
+    { type: 'ik_two_bone', id: 'far', target: { x: 0, y: 0 } },
+    { type: 'ik_two_bone', id: 'near', target: { x: 9, y: 0 } },
+    { type: 'ik_two_bone', id: 'disabled', enabled: false, target: { x: 10, y: 0 } },
+  ] };
+  assert.equal(findIKTargetAtPoint(rig, { x: 10, y: 0 }, 4)?.id, 'near');
+  assert.equal(findIKTargetAtPoint(rig, { x: 10, y: 0 }, 0.5), null);
+  assert.equal(findIKTargetAtPoint(rig, { x: NaN, y: 0 }, 4), null);
 });
