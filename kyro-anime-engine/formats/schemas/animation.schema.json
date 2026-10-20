@@ -79,29 +79,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-<<<<<<< Updated upstream
-        "x": {
-          "$ref": "#/$defs/track"
-        },
-        "y": {
-          "$ref": "#/$defs/track"
-        },
-        "rotation": {
-          "$ref": "#/$defs/track"
-        },
-        "scale_x": {
-          "$ref": "#/$defs/track"
-        },
-        "scale_y": {
-          "$ref": "#/$defs/track"
-        },
-        "opacity": {
-          "$ref": "#/$defs/track"
-        },
-        "rotation_y": {
-          "$ref": "#/$defs/track"
-        }
-=======
         "x": { "$ref": "#/$defs/track" },
         "y": { "$ref": "#/$defs/track" },
         "z": { "$ref": "#/$defs/track" },
@@ -115,7 +92,7 @@
         "anchor_y": { "$ref": "#/$defs/track" },
         "anchor_z": { "$ref": "#/$defs/track" },
         "opacity": { "$ref": "#/$defs/track" }
->>>>>>> Stashed changes
+
       }
     },
     "exposure": {

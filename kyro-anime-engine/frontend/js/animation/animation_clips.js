@@ -1,5 +1,6 @@
 // KAE production animation clips: deterministic procedural motion, no demo-only runtime.
 import { evaluateTransform } from './pose_evaluator.js';
+import { applySavedIKConstraints } from './rig_ik.js';
 
 const TAU = Math.PI * 2;
 const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
@@ -170,6 +171,7 @@ export function evaluateRigAnimation(rig, frame, options = {}) {
   }
   solveContactLeg(rig, pose, frame, 'left', options.layer, options.layerTransform);
   solveContactLeg(rig, pose, frame, 'right', options.layer, options.layerTransform);
+  applySavedIKConstraints(rig, pose);
   return pose;
 }
 

@@ -7,6 +7,8 @@ import { toLocal } from '../rendering/geometry.js';
 import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weights.js';
 import { buildAutoRig } from '../animation/auto_rig.js';
 import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreography.js';
+import { withRotationLimit } from '../animation/rig_constraints.js';
+import { withTwoBoneIK } from '../animation/rig_ik.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -410,6 +412,121 @@ export function initStudioPanel({ onCharacterImported }) {
     }
   }
 
+  function renderRotationLimitControls(rig) {
+    const select = $('constraintBone');
+    const bones = rig?.bones || [];
+    selectOptions(select, bones.map(bone => [bone.id, bone.name || bone.id]), select.value, 'Add a bone first');
+    const bone = bones.find(item => item.id === select.value);
+    const constraint = (rig?.constraints || []).find(item => item.type === 'rotation_limit' && item.bone_id === bone?.id);
+    $('rotationLimitEnabled').checked = !!constraint;
+    $('rotationLimitMin').value = constraint?.min ?? -90;
+    $('rotationLimitMax').value = constraint?.max ?? 90;
+    const enabled = !!rig && !!bone;
+    select.disabled = !enabled;
+    $('rotationLimitEnabled').disabled = !enabled;
+    $('rotationLimitMin').disabled = !enabled || !constraint && !$('rotationLimitEnabled').checked;
+    $('rotationLimitMax').disabled = !enabled || !constraint && !$('rotationLimitEnabled').checked;
+    $('rotationLimitApply').disabled = !enabled;
+    $('rotationLimitStatus').textContent = !bone
+      ? 'Create a rig and add a bone to configure joint limits.'
+      : constraint
+        ? `Rotation limited to ${constraint.min}° … ${constraint.max}°.`
+        : 'No rotation limit is active for this bone.';
+  }
+
+  function applyRotationLimit() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const boneId = $('constraintBone').value;
+    if (!rig || !boneId) return;
+    const enabled = $('rotationLimitEnabled').checked;
+    try {
+      const constraints = withRotationLimit(
+        rig.constraints || [], boneId, enabled,
+        Number($('rotationLimitMin').value), Number($('rotationLimitMax').value), 1,
+      );
+      updateRig({ ...clone(rig), constraints });
+      $('rotationLimitStatus').textContent = enabled
+        ? `Rotation limit applied: ${Number($('rotationLimitMin').value)}° … ${Number($('rotationLimitMax').value)}°.`
+        : 'Rotation limit removed.';
+      toast(enabled ? 'Joint rotation limit applied.' : 'Joint rotation limit removed.', 'ok');
+    } catch (error) {
+      $('rotationLimitStatus').textContent = error.message || 'Invalid rotation limit.';
+      toast(error.message || 'Invalid rotation limit.', 'err');
+    }
+  }
+
+  function selectedIKId() {
+    const upper = $('ikUpperBone')?.value || '';
+    const lower = $('ikLowerBone')?.value || '';
+    return `ik_${upper}_${lower}`;
+  }
+
+  function renderIKControls(rig) {
+    const bones = rig?.bones || [];
+    const options = bones.map(bone => [bone.id, bone.name || bone.id]);
+    selectOptions($('ikUpperBone'), options, $('ikUpperBone').value, 'Select upper bone');
+    selectOptions($('ikLowerBone'), options, $('ikLowerBone').value, 'Select lower bone');
+    const constraint = (rig?.constraints || []).find(item =>
+      item.type === 'ik_two_bone'
+      && item.upper_bone_id === $('ikUpperBone').value
+      && item.lower_bone_id === $('ikLowerBone').value);
+    if (constraint) {
+      $('ikTargetX').value = constraint.target.x;
+      $('ikTargetY').value = constraint.target.y;
+      $('ikBend').value = String(constraint.bend || 1);
+    }
+    const enabled = !!rig && bones.length >= 2;
+    for (const id of ['ikUpperBone', 'ikLowerBone', 'ikTargetX', 'ikTargetY', 'ikBend', 'ikApply', 'ikRemove']) {
+      $(id).disabled = !enabled;
+    }
+    $('ikStatus').textContent = constraint
+      ? `Saved target (${constraint.target.x}, ${constraint.target.y}) for this bone pair.`
+      : 'Choose two bones, set the end target, then save.';
+  }
+
+  function applyIKTarget() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    const upperBoneId = $('ikUpperBone').value;
+    const lowerBoneId = $('ikLowerBone').value;
+    const upper = rig.bones.find(bone => bone.id === upperBoneId);
+    const lower = rig.bones.find(bone => bone.id === lowerBoneId);
+    if (!upper || !lower || upper.id === lower.id) {
+      $('ikStatus').textContent = 'Choose two distinct bones.';
+      return;
+    }
+    const id = selectedIKId();
+    try {
+      const constraints = withTwoBoneIK(rig.constraints || [], {
+        id, upperBoneId, lowerBoneId,
+        targetX: Number($('ikTargetX').value),
+        targetY: Number($('ikTargetY').value),
+        bend: Number($('ikBend').value),
+      });
+      updateRig({ ...clone(rig), constraints });
+      $('ikStatus').textContent = 'IK target saved. It will be applied during procedural rig playback.';
+      toast('IK target saved.', 'ok');
+    } catch (error) {
+      $('ikStatus').textContent = error.message || 'Invalid IK target.';
+      toast(error.message || 'Invalid IK target.', 'err');
+    }
+  }
+
+  function removeIKTarget() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    const upperBoneId = $('ikUpperBone').value;
+    const lowerBoneId = $('ikLowerBone').value;
+    const constraints = (rig.constraints || []).filter(item => !(
+      item.type === 'ik_two_bone'
+      && item.upper_bone_id === upperBoneId
+      && item.lower_bone_id === lowerBoneId
+    ));
+    updateRig({ ...clone(rig), constraints });
+    $('ikStatus').textContent = 'IK target removed.';
+    toast('IK target removed.', 'ok');
+  }
+
   function renderRig() {
     if (!state.project) return;
     const characters = state.project.characters || [];
@@ -417,6 +534,8 @@ export function initStudioPanel({ onCharacterImported }) {
     if (!characters.some(character => character.id === selectedCharacterId)) {
       selectedCharacterId = characterOptions[0]?.[0] || '';
     }
+    // The viewport uses this selection to draw and drag the active rig's IK handles.
+    state.activeRigCharacterId = selectedCharacterId;
     selectOptions($('rigCharacter'), characterOptions, selectedCharacterId, 'Import or generate a character first');
     const character = characters.find(item => item.id === selectedCharacterId);
     const rigs = state.project.rigs || [];
@@ -431,6 +550,8 @@ export function initStudioPanel({ onCharacterImported }) {
     selectOptions($('bonePart'), partOptions, $('bonePart').value, 'No character parts');
     const boneOptions = (rig?.bones || []).map(bone => [bone.id, bone.name || bone.id]);
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
+    renderRotationLimitControls(rig);
+    renderIKControls(rig);
     renderSkinTools(rig);
     renderWalkControls(rig);
     renderTurnControls();
@@ -478,6 +599,7 @@ export function initStudioPanel({ onCharacterImported }) {
         const parentId = nextRig.bones.find(item => item.id === bone.id)?.parent_id || null;
         nextRig.bones = nextRig.bones.filter(item => item.id !== bone.id);
         nextRig.bones.forEach(item => { if (item.parent_id === bone.id) item.parent_id = parentId; });
+        nextRig.constraints = (nextRig.constraints || []).filter(item => item.bone_id !== bone.id && item.target_bone_id !== bone.id);
         updateRig(nextRig);
       };
       row.append(name, rotation, key, remove);
@@ -705,6 +827,18 @@ export function initStudioPanel({ onCharacterImported }) {
     });
   }
   $('boneAdd').onclick = addBone;
+  $('constraintBone').addEventListener('change', () => renderRotationLimitControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('rotationLimitEnabled').addEventListener('change', () => {
+    const active = $('rotationLimitEnabled').checked && !!$('constraintBone').value;
+    $('rotationLimitMin').disabled = !active;
+    $('rotationLimitMax').disabled = !active;
+    if (active) $('rotationLimitStatus').textContent = 'Set a minimum and maximum, then apply the constraint.';
+  });
+  $('rotationLimitApply').onclick = applyRotationLimit;
+  $('ikUpperBone').addEventListener('change', () => renderIKControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('ikLowerBone').addEventListener('change', () => renderIKControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('ikApply').onclick = applyIKTarget;
+  $('ikRemove').onclick = removeIKTarget;
   $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
   $('skinAssign').onclick = () => writeWeightedDrawing('assign');

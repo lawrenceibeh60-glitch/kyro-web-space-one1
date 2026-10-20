@@ -236,3 +236,16 @@ test('renderer projects a layer through keyframed perspective yaw', () => {
   assert.ok(Math.abs(points[0][0] - 160) < 1e-6);
   assert.ok(Math.abs(points[1][0] - 160) < 1e-6);
 });
+
+test('rotation-limit constraints clamp authored bone rotation before deforming artwork', () => {
+  const rig = {
+    bones: [{ id: 'arm', name: 'Arm', pivot: { x: 0, y: 0 }, rotation: 90 }],
+    constraints: [{ type: 'rotation_limit', bone_id: 'arm', min: -30, max: 30 }],
+  };
+  const result = deformStrokeForRig({
+    id: 'limited', points: [[10, 0]],
+    skin_weights: [[{ bone_id: 'arm', weight: 1 }]],
+  }, rig, 0);
+  assert.ok(Math.abs(result.points[0][0] - Math.cos(Math.PI / 6) * 10) < 1e-8);
+  assert.ok(Math.abs(result.points[0][1] - 5) < 1e-8);
+});

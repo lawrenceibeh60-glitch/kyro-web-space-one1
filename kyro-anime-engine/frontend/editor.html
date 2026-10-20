@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="css/editor/inspector.css">
 <link rel="stylesheet" href="css/editor/workspace.css">
 <link rel="stylesheet" href="css/editor/studio_panel.css">
+<link rel="stylesheet" href="css/editor/ai_studio.css">
 <link rel="stylesheet" href="css/editor/asset_browser.css">
 <link rel="stylesheet" href="css/animation/timeline.css">
 <link rel="stylesheet" href="css/animation/dope_sheet.css">
@@ -156,6 +157,23 @@
                 <div class="xrow n"><span>Pivot Y</span><input id="boneY" type="number" step="1"></div>
                 <button id="boneAdd">Add bone</button>
                 <div id="boneList" class="studio-list"></div>
+                <div class="grp-title">Joint constraints</div>
+                <div class="hint">Clamp a bone's local rotation during drawing deformation and playback. Limits are measured in degrees.</div>
+                <label class="fld"><span>Target bone</span><select id="constraintBone"></select></label>
+                <label class="chk"><input id="rotationLimitEnabled" type="checkbox"> Enable rotation limits</label>
+                <div class="xrow n"><span>Minimum °</span><input id="rotationLimitMin" type="number" min="-360" max="360" step="1" value="-90"></div>
+                <div class="xrow n"><span>Maximum °</span><input id="rotationLimitMax" type="number" min="-360" max="360" step="1" value="90"></div>
+                <button id="rotationLimitApply">Apply joint constraint</button>
+                <div id="rotationLimitStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Interactive two-bone IK target</div>
+                <div class="hint">Choose an upper/lower bone pair and set the end-effector target in project coordinates. The saved target is evaluated during procedural rig playback.</div>
+                <label class="fld"><span>Upper bone</span><select id="ikUpperBone"></select></label>
+                <label class="fld"><span>Lower bone</span><select id="ikLowerBone"></select></label>
+                <div class="xrow n"><span>Target X</span><input id="ikTargetX" type="number" step="1" value="0"></div>
+                <div class="xrow n"><span>Target Y</span><input id="ikTargetY" type="number" step="1" value="0"></div>
+                <label class="fld"><span>Bend direction</span><select id="ikBend"><option value="1">Positive</option><option value="-1">Negative</option></select></label>
+                <div class="xbtns"><button id="ikApply" class="primary">Save IK target</button><button id="ikRemove">Remove IK target</button></div>
+                <div id="ikStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Procedural walk cycle</div>
                 <div class="hint">Apply a reusable walk clip to this rig. Bone names identify head, torso, upper/lower arms, thighs, shins, and feet; foot-contact IK runs when both leg chains are available.</div>
                 <label class="chk"><input id="rigWalkEnabled" type="checkbox"> Enable walk cycle</label>
@@ -452,5 +470,6 @@
 <input id="jsonImportFile" type="file" accept=".json,application/json" multiple hidden>
 <div id="toasts" class="toasts"></div>
 <script type="module" src="js/editor/editor_controller.js"></script>
+<script type="module">import { initAIStudio } from "./js/ai_studio.js"; initAIStudio();</script>
 </body>
 </html>
