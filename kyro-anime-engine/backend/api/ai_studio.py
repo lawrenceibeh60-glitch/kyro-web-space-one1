@@ -2,6 +2,7 @@
 import json
 import math
 import os
+import uuid
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -197,6 +198,209 @@ def analyze_video_reference():
     reply, used_model = _chat_reply(result, model)
     return jsonify(analysis=reply, model=used_model, frames_analyzed=len(frames))
 
+
+
+
+def _parse_model_json(raw):
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1]
+        if cleaned.rstrip().endswith("```"):
+            cleaned = cleaned.rstrip()[:-3].strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        raise ApiError(502, "AI returned invalid structured data. Reduce the clip complexity and try again.") from exc
+
+
+def _validated_vector_frames(frames, width, height):
+    if not isinstance(frames, list) or not 2 <= len(frames) <= 6:
+        raise ApiError(422, "Reconstruction must contain between 2 and 6 sampled vector frames.")
+    output = []
+    total_strokes = 0
+    for fi, frame in enumerate(frames):
+        if not isinstance(frame, dict) or not isinstance(frame.get("strokes"), list):
+            raise ApiError(422, f"Vector frame {fi + 1} must contain a strokes array.")
+        strokes = []
+        if len(frame["strokes"]) > 24:
+            raise ApiError(422, f"Vector frame {fi + 1} exceeds the 24-stroke limit.")
+        for si, stroke in enumerate(frame["strokes"]):
+            if not isinstance(stroke, dict):
+                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} is invalid.")
+            color = stroke.get("color", "#222222")
+            width_norm = stroke.get("width", 3)
+            commands = stroke.get("commands")
+            closed = stroke.get("closed", False)
+            fill = stroke.get("fill")
+            if not isinstance(color, str) or not __import__("re").fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", color):
+                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid color.")
+            if isinstance(width_norm, bool) or not isinstance(width_norm, (int, float)) or not math.isfinite(width_norm) or not 0.25 <= width_norm <= 40:
+                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid width.")
+            if not isinstance(closed, bool):
+                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid closed flag.")
+            if fill is not None and (not isinstance(fill, str) or not __import__("re").fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", fill)):
+                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid fill color.")
+            if not isinstance(commands, list) or not 2 <= len(commands) <= 64:
+                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} must contain 2–64 path commands.")
+            checked_commands = []
+            for ci, command in enumerate(commands):
+                if not isinstance(command, list) or not command or command[0] not in ("M", "L", "Q", "C", "Z"):
+                    raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1}, command {ci + 1} is unsupported.")
+                kind = command[0]
+                arity = {"M": 3, "L": 3, "Q": 5, "C": 7, "Z": 1}[kind]
+                if len(command) != arity or (ci == 0 and kind != "M") or (ci > 0 and kind == "M"):
+                    raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has malformed path commands.")
+                converted = [kind]
+                for coordinate in command[1:]:
+                    if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)) or not math.isfinite(coordinate) or not 0 <= coordinate <= 1000:
+                        raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} coordinates must be normalized from 0 to 1000.")
+                    converted.append(round((coordinate / 1000) * (width if len(converted) % 2 == 1 else height), 2))
+                checked_commands.append(converted)
+            strokes.append({
+                "id": f"stroke_{fi + 1}_{si + 1}",
+                "tool": "pen",
+                "color": color,
+                "width": round(float(width_norm) * max(width, height) / 1000, 2),
+                "opacity": 1,
+                "closed": closed,
+                "fill": fill,
+                "commands": checked_commands,
+            })
+            total_strokes += 1
+            if total_strokes > 96:
+                raise ApiError(422, "Vector reconstruction exceeds the 96-stroke total limit.")
+        output.append({"timestamp_seconds": frame.get("timestamp_seconds", fi), "strokes": strokes})
+    return output
+
+
+@bp.post("/ai/video/reconstruction/plan")
+def plan_video_reconstruction():
+    """Convert sampled reference frames into a bounded, editable native vector-cel plan."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError(400, "Request body must be a JSON object")
+    frames = data.get("frames")
+    if not isinstance(frames, list) or not 2 <= len(frames) <= 6:
+        raise ApiError(400, "Provide between 2 and 6 sampled video frames.")
+    project = data.get("project")
+    if not isinstance(project, dict) or not isinstance(project.get("settings"), dict):
+        raise ApiError(400, "A current KAE project context is required.")
+    settings = project["settings"]
+    width, height = settings.get("width"), settings.get("height")
+    if not isinstance(width, int) or not isinstance(height, int) or not 16 <= width <= 8192 or not 16 <= height <= 8192:
+        raise ApiError(400, "Project canvas dimensions are invalid.")
+    key, base, model, _, _ = _config()
+    if not key:
+        raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
+    content = [{
+        "type": "text",
+        "text": (
+            "Create a rough but editable vector-animation reconstruction of the subject across these sampled frames. "
+            "Return ONLY JSON: {summary:string, frames:[{timestamp_seconds:number, strokes:[{color:'#RRGGBB',width:number,closed:boolean,fill:null|string,commands:array}]}]}. "
+            "Return exactly " + str(len(frames)) + " frames in the same order. Each frame may have 2 to 12 strokes. "
+            "Coordinates must be normalized to 0..1000 in both axes. Each commands array starts with ['M',x,y], "
+            "then uses ['L',x,y], ['Q',cx,cy,x,y], ['C',c1x,c1y,c2x,c2y,x,y], or ['Z']; maximum 30 commands per stroke. "
+            "Use clear contour paths and a small number of colors. Prefer continuous, stable contours between frames. "
+            "Do not output prose or markdown. This is an approximation, not pixel-perfect tracing.\n"
+            "Canvas aspect ratio: " + str(width) + ":" + str(height) + ".\n"
+            "Timestamps: " + json.dumps([f.get("timestamp_seconds") for f in frames if isinstance(f, dict)])
+        )
+    }]
+    for index, frame in enumerate(frames):
+        if not isinstance(frame, dict):
+            raise ApiError(400, f"Frame {index + 1} is invalid.")
+        image_data = frame.get("data_url")
+        if not isinstance(image_data, str) or not image_data.startswith("data:image/jpeg;base64,"):
+            raise ApiError(400, f"Frame {index + 1} must be a JPEG data URL.")
+        if len(image_data) > 1_000_000:
+            raise ApiError(413, f"Frame {index + 1} is too large; reduce the sample resolution.")
+        content.append({"type": "image_url", "image_url": {"url": image_data, "detail": "high"}})
+    result = _request_json(
+        f"{base}/chat/completions",
+        method="POST",
+        payload={"model": model, "messages": [
+            {"role": "system", "content": build_system_context(project)},
+            {"role": "user", "content": content},
+        ], "temperature": 0.1},
+        api_key=key,
+        timeout=180,
+    )
+    raw, used_model = _chat_reply(result, model)
+    plan = _parse_model_json(raw)
+    if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != len(frames):
+        raise ApiError(502, "AI reconstruction must return one vector frame for each sampled reference frame.")
+    validated_frames = _validated_vector_frames(plan["frames"], width, height)
+    return jsonify(
+        summary=str(plan.get("summary", "Editable vector reconstruction"))[:2000],
+        frames=validated_frames,
+        model=used_model,
+        canvas={"width": width, "height": height},
+        applied=False,
+    )
+
+
+@bp.post("/ai/video/reconstruction/apply")
+def apply_video_reconstruction():
+    """Add validated vector cels and a new exposure layer without replacing existing artwork."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError(400, "Request body must be a JSON object")
+    project_id, scene_id, plan = data.get("project_id"), data.get("scene_id"), data.get("plan")
+    if not isinstance(project_id, str) or not project_id.strip() or not isinstance(scene_id, str):
+        raise ApiError(400, "project_id and scene_id are required.")
+    if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list):
+        raise ApiError(400, "A reconstruction plan is required.")
+    project = project_repository.load(project_id)
+    settings = project.get("settings", {})
+    frames = _validated_vector_frames(plan["frames"], settings.get("width", 0), settings.get("height", 0))
+    if not 2 <= len(frames) <= 6:
+        raise ApiError(422, "Reconstruction must contain 2 to 6 frames.")
+    scene = next((s for s in project.get("scenes", []) if s.get("id") == scene_id), None)
+    if scene is None:
+        raise ApiError(404, "Target scene not found.")
+    duration = settings.get("duration_frames", 24)
+    if not isinstance(duration, int) or duration < len(frames):
+        raise ApiError(422, "Project duration must be at least the number of reconstructed frames.")
+    # Space samples across the project duration, preserving every existing layer.
+    positions = [round(i * (duration - 1) / (len(frames) - 1)) for i in range(len(frames))]
+    drawings = project.setdefault("drawings", {})
+    new_drawings, exposures = [], []
+    layer_id = "ai_video_" + uuid.uuid4().hex[:12]
+    for index, frame in enumerate(frames):
+        drawing_id = "ai_cel_" + uuid.uuid4().hex[:12]
+        drawing = {"id": drawing_id, "name": f"AI video reconstruction {index + 1}", "strokes": frame["strokes"]}
+        drawings[drawing_id] = drawing
+        end = positions[index + 1] if index + 1 < len(positions) else duration
+        exposures.append({"start": positions[index], "length": max(1, end - positions[index]), "drawing": drawing_id})
+        new_drawings.append(drawing_id)
+    scene.setdefault("layers", []).append({
+        "id": layer_id,
+        "name": "AI Video Reconstruction",
+        "type": "drawing",
+        "visible": True,
+        "locked": False,
+        "opacity": 1,
+        "depth": 1,
+        "blend": "normal",
+        "exposures": exposures,
+        "tracks": {},
+    })
+    from backend.services.validation_service import validate_project
+    errors = validate_project(project)
+    if errors:
+        # Do not write partially valid reconstruction data to disk.
+        raise ApiError(422, "Reconstruction failed native KAE project validation.", errors)
+    project_repository.save(project_id, project)
+    return jsonify(
+        applied=True,
+        project_id=project_id,
+        scene_id=scene_id,
+        layer_id=layer_id,
+        drawing_ids=new_drawings,
+        frames=len(frames),
+        keyframes=positions,
+        message="Added editable vector cels on a new layer. Existing layers and drawings were preserved.",
+    )
 
 
 @bp.post("/ai/animation/plan")
