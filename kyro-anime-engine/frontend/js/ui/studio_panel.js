@@ -8,6 +8,7 @@ import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weigh
 import { buildAutoRig } from '../animation/auto_rig.js';
 import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreography.js';
 import { withRotationLimit } from '../animation/rig_constraints.js';
+import { removeTwoBoneIK, withTwoBoneIK } from '../animation/rig_ik.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -454,6 +455,72 @@ export function initStudioPanel({ onCharacterImported }) {
     }
   }
 
+  function selectedIKId() {
+    const upper = $('ikUpperBone')?.value || '';
+    const lower = $('ikLowerBone')?.value || '';
+    return `ik_${upper}_${lower}`;
+  }
+
+  function renderIKControls(rig) {
+    const bones = rig?.bones || [];
+    const options = bones.map(bone => [bone.id, bone.name || bone.id]);
+    selectOptions($('ikUpperBone'), options, $('ikUpperBone').value, 'Select upper bone');
+    selectOptions($('ikLowerBone'), options, $('ikLowerBone').value, 'Select lower bone');
+    const constraint = (rig?.constraints || []).find(item =>
+      item.type === 'ik_two_bone'
+      && item.upper_bone_id === $('ikUpperBone').value
+      && item.lower_bone_id === $('ikLowerBone').value);
+    if (constraint) {
+      $('ikTargetX').value = constraint.target.x;
+      $('ikTargetY').value = constraint.target.y;
+      $('ikBend').value = String(constraint.bend || 1);
+    }
+    const enabled = !!rig && bones.length >= 2;
+    for (const id of ['ikUpperBone', 'ikLowerBone', 'ikTargetX', 'ikTargetY', 'ikBend', 'ikApply', 'ikRemove']) {
+      $(id).disabled = !enabled;
+    }
+    $('ikStatus').textContent = constraint
+      ? `Saved target (${constraint.target.x}, ${constraint.target.y}) for this bone pair.`
+      : 'Choose two bones, set the end target, then save.';
+  }
+
+  function applyIKTarget() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    const upperBoneId = $('ikUpperBone').value;
+    const lowerBoneId = $('ikLowerBone').value;
+    const upper = rig.bones.find(bone => bone.id === upperBoneId);
+    const lower = rig.bones.find(bone => bone.id === lowerBoneId);
+    if (!upper || !lower || upper.id === lower.id) {
+      $('ikStatus').textContent = 'Choose two distinct bones.';
+      return;
+    }
+    const id = selectedIKId();
+    try {
+      const constraints = withTwoBoneIK(rig.constraints || [], {
+        id, upperBoneId, lowerBoneId,
+        targetX: Number($('ikTargetX').value),
+        targetY: Number($('ikTargetY').value),
+        bend: Number($('ikBend').value),
+      });
+      updateRig({ ...clone(rig), constraints });
+      $('ikStatus').textContent = 'IK target saved. It will be applied during procedural rig playback.';
+      toast('IK target saved.', 'ok');
+    } catch (error) {
+      $('ikStatus').textContent = error.message || 'Invalid IK target.';
+      toast(error.message || 'Invalid IK target.', 'err');
+    }
+  }
+
+  function removeIKTarget() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    const constraints = removeTwoBoneIK(rig.constraints || [], selectedIKId());
+    updateRig({ ...clone(rig), constraints });
+    $('ikStatus').textContent = 'IK target removed.';
+    toast('IK target removed.', 'ok');
+  }
+
   function renderRig() {
     if (!state.project) return;
     const characters = state.project.characters || [];
@@ -759,6 +826,10 @@ export function initStudioPanel({ onCharacterImported }) {
     if (active) $('rotationLimitStatus').textContent = 'Set a minimum and maximum, then apply the constraint.';
   });
   $('rotationLimitApply').onclick = applyRotationLimit;
+  $('ikUpperBone').addEventListener('change', () => renderIKControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('ikLowerBone').addEventListener('change', () => renderIKControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('ikApply').onclick = applyIKTarget;
+  $('ikRemove').onclick = removeIKTarget;
   $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
   $('skinAssign').onclick = () => writeWeightedDrawing('assign');
