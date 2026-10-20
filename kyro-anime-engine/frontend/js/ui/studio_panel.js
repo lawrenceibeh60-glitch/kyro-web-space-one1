@@ -543,6 +543,7 @@ export function initStudioPanel({ onCharacterImported }) {
     const boneOptions = (rig?.bones || []).map(bone => [bone.id, bone.name || bone.id]);
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
     renderRotationLimitControls(rig);
+    renderIKControls(rig);
     renderSkinTools(rig);
     renderWalkControls(rig);
     renderTurnControls();
