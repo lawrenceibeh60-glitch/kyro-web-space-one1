@@ -38,3 +38,6 @@
   .ai-video-panel { padding:9px; }
   .ai-reference-video { max-height:22vh; }
 }
+
+.ai-plan-summary { margin:0; max-height:28vh; overflow:auto; padding:10px; border:1px solid var(--line,#343a44); background:#080a0e; color:var(--text,#e9edf2); white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.55 ui-monospace,monospace; }
+.ai-plan-summary[hidden] { display:none; }
