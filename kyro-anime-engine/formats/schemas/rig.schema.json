@@ -1,69 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "rig.schema.json",
-<<<<<<< Updated upstream
-  "title": "KAE 2D Character Rig",
-  "description": "A hierarchical 2D rotation rig attached to stable character-part IDs, with optional procedural clip playback.",
-  "type": "object",
-  "required": ["id", "name", "character_id", "bones"],
-=======
   "title": "Rig",
   "description": "Character rig with bones, constraints, and skinning weights.",
   "type": "object",
   "required": ["id", "character_id", "bones"],
->>>>>>> Stashed changes
+
   "additionalProperties": false,
   "properties": {
     "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "name": { "type": "string", "minLength": 1 },
     "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-<<<<<<< Updated upstream
-    "animation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "type": { "enum": ["walk"] },
-        "enabled": { "type": "boolean", "default": true },
-        "start_frame": { "type": "integer", "minimum": 0 },
-        "cycle_frames": { "type": "integer", "minimum": 4, "maximum": 240, "default": 24 },
-        "speed": { "type": "number", "minimum": 0.05, "maximum": 8, "default": 1 },
-        "stride": { "type": "number", "minimum": 0, "maximum": 100, "default": 24 },
-        "bob": { "type": "number", "minimum": 0, "maximum": 30, "default": 5 },
-        "weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
-        "loop": { "type": "boolean", "default": true }
-      }
-    },
-    "bones": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "name", "character_part_id", "pivot"],
-        "additionalProperties": false,
-        "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "name": { "type": "string", "minLength": 1 },
-          "parent_id": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "character_part_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "rotation": { "type": "number", "minimum": -3600, "maximum": 3600, "default": 0 },
-          "pivot": {
-            "type": "object",
-            "required": ["x", "y"],
-            "additionalProperties": false,
-            "properties": {
-              "x": { "type": "number", "minimum": -8192, "maximum": 8192 },
-              "y": { "type": "number", "minimum": -8192, "maximum": 8192 }
-            }
-          },
-          "tracks": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "rotation": { "$ref": "animation.schema.json#/$defs/track" }
-            }
-          }
-        }
-      }
-=======
     "bones": { "type": "array", "items": { "$ref": "#/$defs/bone" } },
     "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
   },
@@ -111,7 +58,7 @@
         "weight": { "type": "number", "minimum": 0, "maximum": 1 },
         "bend_direction": { "type": "integer", "enum": [-1, 1] }
       }
->>>>>>> Stashed changes
+
     }
   }
 }
