@@ -896,19 +896,14 @@ export function initStudioPanel({ onCharacterImported }) {
   $('weightRadius')?.addEventListener('input', event => {
     $('weightRadiusValue').textContent = event.target.value;
   });
-  bus.on('viewport:down', point => {
-    startIKTargetDrag(point);
-    if (!ikTargetDrag) startWeightPaint(point);
-  });
-  bus.on('viewport:move', point => {
-    if (ikTargetDrag) moveIKTargetDrag(point); else paintAt(point);
-  });
-  bus.on('viewport:up', () => {
-    if (ikTargetDrag) finishIKTargetDrag(true); else finishWeightPaint(true);
-  });
-  bus.on('viewport:cancel', () => {
-    if (ikTargetDrag) finishIKTargetDrag(false); else finishWeightPaint(false);
-  });
+  bus.on('viewport:down', point => startWeightPaint(point));
+  bus.on('viewport:move', point => paintAt(point));
+  bus.on('viewport:up', () => finishWeightPaint(true));
+  bus.on('viewport:cancel', () => finishWeightPaint(false));
+  bus.on('viewport:ik-down', point => startIKTargetDrag(point));
+  bus.on('viewport:ik-move', point => moveIKTargetDrag(point));
+  bus.on('viewport:ik-up', () => finishIKTargetDrag(true));
+  bus.on('viewport:ik-cancel', () => finishIKTargetDrag(false));
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && ikTargetDrag) finishIKTargetDrag(false);
   });
