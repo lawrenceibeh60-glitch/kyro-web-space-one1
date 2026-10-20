@@ -215,8 +215,8 @@ def _parse_model_json(raw):
 
 
 def _validated_vector_frames(frames, width, height, coordinates_normalized=True):
-    if not isinstance(frames, list) or not 2 <= len(frames) <= 6:
-        raise ApiError(422, "Reconstruction must contain between 2 and 6 sampled vector frames.")
+    if not isinstance(frames, list) or not 1 <= len(frames) <= 6:
+        raise ApiError(422, "Vector validation accepts between 1 and 6 sampled frames.")
     output = []
     total_strokes = 0
     for fi, frame in enumerate(frames):
