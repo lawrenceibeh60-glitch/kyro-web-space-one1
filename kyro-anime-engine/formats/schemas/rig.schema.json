@@ -4,61 +4,195 @@
   "title": "Rig",
   "description": "Character rig with bones, constraints, and skinning weights.",
   "type": "object",
-  "required": ["id", "character_id", "bones"],
-
+  "required": [
+    "id",
+    "character_id",
+    "bones"
+  ],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-    "name": { "type": "string", "minLength": 1 },
-    "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-    "bones": { "type": "array", "items": { "$ref": "#/$defs/bone" } },
-    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "character_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,64}$"
+    },
+    "bones": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/bone"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/constraint"
+      }
+    },
+    "animation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "walk"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cycle_frames": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 240
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 8
+        },
+        "stride": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "bob": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "loop": {
+          "type": "boolean"
+        }
+      }
+    }
   },
   "$defs": {
     "pivot": {
       "type": "object",
-      "required": ["x", "y"],
+      "required": [
+        "x",
+        "y"
+      ],
       "additionalProperties": false,
       "properties": {
-        "x": { "type": "number", "minimum": -8192, "maximum": 8192 },
-        "y": { "type": "number", "minimum": -8192, "maximum": 8192 }
+        "x": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "y": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        }
       }
     },
     "bone": {
       "type": "object",
-      "required": ["id", "name", "character_part_id", "pivot"],
+      "required": [
+        "id",
+        "name",
+        "character_part_id",
+        "pivot"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-        "name": { "type": "string" },
-        "character_part_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-        "parent_id": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-        "pivot": { "$ref": "#/$defs/pivot" },
-        "rotation": { "type": "number" },
-        "length": { "type": "number", "minimum": 0 },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "character_part_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "parent_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "pivot": {
+          "$ref": "#/$defs/pivot"
+        },
+        "rotation": {
+          "type": "number"
+        },
+        "length": {
+          "type": "number",
+          "minimum": 0
+        },
         "tracks": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "rotation": { "$ref": "animation.schema.json#/$defs/track" }
+            "rotation": {
+              "$ref": "animation.schema.json#/$defs/track"
+            }
           }
         }
       }
     },
     "constraint": {
       "type": "object",
-      "required": ["type", "bone_id"],
+      "required": [
+        "type",
+        "bone_id"
+      ],
       "additionalProperties": false,
       "properties": {
-        "type": { "enum": ["rotation_limit", "distance", "pin", "ik_two_bone"] },
-        "bone_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-        "target_bone_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-        "min": { "type": "number" },
-        "max": { "type": "number" },
-        "weight": { "type": "number", "minimum": 0, "maximum": 1 },
-        "bend_direction": { "type": "integer", "enum": [-1, 1] }
+        "type": {
+          "enum": [
+            "rotation_limit",
+            "distance",
+            "pin",
+            "ik_two_bone"
+          ]
+        },
+        "bone_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "target_bone_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "bend_direction": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        }
       }
-
     }
   }
 }
