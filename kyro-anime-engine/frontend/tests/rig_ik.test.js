@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applySavedIKConstraints, removeTwoBoneIK, solveTwoBoneIK, withTwoBoneIK } from '../js/animation/rig_ik.js';
+import { applySavedIKConstraints, findIKTargetAtPoint, moveIKTarget, removeTwoBoneIK, solveTwoBoneIK, withTwoBoneIK } from '../js/animation/rig_ik.js';
 
 test('two-bone IK solves a reachable target and reports the reachable endpoint', () => {
   const result = solveTwoBoneIK({ x: 0, y: 0 }, { x: 6, y: 8 }, 6, 6);
@@ -75,4 +75,28 @@ test('saving the same bone pair replaces an imported IK target instead of duplic
   });
   assert.equal(updated.filter(item => item.type === 'ik_two_bone').length, 1);
   assert.deepEqual(updated[0].target, { x: 30, y: 40 });
+});
+
+
+test('viewport hit testing picks the nearest enabled IK target within the handle radius', () => {
+  const rig = { constraints: [
+    { type: 'ik_two_bone', enabled: true, target: { x: 20, y: 20 } },
+    { type: 'ik_two_bone', enabled: true, target: { x: 10, y: 10 } },
+    { type: 'ik_two_bone', enabled: false, target: { x: 11, y: 11 } },
+    { type: 'pin', target: { x: 10, y: 10 } },
+  ] };
+  assert.equal(findIKTargetAtPoint(rig, { x: 10, y: 10 }, 5), 1);
+  assert.equal(findIKTargetAtPoint(rig, { x: 100, y: 100 }, 5), -1);
+});
+
+test('dragging an IK target is immutable and validates coordinates', () => {
+  const original = [
+    { type: 'ik_two_bone', target: { x: 1, y: 2 } },
+    { type: 'pin', bone_id: 'hand' },
+  ];
+  const moved = moveIKTarget(original, 0, 30, 40);
+  assert.deepEqual(original[0].target, { x: 1, y: 2 });
+  assert.deepEqual(moved[0].target, { x: 30, y: 40 });
+  assert.deepEqual(moved[1], original[1]);
+  assert.throws(() => moveIKTarget(original, 0, NaN, 4), /finite target coordinates/);
 });
