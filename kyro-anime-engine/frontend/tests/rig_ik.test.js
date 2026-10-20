@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { removeTwoBoneIK, solveTwoBoneIK, withTwoBoneIK } from '../js/animation/rig_ik.js';
+import { applySavedIKConstraints, removeTwoBoneIK, solveTwoBoneIK, withTwoBoneIK } from '../js/animation/rig_ik.js';
 
 test('two-bone IK solves a reachable target and reports the reachable endpoint', () => {
   const result = solveTwoBoneIK({ x: 0, y: 0 }, { x: 6, y: 8 }, 6, 6);
@@ -43,4 +43,23 @@ test('IK constraint validation rejects missing bones and invalid targets', () =>
   assert.throws(() => withTwoBoneIK([], {
     id: 'ik', upperBoneId: 'arm', lowerBoneId: 'elbow', targetX: Infinity, targetY: 2,
   }), /finite/);
+});
+
+test('saved IK target writes solved rotations into the procedural pose', () => {
+  const rig = {
+    bones: [
+      { id: 'upper', pivot: { x: 0, y: 0 } },
+      { id: 'lower', parent_id: 'upper', pivot: { x: 5, y: 0 } },
+      { id: 'hand', parent_id: 'lower', name: 'hand', pivot: { x: 9, y: 0 } },
+    ],
+    constraints: [{
+      type: 'ik_two_bone', id: 'arm-target', upper_bone_id: 'upper',
+      lower_bone_id: 'lower', target: { x: 4, y: 5 }, bend: 1, enabled: true,
+    }],
+  };
+  const pose = { bones: {} };
+  assert.equal(applySavedIKConstraints(rig, pose), pose);
+  assert.ok(Number.isFinite(pose.bones.upper));
+  assert.ok(Number.isFinite(pose.bones.lower));
+  assert.ok(Number.isFinite(pose.bones.hand));
 });
