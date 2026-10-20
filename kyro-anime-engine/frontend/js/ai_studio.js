@@ -77,10 +77,11 @@ export function initAIStudio() {
   const reconstruct = el('button', { type: 'button', disabled: '' }, 'Reconstruct editable vector cels');
   const applyReconstruction = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Add reconstruction as a new layer');
   const vectorSummary = el('pre', { class: 'ai-plan-summary', hidden: '' });
+  const vectorPreview = el('div', { class: 'ai-vector-preview', hidden: '' });
   const buildPlan = el('button', { type: 'button', disabled: '' }, 'Build transform-keyframe plan');
   const applyPlan = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Apply transform keyframes');
   const planSummary = el('pre', { class: 'ai-plan-summary', hidden: '' });
-  videoPanel.append(videoInput, video, videoMeta, analyze, sceneSelect, reconstruct, vectorSummary, applyReconstruction, buildPlan, planSummary, applyPlan);
+  videoPanel.append(videoInput, video, videoMeta, analyze, sceneSelect, reconstruct, vectorSummary, vectorPreview, applyReconstruction, buildPlan, planSummary, applyPlan);
 
   const stage = el('div', { class: 'ai-image-stage' });
   const image = el('img', { alt: 'Generated anime character preview', hidden: '' });
@@ -262,6 +263,33 @@ export function initAIStudio() {
   });
 
 
+  function renderVectorPreview(plan) {
+    vectorPreview.replaceChildren();
+    const ns = 'http://www.w3.org/2000/svg';
+    for (const [index, frame] of plan.frames.entries()) {
+      const card = el('div', { class: 'ai-vector-card' });
+      card.append(el('div', { class: 'ai-vector-label' }, 'CEL ' + (index + 1) + ' · ' + frame.strokes.length + ' strokes'));
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', '0 0 ' + plan.canvas.width + ' ' + plan.canvas.height);
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', 'Editable vector cel preview ' + (index + 1));
+      for (const stroke of frame.strokes) {
+        const path = document.createElementNS(ns, 'path');
+        path.setAttribute('d', stroke.commands.map(command => command.join(' ')).join(' '));
+        path.setAttribute('fill', stroke.fill || 'none');
+        path.setAttribute('stroke', stroke.color || '#222222');
+        path.setAttribute('stroke-width', String(stroke.width || 2));
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        path.setAttribute('vector-effect', 'non-scaling-stroke');
+        svg.append(path);
+      }
+      card.append(svg);
+      vectorPreview.append(card);
+    }
+    vectorPreview.hidden = false;
+  }
+
   reconstruct.addEventListener('click', async () => {
     if (!currentProject?.id) {
       status.textContent = 'Open a saved KAE project before reconstructing vector cels.';
@@ -296,6 +324,7 @@ export function initAIStudio() {
         '\nEditable cels: ' + result.frames.length + '\n\n' + frameLines.join('\n') +
         '\n\nThis is a vector approximation. Review before adding it to your project.';
       vectorSummary.hidden = false;
+      renderVectorPreview(result);
       applyReconstruction.disabled = !result.frames.length;
       addMessage('assistant', 'Vector reconstruction plan is ready: ' + result.frames.length +
         ' editable cels. Review the preview summary. Nothing has been added to the project yet.');
@@ -304,6 +333,8 @@ export function initAIStudio() {
       currentVectorPlan = null;
       vectorSummary.textContent = 'Reconstruction failed: ' + error.message;
       vectorSummary.hidden = false;
+      vectorPreview.replaceChildren();
+      vectorPreview.hidden = true;
       applyReconstruction.disabled = true;
       status.textContent = 'Could not reconstruct vector cels: ' + error.message;
     } finally {
