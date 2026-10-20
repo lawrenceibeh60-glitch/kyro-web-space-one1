@@ -7,6 +7,7 @@ import { toLocal } from '../rendering/geometry.js';
 import { paintBoneInfluence, nearestBoneInfluence } from '../animation/rig_weights.js';
 import { buildAutoRig } from '../animation/auto_rig.js';
 import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreography.js';
+import { withRotationLimit } from '../animation/rig_constraints.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
 import { pathCoordinateCount } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
@@ -410,6 +411,49 @@ export function initStudioPanel({ onCharacterImported }) {
     }
   }
 
+  function renderRotationLimitControls(rig) {
+    const select = $('constraintBone');
+    const bones = rig?.bones || [];
+    selectOptions(select, bones.map(bone => [bone.id, bone.name || bone.id]), select.value, 'Add a bone first');
+    const bone = bones.find(item => item.id === select.value);
+    const constraint = (rig?.constraints || []).find(item => item.type === 'rotation_limit' && item.bone_id === bone?.id);
+    $('rotationLimitEnabled').checked = !!constraint;
+    $('rotationLimitMin').value = constraint?.min ?? -90;
+    $('rotationLimitMax').value = constraint?.max ?? 90;
+    const enabled = !!rig && !!bone;
+    select.disabled = !enabled;
+    $('rotationLimitEnabled').disabled = !enabled;
+    $('rotationLimitMin').disabled = !enabled || !constraint && !$('rotationLimitEnabled').checked;
+    $('rotationLimitMax').disabled = !enabled || !constraint && !$('rotationLimitEnabled').checked;
+    $('rotationLimitApply').disabled = !enabled;
+    $('rotationLimitStatus').textContent = !bone
+      ? 'Create a rig and add a bone to configure joint limits.'
+      : constraint
+        ? `Rotation limited to ${constraint.min}° … ${constraint.max}°.`
+        : 'No rotation limit is active for this bone.';
+  }
+
+  function applyRotationLimit() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const boneId = $('constraintBone').value;
+    if (!rig || !boneId) return;
+    const enabled = $('rotationLimitEnabled').checked;
+    try {
+      const constraints = withRotationLimit(
+        rig.constraints || [], boneId, enabled,
+        Number($('rotationLimitMin').value), Number($('rotationLimitMax').value), 1,
+      );
+      updateRig({ ...clone(rig), constraints });
+      $('rotationLimitStatus').textContent = enabled
+        ? `Rotation limit applied: ${Number($('rotationLimitMin').value)}° … ${Number($('rotationLimitMax').value)}°.`
+        : 'Rotation limit removed.';
+      toast(enabled ? 'Joint rotation limit applied.' : 'Joint rotation limit removed.', 'ok');
+    } catch (error) {
+      $('rotationLimitStatus').textContent = error.message || 'Invalid rotation limit.';
+      toast(error.message || 'Invalid rotation limit.', 'err');
+    }
+  }
+
   function renderRig() {
     if (!state.project) return;
     const characters = state.project.characters || [];
@@ -431,6 +475,7 @@ export function initStudioPanel({ onCharacterImported }) {
     selectOptions($('bonePart'), partOptions, $('bonePart').value, 'No character parts');
     const boneOptions = (rig?.bones || []).map(bone => [bone.id, bone.name || bone.id]);
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
+    renderRotationLimitControls(rig);
     renderSkinTools(rig);
     renderWalkControls(rig);
     renderTurnControls();
@@ -478,6 +523,7 @@ export function initStudioPanel({ onCharacterImported }) {
         const parentId = nextRig.bones.find(item => item.id === bone.id)?.parent_id || null;
         nextRig.bones = nextRig.bones.filter(item => item.id !== bone.id);
         nextRig.bones.forEach(item => { if (item.parent_id === bone.id) item.parent_id = parentId; });
+        nextRig.constraints = (nextRig.constraints || []).filter(item => item.bone_id !== bone.id && item.target_bone_id !== bone.id);
         updateRig(nextRig);
       };
       row.append(name, rotation, key, remove);
@@ -705,6 +751,9 @@ export function initStudioPanel({ onCharacterImported }) {
     });
   }
   $('boneAdd').onclick = addBone;
+  $('constraintBone').addEventListener('change', () => renderRotationLimitControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('rotationLimitEnabled').addEventListener('change', () => renderRotationLimitControls((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)));
+  $('rotationLimitApply').onclick = applyRotationLimit;
   $('skinWeight').oninput = event => { $('skinWeightValue').textContent = Number(event.target.value).toFixed(2); };
   $('skinAutoWeight').onclick = () => writeWeightedDrawing('auto');
   $('skinAssign').onclick = () => writeWeightedDrawing('assign');
