@@ -1,5 +1,7 @@
-"""backend/app/middleware.py - JSON error handling + no-cache for dev."""
+"""KAE request middleware: API errors, optional HTTP Basic auth, and no-cache."""
+import hmac
 import logging
+import os
 
 from flask import jsonify, request
 from werkzeug.exceptions import HTTPException
@@ -14,6 +16,24 @@ def _is_api():
 
 
 def install(app):
+    @app.before_request
+    def _require_access_password():
+        expected = os.environ.get("KAE_ACCESS_PASSWORD", "").strip()
+        # Local development remains frictionless; hosted deployments should set this.
+        if not expected or request.path == "/api/health":
+            return None
+
+        auth = request.authorization
+        supplied = auth.password if auth and auth.type.lower() == "basic" else ""
+        username = auth.username if auth and auth.type.lower() == "basic" else ""
+        if username == "kae" and hmac.compare_digest(supplied or "", expected):
+            return None
+
+        response = jsonify(error="Authentication required", details=["Sign in to access KYRO Animation Engine."])
+        response.status_code = 401
+        response.headers["WWW-Authenticate"] = 'Basic realm="KYRO Animation Engine", charset="UTF-8"'
+        return response
+
     @app.errorhandler(ApiError)
     def _api_error(e):
         return jsonify(error=e.message, details=e.details), e.status
