@@ -63,3 +63,16 @@ test('saved IK target writes solved rotations into the procedural pose', () => {
   assert.ok(Number.isFinite(pose.bones.lower));
   assert.ok(Number.isFinite(pose.bones.hand));
 });
+
+test('saving the same bone pair replaces an imported IK target instead of duplicating it', () => {
+  const imported = [{
+    type: 'ik_two_bone', id: 'legacy-target', upper_bone_id: 'upper',
+    lower_bone_id: 'lower', target: { x: 1, y: 2 }, bend: 1, enabled: true,
+  }];
+  const updated = withTwoBoneIK(imported, {
+    id: 'ik_upper_lower', upperBoneId: 'upper', lowerBoneId: 'lower',
+    targetX: 30, targetY: 40, bend: -1,
+  });
+  assert.equal(updated.filter(item => item.type === 'ik_two_bone').length, 1);
+  assert.deepEqual(updated[0].target, { x: 30, y: 40 });
+});
