@@ -239,6 +239,16 @@ export function initViewport(canvas) {
     bus.emit('project:changed');
   }
 
+  function cancelIKDrag() {
+    if (!ikDrag) return;
+    const activeDrag = ikDrag;
+    ikDrag = null;
+    ptrs.delete(activeDrag.pointerId);
+    const rig = state.project?.rigs?.[activeDrag.rigIndex];
+    if (rig) rig.constraints = activeDrag.originalConstraints;
+    bus.emit('project:changed');
+  }
+
   function sampleColor(worldX, worldY) {
     const v = state.view, scene = state.project?.scenes.find(s => s.id === state.sceneId);
     const camera = evaluateCamera(scene?.camera, state.frame);
@@ -373,6 +383,12 @@ export function initViewport(canvas) {
   };
   canvas.addEventListener('pointerup', end);
   canvas.addEventListener('pointercancel', end);
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && ikDrag) {
+      e.preventDefault();
+      cancelIKDrag();
+    }
+  });
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 
   canvas.addEventListener('wheel', e => {
