@@ -213,7 +213,7 @@ def _parse_model_json(raw):
         raise ApiError(502, "AI returned invalid structured data. Reduce the clip complexity and try again.") from exc
 
 
-def _validated_vector_frames(frames, width, height):
+def _validated_vector_frames(frames, width, height, coordinates_normalized=True):
     if not isinstance(frames, list) or not 2 <= len(frames) <= 6:
         raise ApiError(422, "Reconstruction must contain between 2 and 6 sampled vector frames.")
     output = []
@@ -234,7 +234,7 @@ def _validated_vector_frames(frames, width, height):
             fill = stroke.get("fill")
             if not isinstance(color, str) or not __import__("re").fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", color):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid color.")
-            if isinstance(width_norm, bool) or not isinstance(width_norm, (int, float)) or not math.isfinite(width_norm) or not 0.25 <= width_norm <= 40:
+            if isinstance(width_norm, bool) or not isinstance(width_norm, (int, float)) or not math.isfinite(width_norm) or not 0.25 <= width_norm <= (40 if coordinates_normalized else max(width, height) * 0.04):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid width.")
             if not isinstance(closed, bool):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid closed flag.")
@@ -252,15 +252,15 @@ def _validated_vector_frames(frames, width, height):
                     raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has malformed path commands.")
                 converted = [kind]
                 for coordinate in command[1:]:
-                    if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)) or not math.isfinite(coordinate) or not 0 <= coordinate <= 1000:
+                    if isinstance(coordinate, bool) or not isinstance(coordinate, (int, float)) or not math.isfinite(coordinate) or not 0 <= coordinate <= (1000 if coordinates_normalized else (width if len(converted) % 2 == 1 else height)):
                         raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} coordinates must be normalized from 0 to 1000.")
-                    converted.append(round((coordinate / 1000) * (width if len(converted) % 2 == 1 else height), 2))
+                    converted.append(round((coordinate / 1000) * (width if len(converted) % 2 == 1 else height), 2) if coordinates_normalized else round(float(coordinate), 2))
                 checked_commands.append(converted)
             strokes.append({
                 "id": f"stroke_{fi + 1}_{si + 1}",
                 "tool": "pen",
                 "color": color,
-                "width": round(float(width_norm) * max(width, height) / 1000, 2),
+                "width": round(float(width_norm) * max(width, height) / 1000, 2) if coordinates_normalized else round(float(width_norm), 2),
                 "opacity": 1,
                 "closed": closed,
                 "fill": fill,
@@ -352,7 +352,7 @@ def apply_video_reconstruction():
         raise ApiError(400, "A reconstruction plan is required.")
     project = project_repository.load(project_id)
     settings = project.get("settings", {})
-    frames = _validated_vector_frames(plan["frames"], settings.get("width", 0), settings.get("height", 0))
+    frames = _validated_vector_frames(plan["frames"], settings.get("width", 0), settings.get("height", 0), coordinates_normalized=False)
     if not 2 <= len(frames) <= 6:
         raise ApiError(422, "Reconstruction must contain 2 to 6 frames.")
     scene = next((s for s in project.get("scenes", []) if s.get("id") == scene_id), None)
