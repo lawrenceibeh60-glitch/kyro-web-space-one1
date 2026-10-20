@@ -307,7 +307,7 @@ def plan_video_reconstruction():
             "Use clear contour paths and a small number of colors. Prefer continuous, stable contours between frames. "
             "Do not output prose or markdown. This is an approximation, not pixel-perfect tracing.\n"
             "Canvas aspect ratio: " + str(width) + ":" + str(height) + ".\n"
-            "Timestamps: " + json.dumps([f.get("timestamp_seconds") for f in frames if isinstance(f, dict)]) + "\\n"
+            "Timestamps: " + json.dumps([f.get("timestamp_seconds") for f in frames if isinstance(f, dict)]) + "\n"
             "ARTIST'S CREATIVE DIRECTION: " + (direction.strip() or "Stay faithful to the reference action and design.")
         )
     }]
