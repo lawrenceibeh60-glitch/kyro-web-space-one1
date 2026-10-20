@@ -1,7 +1,7 @@
 // 2D linear-blend skinning for point strokes and vector path control points.
 import { evaluateTrack } from './interpolation.js';
 
-function rotationOf(bone, frame, pose) {
+function rotationOf(rig, bone, frame, pose) {
   const base = bone.tracks?.rotation?.length
     ? evaluateTrack(bone.tracks.rotation, frame)
     : (bone.rotation ?? 0);
@@ -30,7 +30,7 @@ function transformPoint(point, chain, frame, pose) {
   let result = { x: point[0], y: point[1] };
   for (const bone of chain) {
     if (!bone.pivot || !Number.isFinite(bone.pivot.x) || !Number.isFinite(bone.pivot.y)) continue;
-    result = rotateAround(result, bone.pivot, rotationOf(bone, frame, pose));
+    result = rotateAround(result, bone.pivot, rotationOf(rig, bone, frame, pose));
   }
   return result;
 }
