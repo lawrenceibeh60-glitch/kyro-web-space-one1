@@ -367,7 +367,7 @@ def apply_video_reconstruction():
     if not isinstance(duration, int) or duration < len(frames):
         raise ApiError(422, "Project duration must be at least the number of reconstructed frames.")
     # Space samples across the project duration, preserving every existing layer.
-    positions = [round(i * (duration - 1) / (len(frames) - 1)) for i in range(len(frames))]
+    positions = [int(i * duration / len(frames)) for i in range(len(frames))]
     drawings = project.setdefault("drawings", {})
     new_drawings, exposures = [], []
     layer_id = "ai_video_" + uuid.uuid4().hex[:12]
