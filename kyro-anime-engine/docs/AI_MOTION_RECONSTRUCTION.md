@@ -29,6 +29,34 @@ Video analysis:
 }
 ```
 
+Vector reconstruction plan generation:
+
+```json
+{
+  "frames": [
+    { "timestamp_seconds": 0.0, "data_url": "data:image/jpeg;base64,..." },
+    { "timestamp_seconds": 0.5, "data_url": "data:image/jpeg;base64,..." }
+  ],
+  "project": {
+    "id": "example",
+    "settings": { "width": 1920, "height": 1080, "fps": 24, "duration_frames": 120 }
+  },
+  "direction": "Keep the original silhouette, make the landing feel heavier, and use a clean dark outline."
+}
+```
+
+The returned vector plan is reviewable and contains native path commands normalized to canvas dimensions. Apply it only after review:
+
+```json
+{
+  "project_id": "example",
+  "scene_id": "scene_main",
+  "plan": { "frames": ["... validated vector cel data ..."] }
+}
+```
+
+The apply route creates new drawing IDs and a new drawing layer, assigns exposure spans, validates the complete project, and saves only if native validation succeeds. Existing drawings and layers are preserved.
+
 Animation plan generation:
 
 ```json
