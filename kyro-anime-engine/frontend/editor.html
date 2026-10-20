@@ -157,6 +157,14 @@
                 <div class="xrow n"><span>Pivot Y</span><input id="boneY" type="number" step="1"></div>
                 <button id="boneAdd">Add bone</button>
                 <div id="boneList" class="studio-list"></div>
+                <div class="grp-title">Joint constraints</div>
+                <div class="hint">Clamp a bone's local rotation during drawing deformation and playback. Limits are measured in degrees.</div>
+                <label class="fld"><span>Target bone</span><select id="constraintBone"></select></label>
+                <label class="chk"><input id="rotationLimitEnabled" type="checkbox"> Enable rotation limits</label>
+                <div class="xrow n"><span>Minimum °</span><input id="rotationLimitMin" type="number" min="-360" max="360" step="1" value="-90"></div>
+                <div class="xrow n"><span>Maximum °</span><input id="rotationLimitMax" type="number" min="-360" max="360" step="1" value="90"></div>
+                <button id="rotationLimitApply">Apply joint constraint</button>
+                <div id="rotationLimitStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Procedural walk cycle</div>
                 <div class="hint">Apply a reusable walk clip to this rig. Bone names identify head, torso, upper/lower arms, thighs, shins, and feet; foot-contact IK runs when both leg chains are available.</div>
                 <label class="chk"><input id="rigWalkEnabled" type="checkbox"> Enable walk cycle</label>
