@@ -9,6 +9,7 @@ _SCHEMA_NAMES = (
     "animation.schema.json",
     "character.schema.json",
     "drawing.schema.json",
+    "effects.schema.json",
     "path.schema.json",
     "project.schema.json",
     "rig.schema.json",
