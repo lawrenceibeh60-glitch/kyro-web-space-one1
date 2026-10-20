@@ -239,7 +239,9 @@ export function initAIStudio() {
       history.push({ role: 'user', content: 'Reference video analysis follows. Use it as the source of truth for later reconstruction requests:\n' + analysis });
       history.push({ role: 'assistant', content: analysis });
       status.textContent = 'Analysis complete. Tell KAE what you want changed, then discuss the reconstruction plan.';
-      input.value = 'I have reviewed the analysis. Ask me what creative changes I want before planning the reconstruction.';
+      addMessage('assistant', 'What creative changes would you like before I build a keyframe plan for the existing KAE layers?');
+      input.value = '';
+      input.placeholder = 'Tell KAE what to change in the motion before building the plan…';
       input.focus();
     } catch (error) {
       status.textContent = 'Video analysis failed: ' + error.message;
