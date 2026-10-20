@@ -1,7 +1,7 @@
 import { request } from './api/client.js';
 
 const history = [];
-let reference = null, imageUrl = null, videoUrl = null, currentProject = null, latestVideoAnalysis = '', currentPlan = null;
+let reference = null, imageUrl = null, videoUrl = null, currentProject = null, latestVideoAnalysis = '', currentPlan = null, latestSampledFrames = null, currentVectorPlan = null;
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -72,11 +72,15 @@ export function initAIStudio() {
   const videoInput = el('input', { type: 'file', accept: 'video/mp4,video/webm,video/quicktime,video/*', 'aria-label': 'Choose reference video' });
   const video = el('video', { class: 'ai-reference-video', controls: '', playsinline: '', preload: 'metadata', hidden: '' });
   const videoMeta = el('div', { class: 'ai-note' }, 'Choose a short reference clip. KAE samples up to 6 frames in your browser; the original video file is not sent to xKiro.');
+  const sceneSelect = el('select', { class: 'ai-scene-select', 'aria-label': 'Scene for vector reconstruction' });
   const analyze = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Analyze reference video');
-  const buildPlan = el('button', { type: 'button', disabled: '' }, 'Build keyframe plan from my instructions');
-  const applyPlan = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Apply keyframes to current project');
+  const reconstruct = el('button', { type: 'button', disabled: '' }, 'Reconstruct editable vector cels');
+  const applyReconstruction = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Add reconstruction as a new layer');
+  const vectorSummary = el('pre', { class: 'ai-plan-summary', hidden: '' });
+  const buildPlan = el('button', { type: 'button', disabled: '' }, 'Build transform-keyframe plan');
+  const applyPlan = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Apply transform keyframes');
   const planSummary = el('pre', { class: 'ai-plan-summary', hidden: '' });
-  videoPanel.append(videoInput, video, videoMeta, analyze, buildPlan, planSummary, applyPlan);
+  videoPanel.append(videoInput, video, videoMeta, analyze, sceneSelect, reconstruct, vectorSummary, applyReconstruction, buildPlan, planSummary, applyPlan);
 
   const stage = el('div', { class: 'ai-image-stage' });
   const image = el('img', { alt: 'Generated anime character preview', hidden: '' });
@@ -105,6 +109,8 @@ export function initAIStudio() {
     analyze.disabled = value || !videoInput.files?.[0];
     buildPlan.disabled = value || !latestVideoAnalysis || !currentProject?.id;
     applyPlan.disabled = value || !currentPlan?.ops?.length;
+    reconstruct.disabled = value || !currentProject?.id || !videoInput.files?.[0];
+    applyReconstruction.disabled = value || !currentVectorPlan?.frames?.length;
   }
 
   async function ask() {
@@ -227,12 +233,16 @@ export function initAIStudio() {
     addMessage('user', 'Analyze reference video: ' + videoInput.files[0].name);
     try {
       const frames = await sampleVideoFrames();
+      latestSampledFrames = frames;
       status.textContent = 'Sending ' + frames.length + ' sampled frames for motion analysis…';
       const result = await request('POST', '/api/ai/video/analyze', { frames, project: projectSummary() });
       const analysis = result.analysis || 'The model returned no analysis.';
       addMessage('assistant', 'REFERENCE ANALYSIS (' + result.frames_analyzed + ' frames)\n\n' + analysis);
       latestVideoAnalysis = analysis;
       currentPlan = null;
+      currentVectorPlan = null;
+      vectorSummary.hidden = true;
+      applyReconstruction.disabled = true;
       planSummary.hidden = true;
       applyPlan.disabled = true;
       buildPlan.disabled = !currentProject?.id;
@@ -251,6 +261,73 @@ export function initAIStudio() {
     }
   });
 
+
+  reconstruct.addEventListener('click', async () => {
+    if (!currentProject?.id) {
+      status.textContent = 'Open a saved KAE project before reconstructing vector cels.';
+      return;
+    }
+    const selectedScene = sceneSelect.value;
+    if (!selectedScene) {
+      status.textContent = 'Choose a target scene for the new reconstruction layer.';
+      return;
+    }
+    setBusy(true);
+    status.textContent = 'Sampling the reference locally and asking the vision model for editable vector contours…';
+    try {
+      if (!latestSampledFrames) latestSampledFrames = await sampleVideoFrames();
+      const result = await request('POST', '/api/ai/video/reconstruction/plan', {
+        frames: latestSampledFrames,
+        project: projectSummary(),
+      });
+      currentVectorPlan = result;
+      const frameLines = result.frames.map((frame, index) =>
+        'Cel ' + (index + 1) + ': ' + frame.strokes.length + ' editable strokes' +
+        ' · source ' + Number(frame.timestamp_seconds || 0).toFixed(2) + 's'
+      );
+      vectorSummary.textContent = result.summary + '\nCanvas: ' + result.canvas.width + ' × ' + result.canvas.height +
+        '\nEditable cels: ' + result.frames.length + '\n\n' + frameLines.join('\n') +
+        '\n\nThis is a vector approximation. Review before adding it to your project.';
+      vectorSummary.hidden = false;
+      applyReconstruction.disabled = !result.frames.length;
+      addMessage('assistant', 'Vector reconstruction plan is ready: ' + result.frames.length +
+        ' editable cels. Review the preview summary. Nothing has been added to the project yet.');
+      status.textContent = 'Vector plan ready. Applying will add new drawings and a new layer, preserving existing art.';
+    } catch (error) {
+      currentVectorPlan = null;
+      vectorSummary.textContent = 'Reconstruction failed: ' + error.message;
+      vectorSummary.hidden = false;
+      applyReconstruction.disabled = true;
+      status.textContent = 'Could not reconstruct vector cels: ' + error.message;
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  applyReconstruction.addEventListener('click', async () => {
+    if (!currentVectorPlan?.frames?.length || !currentProject?.id || !sceneSelect.value) return;
+    if (!confirm('Add ' + currentVectorPlan.frames.length + ' editable vector cels to a NEW layer in the selected scene? Existing drawings and layers will be preserved.')) return;
+    setBusy(true);
+    status.textContent = 'Validating and adding native vector drawings to the saved KAE project…';
+    try {
+      const result = await request('POST', '/api/ai/video/reconstruction/apply', {
+        project_id: currentProject.id,
+        scene_id: sceneSelect.value,
+        plan: currentVectorPlan,
+      });
+      currentProject = await request('GET', '/api/projects/' + encodeURIComponent(currentProject.id));
+      currentVectorPlan = null;
+      applyReconstruction.disabled = true;
+      addMessage('assistant', 'Added ' + result.frames + ' editable vector cels to a new layer (' + result.layer_id +
+        '). Existing art was preserved. Reload the editor to refresh the scene and timeline.');
+      status.textContent = 'Reconstruction added to a new layer. Reload the editor to see the vector cels.';
+    } catch (error) {
+      status.textContent = 'Could not apply reconstruction: ' + error.message;
+      addMessage('assistant', 'Apply failed: ' + error.message);
+    } finally {
+      setBusy(false);
+    }
+  });
 
   buildPlan.addEventListener('click', async () => {
     const direction = input.value.trim();
@@ -392,6 +469,13 @@ export function initAIStudio() {
 
   addMessage('assistant', 'I am connected to KAE’s capability inventory and native project schemas. Upload a reference video to analyze its sampled frames, then tell me your creative changes. I will distinguish supported operations from features that still need implementation.');
   loadCurrentProject().finally(() => {
+    sceneSelect.replaceChildren();
+    const scenes = Array.isArray(currentProject?.scenes) ? currentProject.scenes : [];
+    for (const scene of scenes) {
+      sceneSelect.append(el('option', { value: scene.id }, scene.name || scene.id));
+    }
+    sceneSelect.disabled = !scenes.length;
+    if (!scenes.length) sceneSelect.append(el('option', { value: '' }, 'Open a project with a scene first'));
     setBusy(false);
     request('GET', '/api/ai/status').then(result => {
       status.textContent = result.configured
