@@ -239,7 +239,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid width.")
             if not isinstance(closed, bool):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid closed flag.")
-            if fill is not None and (not isinstance(fill, str) or not __import__("re").fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", fill)):
+            if fill is not None and (not isinstance(fill, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", fill)):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid fill color.")
             if not isinstance(commands, list) or not 2 <= len(commands) <= 64:
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} must contain 2–64 path commands.")
