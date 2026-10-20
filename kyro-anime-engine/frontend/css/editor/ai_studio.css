@@ -45,3 +45,10 @@
 .ai-scene-select { width:100%; min-width:0; padding:9px; border:1px solid var(--line,#343a44); background:#11151b; color:var(--text,#e9edf2); font:12px/1.4 ui-monospace,monospace; }
 .ai-scene-select:disabled { opacity:.55; }
 .ai-video-panel button:focus-visible,.ai-scene-select:focus-visible { outline:2px solid var(--accent,#e8c547); outline-offset:2px; }
+
+.ai-vector-preview { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; max-height:34vh; overflow:auto; }
+.ai-vector-preview[hidden] { display:none; }
+.ai-vector-card { min-width:0; padding:7px; border:1px solid var(--line,#343a44); background:#090c10; }
+.ai-vector-label { margin-bottom:6px; color:var(--muted,#9aa4b2); font:10px/1.4 ui-monospace,monospace; }
+.ai-vector-card svg { display:block; width:100%; max-height:180px; aspect-ratio:16/9; background:#f2f0e9; }
+@media(max-width:520px) { .ai-vector-preview { grid-template-columns:minmax(0,1fr); max-height:28vh; } }
