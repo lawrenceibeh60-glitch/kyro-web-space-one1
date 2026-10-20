@@ -1,7 +1,7 @@
 import { request } from './api/client.js';
 
 const history = [];
-let reference = null, imageUrl = null;
+let reference = null, imageUrl = null, videoUrl = null, currentProject = null;
 
 function el(tag, attrs = {}, text = '') {
   const node = document.createElement(tag);
@@ -15,29 +15,66 @@ function el(tag, attrs = {}, text = '') {
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+function projectSummary() {
+  if (!currentProject) return null;
+  return {
+    id: currentProject.id,
+    name: currentProject.name,
+    version: currentProject.version,
+    settings: currentProject.settings || {},
+    scenes: Array.isArray(currentProject.scenes) ? currentProject.scenes.map(scene => ({
+      id: scene.id, name: scene.name,
+      layer_count: Array.isArray(scene.layers) ? scene.layers.length : 0,
+    })) : [],
+    drawings: currentProject.drawings && typeof currentProject.drawings === 'object'
+      ? Object.fromEntries(Object.keys(currentProject.drawings).slice(0, 100).map(id => [id, true])) : {},
+    characters: Array.isArray(currentProject.characters) ? currentProject.characters.slice(0, 100).map(c => ({ id: c.id, name: c.name })) : [],
+    rigs: Array.isArray(currentProject.rigs) ? currentProject.rigs.slice(0, 100).map(r => ({ id: r.id, name: r.name })) : [],
+  };
+}
+
+async function loadCurrentProject() {
+  const projectId = new URLSearchParams(location.search).get('project');
+  if (!projectId) return;
+  try {
+    currentProject = await request('GET', '/api/projects/' + encodeURIComponent(projectId));
+  } catch (_) {
+    currentProject = null;
+  }
+}
+
 export function initAIStudio() {
   if (document.getElementById('aiStudio')) return;
-  const launch = el('button', { id: 'aiLaunch', class: 'ai-launch', title: 'Open AI character studio' }, 'AI Studio');
+  const launch = el('button', { id: 'aiLaunch', class: 'ai-launch', title: 'Open integrated KAE AI workspace' }, 'AI Workspace');
   document.querySelector('.topbar .spacer')?.after(launch);
   const root = el('section', { id: 'aiStudio', class: 'ai-studio', hidden: '' });
   const side = el('div', { class: 'ai-side' }), head = el('header', { class: 'ai-head' });
-  head.append(el('span', {}, 'KAE / AI CHARACTER STUDIO'));
-  const close = el('button', { type: 'button', 'aria-label': 'Close AI Studio' }, 'Close');
+  head.append(el('span', {}, 'KAE / ENGINE AI'));
+  const close = el('button', { type: 'button', 'aria-label': 'Close AI workspace' }, 'Close');
   head.append(close);
   const thread = el('div', { class: 'ai-thread', 'aria-live': 'polite' });
   const compose = el('form', { class: 'ai-compose' });
-  const input = el('textarea', { placeholder: 'Describe a character, pose, expression, outfit, or animation idea…', maxlength: '12000' });
+  const input = el('textarea', { placeholder: 'Describe a character, animation, or change to the current project…', maxlength: '12000' });
   const actions = el('div', { class: 'ai-actions' });
-  const send = el('button', { class: 'primary', type: 'submit' }, 'Ask xKiro');
+  const send = el('button', { class: 'primary', type: 'submit' }, 'Ask KAE AI');
   const generate = el('button', { type: 'button' }, 'Generate image');
   actions.append(send, generate);
   compose.append(input, actions);
   side.append(head, thread, compose);
 
   const preview = el('div', { class: 'ai-preview' });
-  const previewHead = el('header', { class: 'ai-head' }, 'CHARACTER OUTPUT');
+  const previewHead = el('header', { class: 'ai-head' }, 'REFERENCE & OUTPUT');
   const body = el('div', { class: 'ai-preview-body' });
-  const status = el('div', { class: 'ai-status' }, 'Checking xKiro configuration…');
+  const status = el('div', { class: 'ai-status' }, 'Loading KAE engine capabilities…');
+
+  const videoPanel = el('section', { class: 'ai-video-panel' });
+  videoPanel.append(el('div', { class: 'ai-section-title' }, 'VIDEO → MOTION ANALYSIS'));
+  const videoInput = el('input', { type: 'file', accept: 'video/mp4,video/webm,video/quicktime,video/*', 'aria-label': 'Choose reference video' });
+  const video = el('video', { class: 'ai-reference-video', controls: '', playsinline: '', preload: 'metadata', hidden: '' });
+  const videoMeta = el('div', { class: 'ai-note' }, 'Choose a short reference clip. KAE samples up to 6 frames in your browser; the original video file is not sent to xKiro.');
+  const analyze = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Analyze reference video');
+  videoPanel.append(videoInput, video, videoMeta, analyze);
+
   const stage = el('div', { class: 'ai-image-stage' });
   const image = el('img', { alt: 'Generated anime character preview', hidden: '' });
   stage.append(image);
@@ -47,8 +84,8 @@ export function initAIStudio() {
   const download = el('a', { hidden: '', download: 'kae-character.png' }, 'Save image');
   download.style.cssText = 'padding:8px 10px;border:1px solid var(--line);color:inherit;text-decoration:none;font-size:12px';
   previewActions.append(showRef, download);
-  const note = el('p', { class: 'ai-note' }, 'Canvas reference is a visual guide, not a rigged layer. Image-to-editable-parts and bone binding are not yet automatic. Generated images are not uploaded to your project automatically.');
-  body.append(status, stage, prompt, previewActions, note);
+  const note = el('p', { class: 'ai-note' }, 'The AI receives the sampled frames and the KAE capability/schema inventory. It will analyze the motion and ask for your creative changes. Analysis is not yet a finished animation; reconstruction must be generated as editable KAE project data.');
+  body.append(status, videoPanel, stage, prompt, previewActions, note);
   preview.append(previewHead, body);
   root.append(side, preview);
   document.body.append(root);
@@ -62,6 +99,7 @@ export function initAIStudio() {
   function setBusy(value) {
     send.disabled = value;
     generate.disabled = value;
+    analyze.disabled = value || !video.files?.[0];
   }
 
   async function ask() {
@@ -72,12 +110,14 @@ export function initAIStudio() {
     const previousHistory = history.slice(-12);
     history.push({ role: 'user', content: message });
     setBusy(true);
-    status.textContent = 'Sending prompt to xKiro…';
+    status.textContent = 'Consulting KAE engine context and capabilities…';
     try {
-      const result = await request('POST', '/api/ai/chat', { message, history: previousHistory });
+      const result = await request('POST', '/api/ai/chat', {
+        message, history: previousHistory, project: projectSummary(),
+      });
       addMessage('assistant', result.reply);
       history.push({ role: 'assistant', content: result.reply });
-      status.textContent = 'Chat ready · ' + (result.model || 'xKiro');
+      status.textContent = 'KAE AI ready · ' + (result.model || 'provider model');
       if (/generate|draw|create an image|make an image/i.test(message)) prompt.value = message;
     } catch (error) {
       addMessage('assistant', 'AI unavailable: ' + error.message);
@@ -92,6 +132,110 @@ export function initAIStudio() {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       ask();
+    }
+  });
+
+  videoInput.addEventListener('change', () => {
+    const file = videoInput.files?.[0];
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    videoUrl = null;
+    analyze.disabled = true;
+    if (!file) {
+      video.hidden = true;
+      video.removeAttribute('src');
+      videoMeta.textContent = 'Choose a short reference clip.';
+      return;
+    }
+    if (!file.type.startsWith('video/')) {
+      videoMeta.textContent = 'Choose a valid video file.';
+      videoInput.value = '';
+      return;
+    }
+    if (file.size > 250 * 1024 * 1024) {
+      videoMeta.textContent = 'This video is over 250 MB. Choose a shorter or compressed reference clip.';
+      videoInput.value = '';
+      return;
+    }
+    videoUrl = URL.createObjectURL(file);
+    video.src = videoUrl;
+    video.hidden = false;
+    videoMeta.textContent = file.name + ' · ' + (file.size / (1024 * 1024)).toFixed(1) + ' MB · original stays in your browser';
+    video.onloadedmetadata = () => {
+      if (!Number.isFinite(video.duration) || video.duration <= 0) {
+        videoMeta.textContent = 'Could not read video duration. Try MP4 or WebM.';
+        analyze.disabled = true;
+        return;
+      }
+      analyze.disabled = false;
+      videoMeta.textContent = file.name + ' · ' + video.duration.toFixed(2) + ' seconds · up to 6 frames will be sampled';
+    };
+    video.onerror = () => {
+      videoMeta.textContent = 'This browser could not decode the video. Try MP4 (H.264) or WebM.';
+      analyze.disabled = true;
+    };
+  });
+
+  function seekTo(seconds) {
+    return new Promise((resolve, reject) => {
+      if (Math.abs(video.currentTime - seconds) < 0.025 && video.readyState >= 2) return resolve();
+      const timer = setTimeout(() => cleanup(new Error('Video frame seek timed out.')), 8000);
+      const done = () => cleanup();
+      const failed = () => cleanup(new Error('Could not decode a video frame.'));
+      function cleanup(error) {
+        clearTimeout(timer);
+        video.removeEventListener('seeked', done);
+        video.removeEventListener('error', failed);
+        error ? reject(error) : resolve();
+      }
+      video.addEventListener('seeked', done, { once: true });
+      video.addEventListener('error', failed, { once: true });
+      video.currentTime = Math.min(Math.max(0, seconds), Math.max(0, video.duration - 0.04));
+    });
+  }
+
+  async function sampleVideoFrames() {
+    if (!video.duration || !Number.isFinite(video.duration)) throw new Error('Video duration is not available.');
+    const count = Math.min(6, Math.max(1, Math.ceil(video.duration / 2)));
+    const originalTime = video.currentTime;
+    const width = Math.min(768, video.videoWidth || 768);
+    const height = Math.max(1, Math.round(width * (video.videoHeight || 432) / Math.max(1, video.videoWidth || 768)));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = Math.min(768, height);
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) throw new Error('Browser canvas is unavailable.');
+    const frames = [];
+    for (let i = 0; i < count; i++) {
+      const timestamp = count === 1 ? 0 : (video.duration * i / count);
+      await seekTo(timestamp);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      frames.push({ timestamp_seconds: Number(timestamp.toFixed(3)), data_url: canvas.toDataURL('image/jpeg', 0.62) });
+    }
+    await seekTo(originalTime).catch(() => {});
+    return frames;
+  }
+
+  analyze.addEventListener('click', async () => {
+    if (!videoInput.files?.[0]) return;
+    setBusy(true);
+    status.textContent = 'Sampling reference frames locally…';
+    addMessage('user', 'Analyze reference video: ' + videoInput.files[0].name);
+    try {
+      const frames = await sampleVideoFrames();
+      status.textContent = 'Sending ' + frames.length + ' sampled frames for motion analysis…';
+      const result = await request('POST', '/api/ai/video/analyze', { frames, project: projectSummary() });
+      const analysis = result.analysis || 'The model returned no analysis.';
+      addMessage('assistant', 'REFERENCE ANALYSIS (' + result.frames_analyzed + ' frames)\n\n' + analysis);
+      history.push({ role: 'user', content: 'Reference video analysis follows. Use it as the source of truth for later reconstruction requests:\n' + analysis });
+      history.push({ role: 'assistant', content: analysis });
+      status.textContent = 'Analysis complete. Tell KAE what you want changed, then discuss the reconstruction plan.';
+      input.value = 'I have reviewed the analysis. Ask me what creative changes I want before planning the reconstruction.';
+      input.focus();
+    } catch (error) {
+      status.textContent = 'Video analysis failed: ' + error.message;
+      addMessage('assistant', 'Video analysis failed: ' + error.message);
+    } finally {
+      setBusy(false);
     }
   });
 
@@ -114,9 +258,7 @@ export function initAIStudio() {
         await delay(2500);
         result = await request('GET', '/api/ai/images/' + encodeURIComponent(result.job_id));
       }
-      if (result.status !== 'succeeded') {
-        throw new Error(Date.now() >= deadline ? 'Image generation timed out after 5 minutes.' : 'Image job did not return a completed image.');
-      }
+      if (result.status !== 'succeeded') throw new Error(Date.now() >= deadline ? 'Image generation timed out after 5 minutes.' : 'Image job did not return a completed image.');
       const data = result.image || {};
       imageUrl = data.url || (data.b64_json ? 'data:image/png;base64,' + data.b64_json : null);
       if (!imageUrl) throw new Error('Image provider returned no usable image.');
@@ -125,7 +267,7 @@ export function initAIStudio() {
       showRef.disabled = false;
       download.href = imageUrl;
       download.hidden = false;
-      status.textContent = 'Image ready. You can save it or show it over the canvas as a temporary visual reference.';
+      status.textContent = 'Image ready. Save it or show it over the canvas as a temporary visual reference.';
       if (data.revised_prompt) prompt.value = data.revised_prompt;
     } catch (error) {
       status.textContent = 'Image generation failed: ' + error.message;
@@ -159,10 +301,12 @@ export function initAIStudio() {
     if (event.key === 'Escape' && !root.hidden) root.hidden = true;
   });
 
-  addMessage('assistant', 'Describe your anime character or animation idea. Ask xKiro to refine the design, then generate an image. Image generation runs as a job, so the preview appears when xKiro finishes.');
-  request('GET', '/api/ai/status').then(result => {
-    status.textContent = result.configured
-      ? 'xKiro configured · chat ' + result.chat_model + ' · images ' + result.image_model
-      : 'xKiro not configured: set XKIRO_API_KEY on the server.';
-  }).catch(() => { status.textContent = 'Could not check xKiro configuration.'; });
+  addMessage('assistant', 'I am connected to KAE’s capability inventory and native project schemas. Upload a reference video to analyze its sampled frames, then tell me your creative changes. I will distinguish supported operations from features that still need implementation.');
+  loadCurrentProject().finally(() => {
+    request('GET', '/api/ai/status').then(result => {
+      status.textContent = result.configured
+        ? 'KAE AI connected · chat ' + result.chat_model + ' · image model ' + result.image_model
+        : 'xKiro not configured: set XKIRO_API_KEY on the server or use ignored xkiro.txt.';
+    }).catch(() => { status.textContent = 'Could not check AI configuration.'; });
+  });
 }
