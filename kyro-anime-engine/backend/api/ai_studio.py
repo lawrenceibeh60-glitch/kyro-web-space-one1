@@ -235,7 +235,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
             fill = stroke.get("fill")
             if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", color):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid color.")
-            if isinstance(width_norm, bool) or not isinstance(width_norm, (int, float)) or not math.isfinite(width_norm) or not 0.25 <= width_norm <= (40 if coordinates_normalized else max(width, height) * 0.04):
+            if isinstance(width_norm, bool) or not isinstance(width_norm, (int, float)) or not math.isfinite(width_norm) or not (0.25 if coordinates_normalized else 0.1) <= width_norm <= (40 if coordinates_normalized else max(width, height) * 0.04):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid width.")
             if not isinstance(closed, bool):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid closed flag.")
@@ -261,7 +261,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
                 "id": f"stroke_{fi + 1}_{si + 1}",
                 "tool": "pen",
                 "color": color,
-                "width": round(float(width_norm) * max(width, height) / 1000, 2) if coordinates_normalized else round(float(width_norm), 2),
+                "width": max(0.1, round(float(width_norm) * max(width, height) / 1000, 2)) if coordinates_normalized else round(float(width_norm), 2),
                 "opacity": 1,
                 "closed": closed,
                 "fill": fill,
