@@ -41,3 +41,7 @@
 
 .ai-plan-summary { margin:0; max-height:28vh; overflow:auto; padding:10px; border:1px solid var(--line,#343a44); background:#080a0e; color:var(--text,#e9edf2); white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.55 ui-monospace,monospace; }
 .ai-plan-summary[hidden] { display:none; }
+
+.ai-scene-select { width:100%; min-width:0; padding:9px; border:1px solid var(--line,#343a44); background:#11151b; color:var(--text,#e9edf2); font:12px/1.4 ui-monospace,monospace; }
+.ai-scene-select:disabled { opacity:.55; }
+.ai-video-panel button:focus-visible,.ai-scene-select:focus-visible { outline:2px solid var(--accent,#e8c547); outline-offset:2px; }
