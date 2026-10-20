@@ -781,10 +781,20 @@ def _check_layer(ly, where, layer_ids, drawings, errs, ancestors=None):
         errs.append(f"{where}: character_id and character_part_id must appear together")
     if "opacity" in ly and (not _num(ly["opacity"]) or not 0 <= ly["opacity"] <= 1):
         errs.append(f"{where}.opacity: 0..1 required")
+    transform = ly.get("transform", {})
+    if isinstance(transform, dict) and "rotation_y" in transform and (
+        not _num(transform["rotation_y"]) or not -180 <= transform["rotation_y"] <= 180
+    ):
+        errs.append(f"{where}.transform.rotation_y: number -180..180 required")
     if "exposures" in ly:
         _check_exposures(ly["exposures"], f"{where}.exposures", drawings, errs)
     if "tracks" in ly:
         _check_tracks(ly["tracks"], f"{where}.tracks", errs)
+        tracks = ly["tracks"]
+        if isinstance(tracks, dict) and isinstance(tracks.get("rotation_y"), list):
+            for index, keyframe in enumerate(tracks["rotation_y"]):
+                if isinstance(keyframe, dict) and _num(keyframe.get("v")) and not -180 <= keyframe["v"] <= 180:
+                    errs.append(f"{where}.tracks.rotation_y[{index}].v: number -180..180 required")
     if layer_type in ("group", "character_instance"):
         if lid in ancestors:
             errs.append(f"{where}: cycle detected (ancestor '{lid}')")
