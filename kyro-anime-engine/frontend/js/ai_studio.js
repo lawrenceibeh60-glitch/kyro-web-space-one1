@@ -75,6 +75,14 @@ export function initAIStudio() {
   const testImageModel = el('button', { type: 'button' }, 'Test image model');
   const imageProviderActions = el('div', { class: 'ai-provider-actions' });
   imageProviderActions.append(loadImageModels, testImageModel);
+  const imageProviderStatus = el('div', { class: 'ai-provider-status' });
+  const imageProviderDot = el('span', { class: 'ai-provider-dot', 'aria-hidden': 'true' });
+  const imageProviderStatusText = el('span', {}, 'Image model not checked yet');
+  imageProviderStatus.append(imageProviderDot, imageProviderStatusText);
+  function imageProviderLight(state, message) {
+    imageProviderDot.className = 'ai-provider-dot ' + state;
+    imageProviderStatusText.textContent = message;
+  }
   const imageProviderGrid = el('div', { class: 'ai-provider-grid' });
   function providerField(label, control) {
     const wrap = el('label', { class: 'ai-provider-field' });
@@ -101,7 +109,7 @@ export function initAIStudio() {
     'xKiro offers text-to-image models. Groq offers vision models for understanding images, not generating them.');
   providerPanel.append(providerStatus, providerGrid, providerActions,
     el('div', { class: 'ai-section-title' }, 'IMAGE GENERATION MODEL'),
-    imageProviderGrid, imageProviderActions, imageProviderHelp,
+    imageProviderStatus, imageProviderGrid, imageProviderActions, imageProviderHelp,
     el('p', { class: 'ai-provider-help' }, 'Keys are sent over HTTPS for your AI requests and kept only in this tab session. They are not saved to the KAE server. Claude uses its native API; other listed providers use OpenAI-compatible chat endpoints.'));
   const thread = el('div', { class: 'ai-thread', 'aria-live': 'polite' });
   const compose = el('form', { class: 'ai-compose' });
@@ -249,17 +257,17 @@ export function initAIStudio() {
     const profile = imageProfile();
     if (!profile.api_key) { providerLight('bad', 'Image provider API key required'); imageApiKey.focus(); return; }
     loadImageModels.disabled = true;
-    providerLight('checking', 'Loading ' + profile.provider + ' image/vision models…');
+    imageProviderLight('checking', 'Loading ' + profile.provider + ' image/vision models…');
     try {
       const result = await request('POST', '/api/ai/providers/image-models', { provider_config: profile });
       populateImageModels(result.models || [], profile.model);
-      providerLight(result.generation_supported ? '' : 'bad',
+      imageProviderLight(result.generation_supported ? '' : 'bad',
         result.generation_supported
           ? 'Image models loaded · ' + (result.models || []).length + ' available'
           : 'Groq vision models loaded; image generation is not supported by Groq.');
       imageProviderHelp.textContent = result.note || imageProviderHelp.textContent;
     } catch (error) {
-      providerLight('bad', 'Could not load image models: ' + error.message);
+      imageProviderLight('bad', 'Could not load image models: ' + error.message);
     } finally { loadImageModels.disabled = false; }
   });
   testImageModel.addEventListener('click', async () => {
@@ -267,17 +275,17 @@ export function initAIStudio() {
     if (!profile.api_key) { providerLight('bad', 'Image provider API key required'); imageApiKey.focus(); return; }
     if (!profile.model) { providerLight('bad', 'Choose an image model first'); imageModelSelect.focus(); return; }
     testImageModel.disabled = true;
-    providerLight('checking', 'Checking selected image model…');
+    imageProviderLight('checking', 'Checking selected image model…');
     try {
       const result = await request('POST', '/api/ai/providers/test-image', { provider_config: profile });
       sessionStorage.setItem('kae-ai-image-config', JSON.stringify(profile));
-      providerLight(result.generation_supported ? 'good' : 'bad',
+      imageProviderLight(result.generation_supported ? 'good' : 'bad',
         result.generation_supported
           ? 'IMAGE MODEL READY · ' + result.provider + ' / ' + result.model
           : 'VISION ONLY · ' + result.provider + ' / ' + result.model);
       imageProviderHelp.textContent = result.message;
     } catch (error) {
-      providerLight('bad', 'IMAGE MODEL CHECK FAILED · ' + error.message);
+      imageProviderLight('bad', 'IMAGE MODEL CHECK FAILED · ' + error.message);
     } finally { testImageModel.disabled = false; }
   });
   setImageProviderDefaults();
