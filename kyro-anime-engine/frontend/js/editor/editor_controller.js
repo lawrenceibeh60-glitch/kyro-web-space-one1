@@ -459,6 +459,34 @@ async function boot() {
       // correct artwork can otherwise be committed off-screen and look like nothing happened.
       viewport.fit();
       viewport.requestRender();
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const canvasElement = $('canvas');
+      const captureCanvasPixels = () => {
+        const context = canvasElement?.getContext('2d', { willReadFrequently: true });
+        return context ? context.getImageData(0, 0, canvasElement.width, canvasElement.height).data : null;
+      };
+      const pixelsBeforeDrawing = captureCanvasPixels();
+      const backgroundHex = /^#[0-9a-f]{6}$/i.test(settings.background || '') ? settings.background : '#ffffff';
+      const backgroundRgb = [1, 3, 5].map(index => parseInt(backgroundHex.slice(index, index + 2), 16));
+      const makeVisibleColor = color => {
+        const hex = typeof color === 'string' && /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(color)
+          ? color.slice(0, 7) : '#ff6b35';
+        const rgb = [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+        const distance = Math.hypot(rgb[0] - backgroundRgb[0], rgb[1] - backgroundRgb[1], rgb[2] - backgroundRgb[2]);
+        if (distance < 85) {
+          const luminance = backgroundRgb[0] * 0.2126 + backgroundRgb[1] * 0.7152 + backgroundRgb[2] * 0.0722;
+          return luminance > 128 ? '#e85d25' : '#ffd34e';
+        }
+        return hex;
+      };
+      const pixelsDiffer = (before, after) => {
+        if (!before || !after || before.length !== after.length) return true;
+        for (let index = 0; index < before.length; index += 4) {
+          if (before[index] !== after[index] || before[index + 1] !== after[index + 1] ||
+              before[index + 2] !== after[index + 2] || before[index + 3] !== after[index + 3]) return true;
+        }
+        return false;
+      };
       overlay.hidden = false;
       overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
         '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
@@ -489,12 +517,11 @@ async function boot() {
         // dirty, refreshes the viewport, and makes the artwork undoable.
         const completeStrokes = usableStrokes.map((source, strokeIndex) => {
           const color = typeof source.color === 'string' ? source.color : '#ff6b35';
-          const visibleColor = /^(?:#[0-9a-f]{6})00$/i.test(color) ? color.slice(0, 7) : color;
           return {
             ...source,
             id: 'ai_st_' + token + '_' + frameIndex + '_' + strokeIndex,
             tool: 'pen',
-            color: visibleColor,
+            color: makeVisibleColor(color),
             width: Math.max(1.5, Number(source.width) || 3),
             opacity: Number(source.opacity) > 0 ? Math.min(1, Number(source.opacity)) : 1,
             commands: source.commands.map(command => [...command]),
@@ -509,7 +536,18 @@ async function boot() {
         // only on debounced UI events while AI is generating several frames.
         setState({ project: state.project, sceneId: scene.id, layerId, frame: frameNumber });
         viewport.requestRender();
-        await new Promise(resolve => requestAnimationFrame(() => resolve()));
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (frameIndex === 0) {
+          const pixelsAfterDrawing = captureCanvasPixels();
+          if (!pixelsDiffer(pixelsBeforeDrawing, pixelsAfterDrawing)) {
+            viewport.fit();
+            viewport.requestRender();
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            if (!pixelsDiffer(pixelsBeforeDrawing, captureCanvasPixels())) {
+              throw new Error('The vector paths were added to the project, but the canvas pixels did not change. KAE stopped instead of falsely reporting a successful drawing.');
+            }
+          }
+        }
         totalDrawnStrokes += completeStrokes.length;
         overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
           '\\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
