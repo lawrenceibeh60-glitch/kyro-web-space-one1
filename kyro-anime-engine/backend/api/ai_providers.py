@@ -176,12 +176,60 @@ def list_providers():
 @bp.post("/ai/providers/models")
 def list_models():
     profile = read_profile(request.get_json(silent=True) or {})
-    result = provider_request(profile, "/models")
+    path = "/models?modality=chat" if profile["provider"] == "xkiro" else "/models"
+    result = provider_request(profile, path)
     models = [item.get("id") for item in result.get("data", []) if isinstance(item, dict) and item.get("id")]
     if not models:
         models = profile["fallback_models"]
     models = sorted(set(models), key=str.casefold)
     return jsonify(provider=profile["provider"], models=models, source="provider API" if result.get("data") else "curated fallback")
+
+
+@bp.post("/ai/providers/image-models")
+def list_image_models():
+    """Return image generation models separately from image-understanding models."""
+    profile = read_profile(request.get_json(silent=True) or {})
+    if profile["provider"] == "xkiro":
+        result = provider_request(profile, "/models?modality=image")
+        models = [
+            item.get("id") for item in result.get("data", [])
+            if isinstance(item, dict) and item.get("id")
+            and (not item.get("modality") or item.get("modality") == "image")
+        ]
+        if not models:
+            models = ["openai/gpt-image-2.5", "sensenova/sensenova-u1.5-lite"]
+        return jsonify(provider="xkiro", models=sorted(set(models), key=str.casefold),
+                       generation_supported=True, source="xKiro image model catalog")
+    if profile["provider"] == "groq":
+        result = provider_request(profile, "/models")
+        known_vision = {"qwen/qwen3.6-27b", "qwen/qwen3.8-27b"}
+        available = {item.get("id") for item in result.get("data", [])
+                     if isinstance(item, dict) and item.get("id")}
+        models = sorted(known_vision & available, key=str.casefold) or sorted(known_vision, key=str.casefold)
+        return jsonify(provider="groq", models=models, generation_supported=False,
+                       note="Groq models can understand images, but Groq does not currently expose a text-to-image generation endpoint.",
+                       source="Groq vision model catalog")
+    raise ApiError(422, "KAE image generation currently supports xKiro. Other providers remain available for chat and supported vision tasks.")
+
+
+@bp.post("/ai/providers/test-image")
+def test_image_connection():
+    """Check model availability without generating a billable image."""
+    profile = read_profile(request.get_json(silent=True) or {})
+    if profile["provider"] == "groq":
+        return jsonify(ok=True, generation_supported=False, provider="Groq", model=profile["model"],
+                       message="Groq model is for image understanding only; Groq does not currently offer text-to-image generation.")
+    if profile["provider"] != "xkiro":
+        raise ApiError(422, "This provider does not currently expose a supported image-generation endpoint in KAE.")
+    result = provider_request(profile, "/models?modality=image")
+    available = {item.get("id") for item in result.get("data", [])
+                 if isinstance(item, dict) and item.get("id")}
+    # Some gateways may omit modality metadata; membership in the explicit image
+    # catalog is the authoritative check. If the catalog is empty, avoid a false green.
+    if not available or profile["model"] not in available:
+        raise ApiError(422, f"Image model '{profile['model']}' was not found in xKiro's live image catalog.")
+    return jsonify(ok=True, generation_supported=True, provider="xKiro", model=profile["model"],
+                   message="Image model found in xKiro's live image catalog. Generation will use this exact model.")
 
 
 @bp.post("/ai/providers/test")
