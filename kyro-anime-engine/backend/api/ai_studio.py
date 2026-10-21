@@ -661,6 +661,80 @@ def direct_animation_blueprint():
     )
 
 
+@bp.post("/ai/story/vector-plan")
+def plan_story_vector_animation():
+    """Translate one story beat into editable native vector animation cels (no generated images)."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError(400, "Request body must be a JSON object")
+    direction = data.get("direction")
+    scene_title = data.get("scene_title", "Story scene")
+    project = data.get("project")
+    if not isinstance(direction, str) or not direction.strip():
+        raise ApiError(400, "A story scene description is required.")
+    if len(direction) > 8000:
+        raise ApiError(413, "Story scene description is too long (maximum 8000 characters).")
+    if not isinstance(project, dict) or not isinstance(project.get("settings"), dict):
+        raise ApiError(400, "Open a KAE project before drawing a story.")
+    settings = project["settings"]
+    width, height = settings.get("width"), settings.get("height")
+    if not isinstance(width, int) or not isinstance(height, int) or not 16 <= width <= 8192 or not 16 <= height <= 8192:
+        raise ApiError(400, "Project canvas dimensions are invalid.")
+    if not isinstance(data.get("provider_config"), dict):
+        raise ApiError(400, "Connect an AI chat provider in KAE AI settings first.")
+    profile = read_provider_profile(data)
+    prompt = (
+        "You are the native vector drawing engine for KAE, not an image generator. Convert the scene description into "
+        "a clean, readable, detailed hand-drawn 2D anime storyboard using editable vector strokes. Return ONLY JSON "
+        "with keys summary (string) and frames (array of exactly 4 frames). Each frame has timestamp_seconds (number) "
+        "and strokes (array of 8 to 24 objects). Each stroke has color (#RRGGBB), width (number 0.5 to 22), "
+        "closed (boolean), fill (null or #RRGGBB), and commands (array of 2 to 64 path commands). Coordinates are "
+        "normalized from 0 to 1000 in BOTH axes. Commands: ['M',x,y], ['L',x,y], ['Q',cx,cy,x,y], "
+        "['C',c1x,c1y,c2x,c2y,x,y], ['Z']. Start every path with M; use smooth curves and deliberate contours. "
+        "Keep all coordinates inside 0..1000. Use filled shapes for major silhouettes, faces, hair, clothing, props, "
+        "ground and background forms, then linework for details. Draw the background too; do not assume an image exists. "
+        "Use a coherent limited palette, readable foreground/midground/background, clean outlines and clear silhouettes. "
+        "Across all four frames, preserve the same character design, face, hairstyle, costume, proportions and palette. "
+        "Change poses and action progressively across anticipation, main action, follow-through and settled pose. "
+        "Avoid text, letters, logos and watermarks. This must be actual vector paths that KAE can draw on its canvas, "
+        "not a description of an image and not a raster image. Keep each frame understandable even at thumbnail size.\n\n"
+        "PROJECT CANVAS: " + str(width) + " x " + str(height) + "\n"
+        "SCENE TITLE: " + str(scene_title)[:180] + "\n"
+        "SCENE / STORY BEAT:\n" + direction.strip()
+    )
+    messages = [
+        {"role": "system", "content": (
+            "You produce valid compact JSON for a vector drawing engine. Never return markdown. "
+            "Never claim a raster image was generated. Favor smooth Bézier paths, layered silhouettes and visual continuity."
+        )},
+        {"role": "user", "content": prompt},
+    ]
+    raw, used_model = provider_completion(profile, messages, temperature=0.15, timeout=180)
+    plan = _parse_model_json(raw)
+    if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
+        raise ApiError(502, "The drawing model must return exactly four vector frames. Try a shorter, clearer scene beat.")
+    frames = _validated_vector_frames(plan["frames"], width, height, coordinates_normalized=True)
+    for frame in frames:
+        for stroke in frame["strokes"]:
+            stroke["commands"] = [
+                [command[0]] + [
+                    round(float(value) * (width if index % 2 == 1 else height) / 1000, 2)
+                    for index, value in enumerate(command[1:], start=1)
+                ] if command[0] != "Z" else ["Z"]
+                for command in stroke["commands"]
+            ]
+            stroke["width"] = round(max(0.5, min(22, stroke["width"] * min(width, height) / 1000)), 2)
+    return jsonify(
+        title=str(scene_title)[:180],
+        summary=str(plan.get("summary") or "Editable native vector animation")[:2000],
+        frames=frames,
+        canvas={"width": width, "height": height},
+        model=used_model,
+        format="kae-native-vector-cels",
+        generated_images=False,
+    )
+
+
 @bp.post("/ai/images")
 def generate_image():
     data = request.get_json(silent=True)
