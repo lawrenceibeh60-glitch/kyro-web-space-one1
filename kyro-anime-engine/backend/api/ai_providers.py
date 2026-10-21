@@ -2,8 +2,10 @@
 
 API keys are accepted per request and are never written to server-side storage.
 """
+import base64
 import json
 import re
+from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -41,9 +43,19 @@ def read_profile(data):
     model = str(raw.get("model") or (fallbacks[0] if fallbacks else "")).strip()
     if not api_key:
         raise ApiError(400, "Enter an API key first.")
-    if not base_url or not re.match(r"^https://", base_url, re.I):
-        if not (provider == "custom" and base_url.startswith("http://localhost")):
-            raise ApiError(400, "API base URL must use HTTPS (localhost is allowed for custom providers).")
+    parsed = urlparse(base_url)
+    if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ApiError(400, "API base URL must be a valid HTTPS URL without embedded credentials.")
+    host = parsed.hostname.lower()
+    if host in {"localhost", "metadata.google.internal"} or host.endswith((".local", ".internal", ".localhost")):
+        raise ApiError(400, "Local and internal network hosts are not allowed as provider endpoints.")
+    try:
+        import ipaddress
+        address = ipaddress.ip_address(host)
+        if not address.is_global:
+            raise ApiError(400, "Private or reserved IP addresses are not allowed as provider endpoints.")
+    except ValueError:
+        pass
     return {"provider": provider, "label": label, "base_url": base_url, "api_key": api_key, "model": model, "fallback_models": fallbacks}
 
 
@@ -76,7 +88,27 @@ def completion(profile, messages, temperature=0.2, timeout=90):
         raise ApiError(400, "Choose a model before sending an AI request.")
     if profile["provider"] == "anthropic":
         system = "\n\n".join(item["content"] for item in messages if item.get("role") == "system" and isinstance(item.get("content"), str))
-        conversation = [{"role": item["role"], "content": item.get("content", "")} for item in messages if item.get("role") in ("user", "assistant")]
+        conversation = []
+        for item in messages:
+            if item.get("role") not in ("user", "assistant"):
+                continue
+            content = item.get("content", "")
+            if isinstance(content, list):
+                blocks = []
+                for part in content:
+                    if not isinstance(part, dict):
+                        continue
+                    if part.get("type") == "text":
+                        blocks.append({"type": "text", "text": str(part.get("text", ""))})
+                    elif part.get("type") == "image_url":
+                        image_url = part.get("image_url", {}).get("url", "")
+                        match = re.match(r"^data:(image/(?:jpeg|png|gif|webp));base64,(.+)$", image_url, re.S)
+                        if match:
+                            blocks.append({"type": "image", "source": {"type": "base64", "media_type": match.group(1), "data": match.group(2)}})
+                        else:
+                            raise ApiError(400, "Claude image analysis requires base64 JPEG, PNG, GIF, or WebP frames.")
+                content = blocks
+            conversation.append({"role": item["role"], "content": content})
         result = provider_request(profile, "/messages", "POST", {"model": model, "max_tokens": 4096, "temperature": temperature, "system": system, "messages": conversation}, timeout)
         reply = "\n".join(block.get("text", "") for block in result.get("content", []) if isinstance(block, dict) and block.get("type") == "text")
         if not reply.strip():
