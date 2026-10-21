@@ -1,9 +1,16 @@
 // frontend/js/api/client.js
 export async function request(method, url, body) {
+  let payload = body;
+  if (payload && typeof payload === 'object' && url.startsWith('/api/ai/')) {
+    try {
+      const saved = sessionStorage.getItem('kae-ai-provider-config');
+      if (saved && !payload.provider_config) payload = { ...payload, provider_config: JSON.parse(saved) };
+    } catch (_) { /* ignore unavailable session storage */ }
+  }
   const res = await fetch(url, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+    headers: payload ? { 'Content-Type': 'application/json' } : undefined,
+    body: payload ? JSON.stringify(payload) : undefined,
   });
   if (res.status === 204) return null;
   let data = null;
