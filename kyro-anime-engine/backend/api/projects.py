@@ -23,6 +23,23 @@ def _body():
     return data
 
 
+@bp.get("/storage-status")
+def storage_status():
+    from backend.storage import project_repository
+
+    backend = project_repository.backend_name()
+    return jsonify(
+        backend=backend,
+        durable=(backend == "postgresql"),
+        configured=(backend == "postgresql"),
+        note=(
+            "Projects are stored in managed PostgreSQL."
+            if backend == "postgresql"
+            else "Projects are stored as local JSON files. On ephemeral hosting, files can be lost on restart or redeploy; configure DATABASE_URL for durable PostgreSQL storage."
+        ),
+    )
+
+
 @bp.get("")
 def list_projects():
     return jsonify(projects=svc.list_projects())
