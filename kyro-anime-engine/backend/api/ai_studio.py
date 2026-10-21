@@ -54,6 +54,30 @@ def _config(data=None):
     image_endpoint = os.environ.get("XKIRO_IMAGE_URL", "").strip() or f"{base}/images/generations"
     return key, base, chat_model, image_model, image_endpoint
 
+def _image_config(data=None):
+    """Resolve the image provider and selected image model for this request."""
+    raw = data.get("image_config") if isinstance(data, dict) else None
+    if isinstance(raw, dict):
+        provider = str(raw.get("provider") or "xkiro").strip().lower()
+        if provider == "groq":
+            raise ApiError(422, "Groq vision models can analyze images but do not generate them. Select xKiro for image generation.")
+        if provider != "xkiro":
+            raise ApiError(422, "KAE image generation currently supports xKiro's image-generation API.")
+        key = str(raw.get("api_key") or "").strip()
+        base = str(raw.get("base_url") or "https://api.xkiro.com/v1").strip().rstrip("/")
+        model = str(raw.get("model") or "").strip()
+        if not key:
+            raise ApiError(400, "Enter an xKiro API key in Image Generation settings.")
+        if not model:
+            raise ApiError(400, "Choose an image-generation model before generating.")
+        if base.lower() not in ("https://api.xkiro.com/v1", "https://api.xkiro.com"):
+            raise ApiError(400, "Image generation requires the official xKiro API base URL (https://api.xkiro.com/v1).")
+        api_base = base if base.endswith("/v1") else base + "/v1"
+        return key, api_base + "/images/generations", model, api_base
+    key, _, _, model, endpoint = _config()
+    base = os.environ.get("XKIRO_BASE_URL", "https://api.xkiro.com/v1").rstrip("/")
+    return key, endpoint, model, base
+
 
 def _request_json(url, method="GET", payload=None, api_key="", timeout=30):
     headers = {"Accept": "application/json"}
@@ -543,11 +567,11 @@ def generate_image():
         raise ApiError(400, "Describe the character or pose to generate")
     if len(prompt) > 8000:
         raise ApiError(413, "Image prompt is too long (maximum 8000 characters)")
-    key, _, _, model, endpoint = _config()
+    key, endpoint, model, _ = _image_config(data)
     if not key:
-        raise ApiError(503, "xKiro is not configured. Set XKIRO_API_KEY in the server environment.")
+        raise ApiError(503, "Configure an xKiro API key in Image Generation settings.")
     if not model:
-        raise ApiError(503, "Set XKIRO_IMAGE_MODEL to an image-generation model ID.")
+        raise ApiError(400, "Choose an image-generation model.")
     result = _request_json(
         endpoint,
         method="POST",
@@ -580,6 +604,17 @@ def image_status(job_id):
     key, _, _, _, endpoint = _config()
     if not key:
         raise ApiError(503, "xKiro is not configured. Set XKIRO_API_KEY in the server environment.")
+    return _image_status_result(job_id, key, endpoint)
+
+
+@bp.post("/ai/images/<job_id>")
+def image_status_for_selected_provider(job_id):
+    data = request.get_json(silent=True) or {}
+    key, endpoint, _, _ = _image_config(data)
+    return _image_status_result(job_id, key, endpoint)
+
+
+def _image_status_result(job_id, key, endpoint):
     if not job_id or len(job_id) > 200:
         raise ApiError(400, "Invalid image job ID")
     result = _request_json(f"{endpoint.rstrip('/')}/{quote(job_id, safe='')}", api_key=key, timeout=30)
