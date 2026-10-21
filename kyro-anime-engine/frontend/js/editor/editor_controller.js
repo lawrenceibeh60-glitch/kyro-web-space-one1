@@ -455,6 +455,10 @@ async function boot() {
       execute(insertAt(['scenes', currentSceneIndex, 'layers'], scene.layers.length, layer, 'Add AI story drawing layer'));
       setState({ sceneId: scene.id, layerId, frame: startFrame, dirty: true });
       bus.emit('project:changed', { label: 'AI story drawing started' });
+      // Recenter the project before drawing: if the user had panned far away,
+      // correct artwork can otherwise be committed off-screen and look like nothing happened.
+      viewport.fit();
+      viewport.requestRender();
       overlay.hidden = false;
       overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
         '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
@@ -483,16 +487,29 @@ async function boot() {
         // Commit complete paths through KAE's command system. Never mutate a drawing
         // behind the renderer's back: each command clones the data, marks the project
         // dirty, refreshes the viewport, and makes the artwork undoable.
-        const completeStrokes = usableStrokes.map((source, strokeIndex) => ({
-          ...source,
-          id: 'ai_st_' + token + '_' + frameIndex + '_' + strokeIndex,
-          commands: source.commands.map(command => [...command]),
-        }));
+        const completeStrokes = usableStrokes.map((source, strokeIndex) => {
+          const color = typeof source.color === 'string' ? source.color : '#ff6b35';
+          const visibleColor = /^(?:#[0-9a-f]{6})00$/i.test(color) ? color.slice(0, 7) : color;
+          return {
+            ...source,
+            id: 'ai_st_' + token + '_' + frameIndex + '_' + strokeIndex,
+            tool: 'pen',
+            color: visibleColor,
+            width: Math.max(1.5, Number(source.width) || 3),
+            opacity: Number(source.opacity) > 0 ? Math.min(1, Number(source.opacity)) : 1,
+            commands: source.commands.map(command => [...command]),
+          };
+        });
         execute(setValue(
           ['drawings', drawingId, 'strokes'],
           completeStrokes,
           'Render AI frame ' + (frameIndex + 1)
         ));
+        // Explicitly repaint after the complete cel is committed. This avoids relying
+        // only on debounced UI events while AI is generating several frames.
+        setState({ project: state.project, sceneId: scene.id, layerId, frame: frameNumber });
+        viewport.requestRender();
+        await new Promise(resolve => requestAnimationFrame(() => resolve()));
         totalDrawnStrokes += completeStrokes.length;
         overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
           '\\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
