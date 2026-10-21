@@ -140,15 +140,21 @@ export function initAIStudio() {
   const buildPlan = el('button', { type: 'button', disabled: '' }, 'Build transform-keyframe plan');
   const applyPlan = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Apply transform keyframes');
   const planSummary = el('pre', { class: 'ai-plan-summary', hidden: '' });
-  const directAnimation = el('button', { type: 'button', class: 'primary' }, 'Generate animation from instruction');
-  const directAnimationNote = el('div', { class: 'ai-note' }, 'Describe the scene in the instruction box. KAE will plan the background, character continuity, four key poses and camera beats, generate the images, then let you export a timed WebM animatic.');
+  const storyInput = el('input', { type: 'file', accept: '.json,application/json', 'aria-label': 'Import story JSON' });
+  const storyStatus = el('div', { class: 'ai-note' }, 'Import a story JSON. KAE expands it into scenes, then draws native editable vector strokes directly on the main canvas—no generated images.');
+  const drawStory = el('button', { type: 'button', class: 'primary' }, 'Import story JSON & draw on canvas');
+  const directAnimation = el('button', { type: 'button', class: 'primary' }, 'Draw animation from instruction');
+  const directAnimationNote = el('div', { class: 'ai-note' }, 'For a single scene, describe the action in the instruction box. KAE will draw native vector paths directly on the main canvas.');
   const storyboard = el('div', { class: 'ai-storyboard' });
   const storyboardActions = el('div', { class: 'ai-actions' });
   const previewAnimatic = el('button', { type: 'button', disabled: '' }, 'Preview animatic');
   const exportAnimatic = el('button', { type: 'button', disabled: '' }, 'Export WebM animatic');
   storyboardActions.append(previewAnimatic, exportAnimatic);
-  videoPanel.append(directAnimationNote, directAnimation, storyboard, storyboardActions,
-    videoInput, video, videoMeta, analyze, sceneSelect, reconstruct, vectorSummary, vectorPreview, applyReconstruction, buildPlan, planSummary, applyPlan);
+  videoPanel.append(
+    el('div', { class: 'ai-section-title' }, 'STORY → LIVE CANVAS DRAWING'),
+    storyInput, storyStatus, drawStory, directAnimationNote, directAnimation, storyboard, storyboardActions,
+    videoInput, video, videoMeta, analyze, sceneSelect, reconstruct, vectorSummary, vectorPreview, applyReconstruction, buildPlan, planSummary, applyPlan
+  );
 
   const stage = el('div', { class: 'ai-image-stage' });
   const image = el('img', { alt: 'Generated anime character preview', hidden: '' });
@@ -674,102 +680,104 @@ export function initAIStudio() {
     return card;
   }
 
+  function activeProviderPayload() {
+    if (!connectedProvider?.api_key || !connectedProvider?.model) {
+      throw new Error('Connect your AI chat provider first in AI Provider Connection.');
+    }
+    return { provider_config: {
+      provider: connectedProvider.provider, base_url: connectedProvider.base_url,
+      api_key: connectedProvider.api_key, model: connectedProvider.model,
+    }};
+  }
+
+  async function drawStoryScenes(rawStory, sourceLabel) {
+    const providerPayload = activeProviderPayload();
+    if (!currentProject?.id) throw new Error('Open a KAE project before drawing a story.');
+    root.hidden = true;
+    const outlineResult = await request('POST', '/api/ai/story/outline', {
+      story: rawStory, project: projectSummary(), ...providerPayload,
+    });
+    const outline = outlineResult;
+    addMessage('assistant', 'STORY LOCKED · ' + outline.title + '\n' + outline.logline +
+      '\n\nStyle: ' + outline.style_bible + '\n\n' +
+      outline.scenes.map(scene => scene.scene_number + '. ' + scene.title + ' — ' + scene.action).join('\n'));
+    const total = outline.scenes.length;
+    for (let index = 0; index < total; index++) {
+      const scene = outline.scenes[index];
+      storyStatus.textContent = 'Scene ' + (index + 1) + '/' + total + ' · asking KAE to draw native vector paths…';
+      const direction = [
+        'WHOLE STORY: ' + outline.title + ' — ' + outline.logline,
+        'GLOBAL STYLE BIBLE: ' + outline.style_bible,
+        'CHARACTER BIBLE: ' + (outline.characters || []).join('\n'),
+        'SCENE ' + scene.scene_number + ': ' + scene.title,
+        'LOCATION: ' + scene.location,
+        'MOOD: ' + scene.mood,
+        'CHARACTERS: ' + (scene.characters || []).join(', '),
+        'ACTION: ' + scene.action,
+        'VISUAL DESCRIPTION: ' + scene.visual_description,
+        'CONTINUITY: ' + scene.continuity_notes,
+        'DIALOGUE (visual context only; do not draw text): ' + scene.dialogue,
+        'Create four connected visual beats for this scene. Draw every visible element as editable native vector strokes.'
+      ].join('\n');
+      const result = await request('POST', '/api/ai/story/vector-plan', {
+        direction, scene_title: scene.title, project: projectSummary(), ...providerPayload,
+      });
+      storyStatus.textContent = 'Scene ' + (index + 1) + '/' + total + ' · drawing ' +
+        result.frames.reduce((sum, frame) => sum + frame.strokes.length, 0) + ' native vector strokes on the main canvas…';
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Canvas drawing timed out.')), 10 * 60 * 1000);
+        window.dispatchEvent(new CustomEvent('kae:ai-draw-frames', { detail: {
+          title: scene.title, storyTitle: outline.title, sceneNumber: index + 1, totalScenes: total,
+          frames: result.frames, resolve: value => { clearTimeout(timer); resolve(value); },
+          reject: error => { clearTimeout(timer); reject(error); },
+        }}));
+      });
+    }
+    storyStatus.textContent = 'Story drawing complete · ' + total + ' scenes added to the editable KAE timeline.';
+    addMessage('assistant', 'DRAWING COMPLETE · ' + outline.title + '\n' + total +
+      ' story scenes have been drawn as native editable vector cels on the main canvas and saved to your KAE project.');
+    root.hidden = true;
+  }
+
+  storyInput.addEventListener('change', () => {
+    const file = storyInput.files?.[0];
+    storyStatus.textContent = file ? 'Ready to import: ' + file.name : 'Choose a story JSON file.';
+  });
+  drawStory.addEventListener('click', async () => {
+    const file = storyInput.files?.[0];
+    if (!file) { storyStatus.textContent = 'Choose your story .json file first.'; storyInput.click(); return; }
+    drawStory.disabled = true;
+    directAnimation.disabled = true;
+    setBusy(true);
+    try {
+      const raw = JSON.parse(await file.text());
+      await drawStoryScenes(raw, file.name);
+    } catch (error) {
+      root.hidden = false;
+      storyStatus.textContent = 'Story drawing failed: ' + error.message;
+      addMessage('assistant', 'Story drawing failed: ' + error.message);
+    } finally {
+      drawStory.disabled = false;
+      directAnimation.disabled = false;
+      setBusy(false);
+    }
+  });
+
   directAnimation.addEventListener('click', async () => {
     const direction = input.value.trim() || prompt.value.trim() ||
       [...history].reverse().find(item => item.role === 'user')?.content || '';
-    if (!direction) {
-      status.textContent = 'Describe the animation you want in the instruction box first.';
-      input.focus();
-      return;
-    }
-    const imageConfig = imageProfile();
-    if (imageConfig.provider !== 'xkiro' || !imageConfig.api_key || !imageConfig.model) {
-      status.textContent = 'Choose xKiro, enter its API key, and select/test an image model in Image Generation Model.';
-      return;
-    }
-    const providerConfig = connectedProvider ? {
-      provider_config: {
-        provider: connectedProvider.provider, base_url: connectedProvider.base_url,
-        api_key: connectedProvider.api_key, model: connectedProvider.model,
-      },
-    } : {};
-    setBusy(true);
+    if (!direction) { status.textContent = 'Describe the scene you want drawn in the instruction box first.'; input.focus(); return; }
+    drawStory.disabled = true;
     directAnimation.disabled = true;
-    previewAnimatic.disabled = true;
-    exportAnimatic.disabled = true;
-    storyboard.replaceChildren();
-    storyboardFrames = [];
-    storyboardBackground = null;
-    status.textContent = '1/6 · Directing the animation from your instruction…';
+    setBusy(true);
     try {
-      const planResult = await request('POST', '/api/ai/animation/director', {
-        direction, project_id: currentProject?.id || null,
-        ...providerConfig,
-      });
-      storyboardPlan = planResult.plan;
-      sessionStorage.setItem('kae-ai-image-config', JSON.stringify(imageConfig));
-      addMessage('assistant', 'ANIMATION DIRECTOR · ' + storyboardPlan.title + '\n' +
-        storyboardPlan.style_bible + '\n\nCharacter continuity: ' + storyboardPlan.character_bible +
-        '\n\n' + storyboardPlan.keyframes.map(k => 'Frame ' + k.frame + ' · ' + k.beat + ' — ' + k.action).join('\n'));
-      if (currentProject?.id) {
-        try {
-          status.textContent = '2/7 · Building validated timeline motion for existing project layers…';
-          const motion = await request('POST', '/api/ai/animation/plan', {
-            project_id: currentProject.id,
-            direction: direction + '\n\nAnimation beats: ' + storyboardPlan.keyframes.map(k =>
-              'Frame ' + k.frame + ': ' + k.action + '; camera: ' + k.camera
-            ).join('\n'),
-            analysis: storyboardPlan.style_bible + '\n' + storyboardPlan.character_bible,
-            ...providerConfig,
-          });
-          currentPlan = motion;
-          planSummary.textContent = motion.summary + '\n\nValidated transform keyframes: ' + motion.ops.length +
-            '\nThese animate existing project layers; generated storyboard images remain separate visual assets.\n\n' +
-            motion.ops.slice(0, 60).map((op, index) =>
-              (index + 1) + '. ' + op.scene_id + ' / ' + op.layer_id + ' · ' + op.channel +
-              ' = ' + op.value + ' at frame ' + op.time + ' (' + op.ease + ')'
-            ).join('\n');
-          planSummary.hidden = false;
-          applyPlan.disabled = !motion.ops.length;
-          if (motion.ops.length) addMessage('assistant', 'TIMELINE MOTION READY · ' + motion.ops.length +
-            ' validated keyframes are ready for your existing project layers. Use Apply transform keyframes to add them to the saved timeline.');
-        } catch (motionError) {
-          currentPlan = null;
-          applyPlan.disabled = true;
-          planSummary.textContent = 'Storyboard generation can continue, but automatic timeline motion could not be planned: ' + motionError.message;
-          planSummary.hidden = false;
-        }
-      }
-      status.textContent = '3/7 · Generating environment background…';
-      storyboardBackground = await generateImageForPrompt(imageConfig,
-        storyboardPlan.background_prompt + '\nStyle bible: ' + storyboardPlan.style_bible +
-        '\nEnvironment plate only, absolutely no characters, wide 16:9 cinematic composition.',
-        'Background generation');
-      addStoryboardCard('BACKGROUND PLATE', 'Environment · 16:9', storyboardBackground);
-      const frames = [];
-      for (let i = 0; i < storyboardPlan.keyframes.length; i++) {
-        const frame = storyboardPlan.keyframes[i];
-        status.textContent = (i + 3) + '/6 · Generating keyframe ' + (i + 1) + '/4…';
-        const promptText = frame.image_prompt + '\n\nCONTINUITY LOCK — ' +
-          storyboardPlan.character_bible + '\nSTYLE LOCK — ' + storyboardPlan.style_bible +
-          '\nSHOT: ' + frame.camera + '\nACTION BEAT: ' + frame.action +
-          '\nSame lead character identity, face, hairstyle, costume, colors, body proportions and linework as every other frame. ' +
-          'Full cinematic 16:9 anime frame, coherent lighting and perspective, no text, no watermark.';
-        const url = await generateImageForPrompt(imageConfig, promptText, 'Keyframe ' + (i + 1));
-        frames.push({ ...frame, url });
-        addStoryboardCard('KEYFRAME ' + (i + 1) + ' · F' + frame.frame,
-          frame.beat + ' · ' + frame.camera, url);
-        storyboardFrames = frames.slice();
-      }
-      previewAnimatic.disabled = false;
-      exportAnimatic.disabled = false;
-      status.textContent = 'Storyboard ready · background + ' + frames.length +
-        ' generated keyframes. Preview or export a timed WebM animatic.';
-      addMessage('assistant', 'ANIMATIC READY — background plate and four keyframe images generated. This is a timed storyboard animatic, not yet a fully in-betweened production animation. Export WebM to review the motion beats.');
+      await drawStoryScenes({ title: 'Instruction animation', story: direction }, 'instruction');
     } catch (error) {
-      status.textContent = 'Animation generation stopped: ' + error.message;
-      addMessage('assistant', 'Animation generation error: ' + error.message);
+      root.hidden = false;
+      status.textContent = 'Live drawing failed: ' + error.message;
+      addMessage('assistant', 'Live drawing failed: ' + error.message);
     } finally {
+      drawStory.disabled = false;
       directAnimation.disabled = false;
       setBusy(false);
     }
