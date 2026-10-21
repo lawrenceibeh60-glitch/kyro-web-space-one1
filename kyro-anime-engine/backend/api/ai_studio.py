@@ -163,7 +163,7 @@ def analyze_video_reference():
     frames = data.get("frames")
     if not isinstance(frames, list) or not 1 <= len(frames) <= 8:
         raise ApiError(400, "Provide between 1 and 8 sampled video frames.")
-    key, base, model, _, _ = _config()
+    key, base, model, _, _ = _config(data)
     if not key:
         raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
     project = data.get("project") if isinstance(data.get("project"), dict) else None
@@ -305,7 +305,7 @@ def plan_video_reconstruction():
     width, height = settings.get("width"), settings.get("height")
     if not isinstance(width, int) or not isinstance(height, int) or not 16 <= width <= 8192 or not 16 <= height <= 8192:
         raise ApiError(400, "Project canvas dimensions are invalid.")
-    key, base, model, _, _ = _config()
+    key, base, model, _, _ = _config(data)
     if not key:
         raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
     content = [{
@@ -441,7 +441,7 @@ def create_animation_plan():
         raise ApiError(400, "Describe the creative changes or animation you want.")
     if len(direction) > 8000 or not isinstance(analysis, str) or len(analysis) > 16000:
         raise ApiError(413, "Animation direction or reference analysis is too long.")
-    key, base, model, _, _ = _config()
+    key, base, model, _, _ = _config(data)
     if not key:
         raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
     project = project_repository.load(project_id)
