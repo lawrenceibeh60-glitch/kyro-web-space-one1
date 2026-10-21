@@ -7,3 +7,6 @@ pillow
 
 # Canonical Draft 2020-12 validation for native .kae project schemas
 jsonschema>=4.18,<5
+
+# Managed PostgreSQL storage for persistent deployed projects
+psycopg[binary]>=3.2,<4
