@@ -96,9 +96,9 @@ def provider_request(profile, path, method="GET", payload=None, timeout=30):
                 # Security gateways often return HTML (for example, a browser-signature
                 # block page) instead of the provider JSON error format.
                 title = re.search(r"(?is)<title[^>]*>(.*?)</title>", raw_detail)
-                text_only = re.sub(r"(?is)<(script|style).*?>.*?</\\1>", " ", raw_detail)
+                text_only = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", raw_detail)
                 text_only = re.sub(r"(?s)<[^>]+>", " ", text_only)
-                text_only = re.sub(r"\\s+", " ", text_only).strip()
+                text_only = re.sub(r"\s+", " ", text_only).strip()
                 detail = (title.group(1).strip() + ": " if title else "") + text_only[:500]
         except OSError:
             detail = ""
