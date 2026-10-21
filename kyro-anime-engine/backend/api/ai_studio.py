@@ -713,17 +713,8 @@ def plan_story_vector_animation():
     plan = _parse_model_json(raw)
     if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
         raise ApiError(502, "The drawing model must return exactly four vector frames. Try a shorter, clearer scene beat.")
+    # The validator converts normalized coordinates and stroke widths into canvas pixels.
     frames = _validated_vector_frames(plan["frames"], width, height, coordinates_normalized=True)
-    for frame in frames:
-        for stroke in frame["strokes"]:
-            stroke["commands"] = [
-                [command[0]] + [
-                    round(float(value) * (width if index % 2 == 1 else height) / 1000, 2)
-                    for index, value in enumerate(command[1:], start=1)
-                ] if command[0] != "Z" else ["Z"]
-                for command in stroke["commands"]
-            ]
-            stroke["width"] = round(max(0.5, min(22, stroke["width"] * min(width, height) / 1000)), 2)
     return jsonify(
         title=str(scene_title)[:180],
         summary=str(plan.get("summary") or "Editable native vector animation")[:2000],
