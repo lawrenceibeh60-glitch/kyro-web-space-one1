@@ -424,10 +424,12 @@ async function boot() {
       const frames = task.frames;
       const frameSpan = 3;
       const sceneLength = frames.length * frameSpan;
-      const hasArt = Object.values(state.project.drawings || {}).some(drawing => drawing?.strokes?.length);
-      const lastOccupied = scene.layers.reduce((maximum, layer) =>
-        Math.max(maximum, ...(layer.exposures || []).map(exposure => (exposure.start || 0) + (exposure.length || 1))), 0);
-      const startFrame = hasArt ? lastOccupied : 0;
+      const occupiedEnds = scene.layers.flatMap(layer =>
+        (layer.exposures || [])
+          .filter(exposure => state.project.drawings?.[exposure.drawing]?.strokes?.length)
+          .map(exposure => (exposure.start || 0) + (exposure.length || 1))
+      );
+      const startFrame = occupiedEnds.length ? Math.max(...occupiedEnds) : 0;
       const endFrame = startFrame + sceneLength;
       if (endFrame > 2000) throw new Error('This story would exceed KAE’s 2,000-frame project limit.');
       if (settings.duration_frames < endFrame) {
