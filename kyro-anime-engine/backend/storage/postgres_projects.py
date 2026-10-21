@@ -3,8 +3,12 @@
 Set DATABASE_URL to a managed PostgreSQL connection string in production.
 Filesystem storage remains available for local/offline development.
 """
+import json
 import os
 import threading
+from pathlib import Path
+
+import config
 
 _lock = threading.RLock()
 _ready = False
@@ -54,7 +58,44 @@ def _ensure_schema(conn):
             "CREATE INDEX IF NOT EXISTS kae_projects_updated_at_idx "
             "ON kae_projects (updated_at DESC)"
         )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS kae_storage_migrations (
+                name TEXT PRIMARY KEY,
+                completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
         conn.commit()
+        # Import legacy JSON projects once, without overwriting anything already in
+        # PostgreSQL. This keeps existing work when DATABASE_URL is first enabled.
+        marker = conn.execute(
+            "SELECT 1 FROM kae_storage_migrations WHERE name = %s",
+            ("filesystem-projects-v1",),
+        ).fetchone()
+        if not marker:
+            root = Path(config.PROJECTS_DIR)
+            if root.exists():
+                for project_file in root.glob("*/project.json"):
+                    try:
+                        with project_file.open("r", encoding="utf-8") as handle:
+                            document = json.load(handle)
+                        project_id = document.get("id")
+                        if not isinstance(project_id, str) or not project_id:
+                            continue
+                        from psycopg.types.json import Jsonb
+                        conn.execute(
+                            "INSERT INTO kae_projects (id, document) VALUES (%s, %s) "
+                            "ON CONFLICT (id) DO NOTHING",
+                            (project_id, Jsonb(document)),
+                        )
+                    except (OSError, ValueError, TypeError):
+                        # Leave unreadable legacy files untouched for manual recovery.
+                        continue
+            conn.execute(
+                "INSERT INTO kae_storage_migrations (name) VALUES (%s) "
+                "ON CONFLICT (name) DO NOTHING",
+                ("filesystem-projects-v1",),
+            )
+            conn.commit()
         _ready = True
 
 
