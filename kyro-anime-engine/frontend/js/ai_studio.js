@@ -68,6 +68,14 @@ export function initAIStudio() {
   const testProvider = el('button', { type: 'button', class: 'primary' }, 'Test & connect');
   const providerActions = el('div', { class: 'ai-provider-actions' });
   providerActions.append(refreshModels, testProvider);
+  const imageProviderSelect = el('select', { class: 'ai-provider-control', 'aria-label': 'Image generation provider' });
+  const imageModelSelect = el('select', { class: 'ai-provider-control', 'aria-label': 'Image generation model' });
+  const imageApiKey = el('input', { class: 'ai-provider-control', type: 'password', placeholder: 'xKiro image API key', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Image generation API key' });
+  const loadImageModels = el('button', { type: 'button' }, 'Load image models');
+  const testImageModel = el('button', { type: 'button' }, 'Test image model');
+  const imageProviderActions = el('div', { class: 'ai-provider-actions' });
+  imageProviderActions.append(loadImageModels, testImageModel);
+  const imageProviderGrid = el('div', { class: 'ai-provider-grid' });
   function providerField(label, control) {
     const wrap = el('label', { class: 'ai-provider-field' });
     wrap.append(el('span', {}, label), control);
@@ -80,7 +88,20 @@ export function initAIStudio() {
     providerField('CUSTOM MODEL ID (OPTIONAL)', customModel),
     providerField('API BASE URL', baseUrl),
   );
+  imageProviderSelect.append(
+    el('option', { value: 'xkiro' }, 'xKiro · image generation'),
+    el('option', { value: 'groq' }, 'Groq · image understanding only'),
+  );
+  imageProviderGrid.append(
+    providerField('IMAGE PROVIDER', imageProviderSelect),
+    providerField('IMAGE MODEL', imageModelSelect),
+    providerField('IMAGE API KEY', imageApiKey),
+  );
+  const imageProviderHelp = el('p', { class: 'ai-provider-help' },
+    'xKiro offers text-to-image models. Groq offers vision models for understanding images, not generating them.');
   providerPanel.append(providerStatus, providerGrid, providerActions,
+    el('div', { class: 'ai-section-title' }, 'IMAGE GENERATION MODEL'),
+    imageProviderGrid, imageProviderActions, imageProviderHelp,
     el('p', { class: 'ai-provider-help' }, 'Keys are sent over HTTPS for your AI requests and kept only in this tab session. They are not saved to the KAE server. Claude uses its native API; other listed providers use OpenAI-compatible chat endpoints.'));
   const thread = el('div', { class: 'ai-thread', 'aria-live': 'polite' });
   const compose = el('form', { class: 'ai-compose' });
@@ -181,6 +202,85 @@ export function initAIStudio() {
     providerLight('', 'Not connected · enter key and test');
   }
   providerCatalog.forEach(item => providerSelect.append(el('option', { value: item.id }, item.label)));
+  function imageProfile() {
+    const provider = imageProviderSelect.value || 'xkiro';
+    return {
+      provider,
+      base_url: provider === 'xkiro' ? 'https://api.xkiro.com/v1' : 'https://api.groq.com/openai/v1',
+      api_key: imageApiKey.value.trim(),
+      model: imageModelSelect.value,
+    };
+  }
+  function populateImageModels(models, selected) {
+    imageModelSelect.replaceChildren();
+    for (const model of models) {
+      const label = imageProviderSelect.value === 'groq' ? model + ' · vision only' : model;
+      imageModelSelect.append(el('option', { value: model }, label));
+    }
+    if (selected && models.includes(selected)) imageModelSelect.value = selected;
+    if (!models.length) imageModelSelect.append(el('option', { value: '' }, 'Load image models'));
+    const generationSupported = imageProviderSelect.value === 'xkiro';
+    generate.disabled = !generationSupported;
+    imageProviderHelp.textContent = generationSupported
+      ? 'xKiro image models generate images. The exact selected model is sent to the image-generation API.'
+      : 'Groq image-capable models are for image understanding only. Groq does not currently provide text-to-image generation, so Generate image is disabled for Groq.';
+  }
+  function setImageProviderDefaults() {
+    const isXkiro = imageProviderSelect.value === 'xkiro';
+    if (!imageApiKey.value.trim() && providerSelect.value === imageProviderSelect.value) imageApiKey.value = apiKey.value;
+    populateImageModels(isXkiro
+      ? ['openai/gpt-image-2.5', 'sensenova/sensenova-u1.5-lite']
+      : ['qwen/qwen3.6-27b', 'qwen/qwen3.8-27b']);
+    try {
+      const savedImage = JSON.parse(sessionStorage.getItem('kae-ai-image-config') || 'null');
+      if (savedImage && savedImage.provider === imageProviderSelect.value) {
+        if (!imageApiKey.value) imageApiKey.value = savedImage.api_key || '';
+        populateImageModels(isXkiro
+          ? ['openai/gpt-image-2.5', 'sensenova/sensenova-u1.5-lite']
+          : ['qwen/qwen3.6-27b', 'qwen/qwen3.8-27b'], savedImage.model);
+      }
+    } catch (_) {}
+  }
+  imageProviderSelect.addEventListener('change', setImageProviderDefaults);
+  apiKey.addEventListener('input', () => {
+    if (imageProviderSelect.value === providerSelect.value && !imageApiKey.value) imageApiKey.value = apiKey.value;
+  });
+  loadImageModels.addEventListener('click', async () => {
+    const profile = imageProfile();
+    if (!profile.api_key) { providerLight('bad', 'Image provider API key required'); imageApiKey.focus(); return; }
+    loadImageModels.disabled = true;
+    providerLight('checking', 'Loading ' + profile.provider + ' image/vision models…');
+    try {
+      const result = await request('POST', '/api/ai/providers/image-models', { provider_config: profile });
+      populateImageModels(result.models || [], profile.model);
+      providerLight(result.generation_supported ? '' : 'bad',
+        result.generation_supported
+          ? 'Image models loaded · ' + (result.models || []).length + ' available'
+          : 'Groq vision models loaded; image generation is not supported by Groq.');
+      imageProviderHelp.textContent = result.note || imageProviderHelp.textContent;
+    } catch (error) {
+      providerLight('bad', 'Could not load image models: ' + error.message);
+    } finally { loadImageModels.disabled = false; }
+  });
+  testImageModel.addEventListener('click', async () => {
+    const profile = imageProfile();
+    if (!profile.api_key) { providerLight('bad', 'Image provider API key required'); imageApiKey.focus(); return; }
+    if (!profile.model) { providerLight('bad', 'Choose an image model first'); imageModelSelect.focus(); return; }
+    testImageModel.disabled = true;
+    providerLight('checking', 'Checking selected image model…');
+    try {
+      const result = await request('POST', '/api/ai/providers/test-image', { provider_config: profile });
+      sessionStorage.setItem('kae-ai-image-config', JSON.stringify(profile));
+      providerLight(result.generation_supported ? 'good' : 'bad',
+        result.generation_supported
+          ? 'IMAGE MODEL READY · ' + result.provider + ' / ' + result.model
+          : 'VISION ONLY · ' + result.provider + ' / ' + result.model);
+      imageProviderHelp.textContent = result.message;
+    } catch (error) {
+      providerLight('bad', 'IMAGE MODEL CHECK FAILED · ' + error.message);
+    } finally { testImageModel.disabled = false; }
+  });
+  setImageProviderDefaults();
   providerSelect.addEventListener('change', resetProviderForSelection);
   refreshModels.addEventListener('click', async () => {
     const profile = providerProfile();
@@ -230,12 +330,23 @@ export function initAIStudio() {
       customModel.value = (selected?.models || []).includes(saved.model) ? '' : (saved.model || '');
       connectedProvider = saved;
       providerLight('good', 'SESSION CONFIGURED · ' + (selected?.label || saved.provider) + ' · run Test & connect to verify');
+      try {
+        const savedImage = JSON.parse(sessionStorage.getItem('kae-ai-image-config') || 'null');
+        if (savedImage) {
+          imageProviderSelect.value = savedImage.provider || 'xkiro';
+          imageApiKey.value = savedImage.api_key || '';
+          setImageProviderDefaults();
+          populateImageModels(imageProviderSelect.value === 'xkiro'
+            ? ['openai/gpt-image-2.5', 'sensenova/sensenova-u1.5-lite']
+            : ['qwen/qwen3.6-27b', 'qwen/qwen3.8-27b'], savedImage.model);
+        }
+      } catch (_) {}
     } else resetProviderForSelection();
   } catch (_) { resetProviderForSelection(); }
 
   function setBusy(value) {
     send.disabled = value;
-    generate.disabled = value;
+    generate.disabled = value || imageProviderSelect.value !== 'xkiro';
     analyze.disabled = value || !videoInput.files?.[0];
     buildPlan.disabled = value || !latestVideoAnalysis || !currentProject?.id;
     applyPlan.disabled = value || !currentPlan?.ops?.length;
@@ -594,15 +705,32 @@ export function initAIStudio() {
       return;
     }
     prompt.value = description;
+    const imageConfig = imageProfile();
+    if (imageConfig.provider !== 'xkiro') {
+      status.textContent = 'Groq vision models can analyze images, but they cannot generate images. Select xKiro under Image Generation Model.';
+      addMessage('assistant', status.textContent);
+      return;
+    }
+    if (!imageConfig.api_key) {
+      status.textContent = 'Enter an xKiro API key under Image Generation Model and test the selected image model.';
+      imageApiKey.focus();
+      return;
+    }
+    if (!imageConfig.model) {
+      status.textContent = 'Choose an image-generation model first.';
+      imageModelSelect.focus();
+      return;
+    }
     setBusy(true);
-    status.textContent = 'Submitting image job to xKiro…';
+    status.textContent = 'Submitting image job to xKiro / ' + imageConfig.model + '…';
     try {
-      let result = await request('POST', '/api/ai/images', { prompt: description });
+      sessionStorage.setItem('kae-ai-image-config', JSON.stringify(imageConfig));
+      let result = await request('POST', '/api/ai/images', { prompt: description, image_config: imageConfig });
       const deadline = Date.now() + 5 * 60 * 1000;
       while (result.status !== 'succeeded' && result.job_id && Date.now() < deadline) {
-        status.textContent = 'Generating image… xKiro job ' + result.status;
+        status.textContent = 'Generating with ' + imageConfig.model + '… job ' + result.status;
         await delay(2500);
-        result = await request('GET', '/api/ai/images/' + encodeURIComponent(result.job_id));
+        result = await request('POST', '/api/ai/images/' + encodeURIComponent(result.job_id), { image_config: imageConfig });
       }
       if (result.status !== 'succeeded') throw new Error(Date.now() >= deadline ? 'Image generation timed out after 5 minutes.' : 'Image job did not return a completed image.');
       const data = result.image || {};
