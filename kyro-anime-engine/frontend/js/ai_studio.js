@@ -711,7 +711,36 @@ export function initAIStudio() {
       addMessage('assistant', 'ANIMATION DIRECTOR · ' + storyboardPlan.title + '\n' +
         storyboardPlan.style_bible + '\n\nCharacter continuity: ' + storyboardPlan.character_bible +
         '\n\n' + storyboardPlan.keyframes.map(k => 'Frame ' + k.frame + ' · ' + k.beat + ' — ' + k.action).join('\n'));
-      status.textContent = '2/6 · Generating environment background…';
+      if (currentProject?.id) {
+        try {
+          status.textContent = '2/7 · Building validated timeline motion for existing project layers…';
+          const motion = await request('POST', '/api/ai/animation/plan', {
+            project_id: currentProject.id,
+            direction: direction + '\n\nAnimation beats: ' + storyboardPlan.keyframes.map(k =>
+              'Frame ' + k.frame + ': ' + k.action + '; camera: ' + k.camera
+            ).join('\n'),
+            analysis: storyboardPlan.style_bible + '\n' + storyboardPlan.character_bible,
+            ...providerConfig,
+          });
+          currentPlan = motion;
+          planSummary.textContent = motion.summary + '\n\nValidated transform keyframes: ' + motion.ops.length +
+            '\nThese animate existing project layers; generated storyboard images remain separate visual assets.\n\n' +
+            motion.ops.slice(0, 60).map((op, index) =>
+              (index + 1) + '. ' + op.scene_id + ' / ' + op.layer_id + ' · ' + op.channel +
+              ' = ' + op.value + ' at frame ' + op.time + ' (' + op.ease + ')'
+            ).join('\n');
+          planSummary.hidden = false;
+          applyPlan.disabled = !motion.ops.length;
+          if (motion.ops.length) addMessage('assistant', 'TIMELINE MOTION READY · ' + motion.ops.length +
+            ' validated keyframes are ready for your existing project layers. Use Apply transform keyframes to add them to the saved timeline.');
+        } catch (motionError) {
+          currentPlan = null;
+          applyPlan.disabled = true;
+          planSummary.textContent = 'Storyboard generation can continue, but automatic timeline motion could not be planned: ' + motionError.message;
+          planSummary.hidden = false;
+        }
+      }
+      status.textContent = '3/7 · Generating environment background…';
       storyboardBackground = await generateImageForPrompt(imageConfig,
         storyboardPlan.background_prompt + '\nStyle bible: ' + storyboardPlan.style_bible +
         '\nEnvironment plate only, absolutely no characters, wide 16:9 cinematic composition.',
