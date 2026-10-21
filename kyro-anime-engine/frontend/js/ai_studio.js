@@ -140,7 +140,15 @@ export function initAIStudio() {
   const buildPlan = el('button', { type: 'button', disabled: '' }, 'Build transform-keyframe plan');
   const applyPlan = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Apply transform keyframes');
   const planSummary = el('pre', { class: 'ai-plan-summary', hidden: '' });
-  videoPanel.append(videoInput, video, videoMeta, analyze, sceneSelect, reconstruct, vectorSummary, vectorPreview, applyReconstruction, buildPlan, planSummary, applyPlan);
+  const directAnimation = el('button', { type: 'button', class: 'primary' }, 'Generate animation from instruction');
+  const directAnimationNote = el('div', { class: 'ai-note' }, 'Describe the scene in the instruction box. KAE will plan the background, character continuity, four key poses and camera beats, generate the images, then let you export a timed WebM animatic.');
+  const storyboard = el('div', { class: 'ai-storyboard' });
+  const storyboardActions = el('div', { class: 'ai-actions' });
+  const previewAnimatic = el('button', { type: 'button', disabled: '' }, 'Preview animatic');
+  const exportAnimatic = el('button', { type: 'button', disabled: '' }, 'Export WebM animatic');
+  storyboardActions.append(previewAnimatic, exportAnimatic);
+  videoPanel.append(directAnimationNote, directAnimation, storyboard, storyboardActions,
+    videoInput, video, videoMeta, analyze, sceneSelect, reconstruct, vectorSummary, vectorPreview, applyReconstruction, buildPlan, planSummary, applyPlan);
 
   const stage = el('div', { class: 'ai-image-stage' });
   const image = el('img', { alt: 'Generated anime character preview', hidden: '' });
@@ -151,7 +159,12 @@ export function initAIStudio() {
   const download = el('a', { hidden: '', download: 'kae-character.png' }, 'Save image');
   download.style.cssText = 'padding:8px 10px;border:1px solid var(--line);color:inherit;text-decoration:none;font-size:12px';
   previewActions.append(showRef, download);
-  const note = el('p', { class: 'ai-note' }, 'The AI receives the sampled frames and the KAE capability/schema inventory. It will analyze the motion and ask for your creative changes. Analysis is not yet a finished animation; reconstruction must be generated as editable KAE project data.');
+  storyboard.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0';
+  let storyboardPlan = null;
+  let storyboardFrames = [];
+  let storyboardBackground = null;
+  let animaticRecorder = null;
+  const note = el('p', { class: 'ai-note' }, 'The AI receives the sampled frames and the KAE capability/schema inventory. It will analyze the motion and ask for your creative changes.');
   body.append(status, videoPanel, stage, prompt, previewActions, note);
   preview.append(previewHead, body);
   root.append(side, preview);
@@ -626,6 +639,193 @@ export function initAIStudio() {
     } finally {
       setBusy(false);
     }
+  });
+
+  async function generateImageForPrompt(imageConfig, imagePrompt, label) {
+    let result = await request('POST', '/api/ai/images', {
+      prompt: imagePrompt, image_config: imageConfig,
+    });
+    const deadline = Date.now() + 5 * 60 * 1000;
+    while (result.status !== 'succeeded' && result.job_id && Date.now() < deadline) {
+      status.textContent = label + ' · ' + result.status;
+      await delay(2200);
+      result = await request('POST', '/api/ai/images/' + encodeURIComponent(result.job_id), {
+        image_config: imageConfig,
+      });
+    }
+    if (result.status !== 'succeeded') throw new Error(label + ' timed out or did not complete.');
+    const item = result.image || {};
+    const url = item.url || (item.b64_json ? 'data:image/png;base64,' + item.b64_json : null);
+    if (!url) throw new Error(label + ' returned no usable image.');
+    return url;
+  }
+
+  function addStoryboardCard(title, subtitle, url) {
+    const card = el('article', { class: 'ai-storyboard-card' });
+    card.style.cssText = 'min-width:0;border:1px solid var(--line);padding:8px;background:var(--panel,#111820)';
+    const thumb = el('img', { alt: title, src: url });
+    thumb.style.cssText = 'width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#0a0e12';
+    const heading = el('strong', {}, title);
+    heading.style.cssText = 'display:block;font-size:12px;margin-top:7px';
+    const detail = el('div', {}, subtitle);
+    detail.style.cssText = 'font-size:11px;opacity:.8;margin-top:4px;line-height:1.4';
+    card.append(thumb, heading, detail);
+    storyboard.append(card);
+    return card;
+  }
+
+  directAnimation.addEventListener('click', async () => {
+    const direction = input.value.trim() || prompt.value.trim() ||
+      [...history].reverse().find(item => item.role === 'user')?.content || '';
+    if (!direction) {
+      status.textContent = 'Describe the animation you want in the instruction box first.';
+      input.focus();
+      return;
+    }
+    const imageConfig = imageProfile();
+    if (imageConfig.provider !== 'xkiro' || !imageConfig.api_key || !imageConfig.model) {
+      status.textContent = 'Choose xKiro, enter its API key, and select/test an image model in Image Generation Model.';
+      return;
+    }
+    const providerConfig = connectedProvider ? {
+      provider_config: {
+        provider: connectedProvider.provider, base_url: connectedProvider.base_url,
+        api_key: connectedProvider.api_key, model: connectedProvider.model,
+      },
+    } : {};
+    setBusy(true);
+    directAnimation.disabled = true;
+    previewAnimatic.disabled = true;
+    exportAnimatic.disabled = true;
+    storyboard.replaceChildren();
+    storyboardFrames = [];
+    storyboardBackground = null;
+    status.textContent = '1/6 · Directing the animation from your instruction…';
+    try {
+      const planResult = await request('POST', '/api/ai/animation/director', {
+        direction, project_id: currentProject?.id || null,
+        ...providerConfig,
+      });
+      storyboardPlan = planResult.plan;
+      sessionStorage.setItem('kae-ai-image-config', JSON.stringify(imageConfig));
+      addMessage('assistant', 'ANIMATION DIRECTOR · ' + storyboardPlan.title + '\n' +
+        storyboardPlan.style_bible + '\n\nCharacter continuity: ' + storyboardPlan.character_bible +
+        '\n\n' + storyboardPlan.keyframes.map(k => 'Frame ' + k.frame + ' · ' + k.beat + ' — ' + k.action).join('\n'));
+      status.textContent = '2/6 · Generating environment background…';
+      storyboardBackground = await generateImageForPrompt(imageConfig,
+        storyboardPlan.background_prompt + '\nStyle bible: ' + storyboardPlan.style_bible +
+        '\nEnvironment plate only, absolutely no characters, wide 16:9 cinematic composition.',
+        'Background generation');
+      addStoryboardCard('BACKGROUND PLATE', 'Environment · 16:9', storyboardBackground);
+      const frames = [];
+      for (let i = 0; i < storyboardPlan.keyframes.length; i++) {
+        const frame = storyboardPlan.keyframes[i];
+        status.textContent = (i + 3) + '/6 · Generating keyframe ' + (i + 1) + '/4…';
+        const promptText = frame.image_prompt + '\n\nCONTINUITY LOCK — ' +
+          storyboardPlan.character_bible + '\nSTYLE LOCK — ' + storyboardPlan.style_bible +
+          '\nSHOT: ' + frame.camera + '\nACTION BEAT: ' + frame.action +
+          '\nSame lead character identity, face, hairstyle, costume, colors, body proportions and linework as every other frame. ' +
+          'Full cinematic 16:9 anime frame, coherent lighting and perspective, no text, no watermark.';
+        const url = await generateImageForPrompt(imageConfig, promptText, 'Keyframe ' + (i + 1));
+        frames.push({ ...frame, url });
+        addStoryboardCard('KEYFRAME ' + (i + 1) + ' · F' + frame.frame,
+          frame.beat + ' · ' + frame.camera, url);
+        storyboardFrames = frames.slice();
+      }
+      previewAnimatic.disabled = false;
+      exportAnimatic.disabled = false;
+      status.textContent = 'Storyboard ready · background + ' + frames.length +
+        ' generated keyframes. Preview or export a timed WebM animatic.';
+      addMessage('assistant', 'ANIMATIC READY — background plate and four keyframe images generated. This is a timed storyboard animatic, not yet a fully in-betweened production animation. Export WebM to review the motion beats.');
+    } catch (error) {
+      status.textContent = 'Animation generation stopped: ' + error.message;
+      addMessage('assistant', 'Animation generation error: ' + error.message);
+    } finally {
+      directAnimation.disabled = false;
+      setBusy(false);
+    }
+  });
+
+  async function makeAnimatic() {
+    if (!storyboardFrames.length) throw new Error('Generate a storyboard first.');
+    const canvas = document.createElement('canvas');
+    canvas.width = 1280;
+    canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas rendering is unavailable.');
+    const loadImage = src => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Could not load one of the generated storyboard images.'));
+      img.src = src;
+    });
+    const [background, frames] = await Promise.all([
+      storyboardBackground ? loadImage(storyboardBackground) : Promise.resolve(null),
+      Promise.all(storyboardFrames.map(frame => loadImage(frame.url))),
+    ]);
+    const stream = canvas.captureStream(storyboardPlan?.fps || 24);
+    const chunks = [];
+    const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      .find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type));
+    if (!mimeType) throw new Error('This browser does not support WebM recording.');
+    const recorder = new MediaRecorder(stream, { mimeType });
+    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    const finished = new Promise((resolve, reject) => {
+      recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+      recorder.onerror = () => reject(new Error('WebM recording failed.'));
+    });
+    const fps = storyboardPlan?.fps || 24;
+    const totalSeconds = storyboardPlan?.duration_seconds || 4;
+    const frameSeconds = totalSeconds / frames.length;
+    const drawCover = img => {
+      const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+      const width = img.width * scale, height = img.height * scale;
+      ctx.drawImage(img, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+    };
+    recorder.start();
+    const started = performance.now();
+    for (let i = 0; i < frames.length; i++) {
+      const segmentStart = started + i * frameSeconds * 1000;
+      while (performance.now() < segmentStart + frameSeconds * 1000) {
+        if (background) drawCover(background);
+        else { ctx.fillStyle = '#101820'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+        drawCover(frames[i]);
+        // Subtle camera push-in gives the still-frame storyboard a cinematic animatic feel.
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+    }
+    recorder.stop();
+    const blob = await finished;
+    stream.getTracks().forEach(track => track.stop());
+    return blob;
+  }
+
+  previewAnimatic.addEventListener('click', async () => {
+    setBusy(true);
+    status.textContent = 'Rendering preview animatic…';
+    try {
+      const blob = await makeAnimatic();
+      const url = URL.createObjectURL(blob);
+      const previewVideo = el('video', { controls: '', playsinline: '', src: url });
+      previewVideo.style.cssText = 'width:100%;max-height:360px;grid-column:1/-1';
+      storyboard.append(previewVideo);
+      status.textContent = 'Animatic preview ready.';
+    } catch (error) { status.textContent = 'Could not render preview: ' + error.message; }
+    finally { setBusy(false); }
+  });
+
+  exportAnimatic.addEventListener('click', async () => {
+    setBusy(true);
+    status.textContent = 'Rendering WebM animatic…';
+    try {
+      const blob = await makeAnimatic();
+      const url = URL.createObjectURL(blob);
+      const link = el('a', { href: url, download: 'kae-animation-animatic.webm' }, 'Download WebM animatic');
+      link.style.cssText = 'display:inline-block;padding:10px;border:1px solid var(--line);color:inherit;grid-column:1/-1';
+      storyboard.append(link);
+      status.textContent = 'WebM animatic exported. Download it to your device.';
+    } catch (error) { status.textContent = 'Could not export WebM: ' + error.message; }
+    finally { setBusy(false); }
   });
 
   buildPlan.addEventListener('click', async () => {
