@@ -459,36 +459,48 @@ async function boot() {
       overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
         '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
         '\nFrame 1/4 · preparing canvas…';
+      let totalDrawnStrokes = 0;
       for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
         const drawingId = drawings[frameIndex];
-        const sourceStrokes = frames[frameIndex]?.strokes || [];
-        setFrame(startFrame + frameIndex * frameSpan);
-        setState({ sceneId: scene.id, layerId, frame: startFrame + frameIndex * frameSpan });
-        overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
-          '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
-          '\nFrame ' + (frameIndex + 1) + '/4 · drawing ' + sourceStrokes.length + ' vector strokes';
-        for (let strokeIndex = 0; strokeIndex < sourceStrokes.length; strokeIndex++) {
-          const source = sourceStrokes[strokeIndex];
-          if (!Array.isArray(source.commands) || source.commands.length < 2) continue;
-          const stroke = {
-            ...source,
-            id: 'ai_st_' + token + '_' + frameIndex + '_' + strokeIndex,
-            commands: [source.commands[0]],
-          };
-          const strokePath = ['drawings', drawingId, 'strokes'];
-          execute(insertAt(strokePath, state.project.drawings[drawingId].strokes.length, stroke, 'AI draw vector stroke'));
-          const liveStroke = state.project.drawings[drawingId].strokes[state.project.drawings[drawingId].strokes.length - 1];
-          for (let commandIndex = 1; commandIndex < source.commands.length; commandIndex++) {
-            liveStroke.commands.push(source.commands[commandIndex]);
-            bus.emit('project:changed', { label: 'AI is drawing' });
-            await pause(16);
-          }
-          overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
-            '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
-            '\nFrame ' + (frameIndex + 1) + '/4 · completed stroke ' + (strokeIndex + 1) + '/' + sourceStrokes.length;
+        const sourceStrokes = Array.isArray(frames[frameIndex]?.strokes) ? frames[frameIndex].strokes : [];
+        const usableStrokes = sourceStrokes.filter(source =>
+          Array.isArray(source?.commands) && source.commands.length >= 2 &&
+          source.commands.every(command => Array.isArray(command) &&
+            ['M', 'L', 'Q', 'C', 'Z'].includes(command[0]) &&
+            command.slice(1).every(Number.isFinite))
+        );
+        if (!usableStrokes.length) {
+          throw new Error('AI frame ' + (frameIndex + 1) + ' contains no drawable vector paths.');
         }
-        bus.emit('project:changed', { label: 'AI frame drawn' });
-        await pause(180);
+
+        const frameNumber = startFrame + frameIndex * frameSpan;
+        setFrame(frameNumber);
+        setState({ sceneId: scene.id, layerId, frame: frameNumber });
+        overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
+          '\\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
+          '\\nFrame ' + (frameIndex + 1) + '/4 · rendering ' + usableStrokes.length + ' vector paths…';
+
+        // Commit complete paths through KAE's command system. Never mutate a drawing
+        // behind the renderer's back: each command clones the data, marks the project
+        // dirty, refreshes the viewport, and makes the artwork undoable.
+        const completeStrokes = usableStrokes.map((source, strokeIndex) => ({
+          ...source,
+          id: 'ai_st_' + token + '_' + frameIndex + '_' + strokeIndex,
+          commands: source.commands.map(command => [...command]),
+        }));
+        execute(setValue(
+          ['drawings', drawingId, 'strokes'],
+          completeStrokes,
+          'Render AI frame ' + (frameIndex + 1)
+        ));
+        totalDrawnStrokes += completeStrokes.length;
+        overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
+          '\\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
+          '\\nFrame ' + (frameIndex + 1) + '/4 · rendered ' + completeStrokes.length + ' paths (' + totalDrawnStrokes + ' total)';
+        await pause(250);
+      }
+      if (!drawings.some(id => state.project.drawings[id]?.strokes?.length)) {
+        throw new Error('KAE received the animation but produced zero visible strokes.');
       }
       setFrame(startFrame);
       await save({ silent: true });
