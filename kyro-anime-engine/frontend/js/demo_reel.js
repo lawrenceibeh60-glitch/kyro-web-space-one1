@@ -75,8 +75,8 @@ $('record').onclick=async()=>{
   const stream=canvas.captureStream(30);let mime='video/webm;codecs=vp9';if(!MediaRecorder.isTypeSupported(mime))mime='video/webm';
   recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:5000000});chunks=[];recording=true;$('record').textContent='■ Stop & save';$('recordStatus').textContent='Recording live 1280 × 720 canvas at 30 FPS…';
   recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
-  recorder.onstop=()=>{const blob=new Blob(chunks,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='KAE-Cinematic-Demo.webm';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);stream.getTracks().forEach(track=>track.stop());recording=false;$('record').textContent='● Record WebM';$('recordStatus').textContent='Video saved to your device · '+(blob.size/1024/1024).toFixed(1)+' MB.'};
-  recorder.start(250);paused=false;$('playPause').textContent='Ⅱ Pause';started=performance.now();
+  recorder.onstop=()=>{const blob=new Blob(chunks,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='KAE-Cinematic-Demo.webm';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);stream.getTracks().forEach(track=>track.stop());document.querySelector('.reel-stage').classList.remove('recording');recording=false;$('record').textContent='● Record WebM';$('recordStatus').textContent='Video saved to your device · '+(blob.size/1024/1024).toFixed(1)+' MB.'};
+  document.querySelector('.reel-stage').classList.add('recording');recorder.start(250);paused=false;$('playPause').textContent='Ⅱ Pause';started=performance.now();
  }catch(error){recording=false;$('recordStatus').textContent='Could not start recording: '+error.message}
 };
 draw(0);requestAnimationFrame(tick);
