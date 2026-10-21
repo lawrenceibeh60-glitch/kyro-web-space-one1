@@ -1,7 +1,7 @@
 // frontend/js/api/client.js
 export async function request(method, url, body) {
   let payload = body;
-  if (payload && typeof payload === 'object' && url.startsWith('/api/ai/')) {
+  if (payload && typeof payload === 'object' && ['/api/ai/chat', '/api/ai/video/analyze', '/api/ai/video/reconstruction/plan', '/api/ai/animation/plan'].includes(url)) {
     try {
       const saved = sessionStorage.getItem('kae-ai-provider-config');
       if (saved && !payload.provider_config) payload = { ...payload, provider_config: JSON.parse(saved) };
