@@ -90,7 +90,7 @@ def provider_request(profile, path, method="GET", payload=None, timeout=30):
         except (OSError, ValueError):
             detail = ""
         detail = re.sub(re.escape(profile["api_key"]), "[REDACTED]", detail, flags=re.I) if profile.get("api_key") else detail
-        detail = re.sub(r"(?i)(bearer\\s+)[^\\s,;]+", r"\\1[REDACTED]", detail)[:420]
+        detail = re.sub(r"(?i)(bearer\s+)[^\s,;]+", r"\1[REDACTED]", detail)[:420]
         if not detail:
             detail = "Check the API key, account access, endpoint, and model permissions."
         raise ApiError(502, f"{profile['label']} returned HTTP {exc.code}: {detail}") from exc
