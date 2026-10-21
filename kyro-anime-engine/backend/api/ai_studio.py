@@ -557,6 +557,110 @@ def create_animation_plan():
     )
 
 
+@bp.post("/ai/animation/director")
+def direct_animation_blueprint():
+    """Turn a plain-language instruction into a validated production-ready storyboard plan."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError(400, "Request body must be a JSON object")
+    direction = data.get("direction")
+    if not isinstance(direction, str) or not direction.strip():
+        raise ApiError(400, "Describe the animation you want KAE to create.")
+    if len(direction) > 8000:
+        raise ApiError(413, "Animation instruction is too long (maximum 8000 characters).")
+    project = None
+    project_id = data.get("project_id")
+    if isinstance(project_id, str) and project_id.strip():
+        project = project_repository.load(project_id)
+    key, base, model, _, _ = _config(data)
+    if not isinstance(data.get("provider_config"), dict) and not key:
+        raise ApiError(503, "Connect an AI chat provider before generating an animation plan.")
+    context = build_system_context(project) if project else (
+        "You are the animation director inside KYRO Animation Engine (KAE), an anime-first 2D/2.5D animation studio."
+    )
+    prompt = (
+        "Act as a senior anime animation director, storyboard artist, character designer and background artist. "
+        "Convert the user's instruction into a concrete production plan. Return ONLY valid JSON with keys: "
+        "title (string), style_bible (string), character_bible (string), background_prompt (string), "
+        "fps (integer 12-30), duration_seconds (number 2-8), keyframes (array of exactly 4 objects). "
+        "Each keyframe must contain frame (integer), beat (short string), camera (string), action (string), "
+        "image_prompt (string). The image_prompt must describe a complete 16:9 cinematic anime frame, keep "
+        "the exact same character identity, outfit, colors, proportions and art direction across all frames, "
+        "and describe a distinct readable pose/action. Avoid text, captions, logos and watermarks. "
+        "Make the sequence temporally coherent: anticipation, main action, follow-through, settled ending. "
+        "background_prompt must describe a clean, detailed environment plate for the same scene with no characters, "
+        "no text, no watermark, 16:9 composition. Include lighting, atmospheric depth, foreground/midground/background, "
+        "and palette. Keep prompts actionable, specific and safe. Frames should be spaced across the duration. "
+        "Do not claim images or animation have already been generated.\n\n"
+        "USER INSTRUCTION:\n" + direction.strip() + "\n\n"
+        "CURRENT PROJECT CONTEXT (if supplied):\n" + json.dumps({
+            "name": project.get("name") if project else None,
+            "settings": project.get("settings", {}) if project else {},
+            "scenes": [
+                {"id": scene.get("id"), "name": scene.get("name"),
+                 "layers": [{"id": layer.get("id"), "name": layer.get("name")}
+                            for layer in scene.get("layers", []) if isinstance(layer, dict)]}
+                for scene in (project.get("scenes", []) if project else []) if isinstance(scene, dict)
+            ][:12],
+        }, ensure_ascii=False)[:10000]
+    )
+    messages = [{"role": "system", "content": context}, {"role": "user", "content": prompt}]
+    if isinstance(data.get("provider_config"), dict):
+        raw, used_model = provider_completion(read_provider_profile(data), messages, temperature=0.2, timeout=120)
+    else:
+        result = _request_json(
+            f"{base}/chat/completions",
+            method="POST",
+            payload={"model": model, "messages": messages, "temperature": 0.2},
+            api_key=key,
+            timeout=120,
+        )
+        raw, used_model = _chat_reply(result, model)
+    plan = _parse_model_json(raw)
+    if not isinstance(plan, dict) or not isinstance(plan.get("keyframes"), list) or len(plan["keyframes"]) != 4:
+        raise ApiError(502, "Animation director must return exactly four valid keyframes. Try a more specific instruction.")
+    for field in ("title", "style_bible", "character_bible", "background_prompt"):
+        if not isinstance(plan.get(field), str) or not plan[field].strip():
+            raise ApiError(502, f"Animation director omitted required field: {field}.")
+        plan[field] = plan[field].strip()[:5000]
+    try:
+        fps = int(plan.get("fps", 24))
+        duration = float(plan.get("duration_seconds", 4))
+    except (TypeError, ValueError) as exc:
+        raise ApiError(502, "Animation director returned invalid timing.") from exc
+    if not 12 <= fps <= 30 or not 2 <= duration <= 8:
+        raise ApiError(502, "Animation timing must be 12–30 FPS and 2–8 seconds.")
+    validated_frames = []
+    last_frame = -1
+    for index, frame in enumerate(plan["keyframes"]):
+        if not isinstance(frame, dict):
+            raise ApiError(502, f"Keyframe {index + 1} is invalid.")
+        try:
+            frame_number = int(frame.get("frame", round(index * (duration * fps - 1) / 3)))
+        except (TypeError, ValueError) as exc:
+            raise ApiError(502, f"Keyframe {index + 1} has invalid timing.") from exc
+        if not 0 <= frame_number < int(duration * fps) or frame_number <= last_frame:
+            frame_number = round(index * (duration * fps - 1) / 3)
+        last_frame = frame_number
+        values = {}
+        for field in ("beat", "camera", "action", "image_prompt"):
+            value = frame.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise ApiError(502, f"Keyframe {index + 1} is missing {field}.")
+            values[field] = value.strip()[:5000]
+        values["frame"] = frame_number
+        validated_frames.append(values)
+    return jsonify(
+        plan={
+            "title": plan["title"], "style_bible": plan["style_bible"],
+            "character_bible": plan["character_bible"], "background_prompt": plan["background_prompt"],
+            "fps": fps, "duration_seconds": duration, "keyframes": validated_frames,
+        },
+        model=used_model, project_id=project_id, status="planned",
+        note="This is a validated storyboard plan. Images must be generated before an animatic can be exported.",
+    )
+
+
 @bp.post("/ai/images")
 def generate_image():
     data = request.get_json(silent=True)
