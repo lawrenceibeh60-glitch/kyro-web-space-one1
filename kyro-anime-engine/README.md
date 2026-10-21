@@ -49,6 +49,22 @@ Choose **Studio** in the workspace bar to open the Effects, Rig, Character, and 
 - Generate a vector anime character with stable ID, hairstyle, expression, hair/eye/skin/outfit colors. Reusing its ID updates the same editable part layers and preserves existing animation.
 - Import WAV, MP3, OGG, M4A, AAC, or WebM audio clips. Set timeline start frame, trim offset, and volume. Playback follows the timeline; browser-recorded WebM exports mix the active audio clips. PNG, GIF, and sprite exports are silent.
 
+
+## AI provider connections
+
+Open the editor and choose **AI Workspace**. The AI Provider Connection panel supports OpenAI, Anthropic/Claude, Groq, OpenRouter, Together AI, DeepSeek, Mistral, xAI, Cerebras, Fireworks AI, Perplexity, NVIDIA NIM, xKiro, and custom OpenAI-compatible endpoints.
+
+1. Choose a provider and enter its API key.
+2. Use **Load models** to query the provider's model list. If the provider does not expose a compatible model-list endpoint, KAE shows its curated fallback list.
+3. Choose a model and press **Test & connect**. The indicator turns green only after a real model response; failures show red with a sanitized error.
+4. Chat, video-frame analysis, and AI planning/reconstruction use the selected provider for the current browser tab session.
+
+Keys are sent to the KAE server over HTTPS only when you invoke an AI feature. They are not saved to server-side files or database and are kept in browser session storage for the current tab session. Do not use this with an untrusted KAE host. Provider model availability, API access, pricing, and rate limits are controlled by each provider. Image generation still uses the existing xKiro image endpoint; provider switching for image generation is not implied by the chat connection indicator.
+
+## Cinematic demo reel
+
+From the home screen, choose **Watch cinematic demo** or open `demo.html`. The original 24-second procedural anime-inspired motion study is drawn live in a 1280×720 canvas with layered parallax, character motion, energy trails, and a cinematic HUD. Use **Record WebM** to record the live animation to a WebM video file on a browser/device that supports `MediaRecorder`; recording happens locally and the video is not uploaded.
+
 ## Shortcuts
 `B` brush, `G` Grease Pencil, `E` eraser, `H` hand, `K` camera, `M` move, `R` rotate, `S` scale, `[` `]` size.
 `L` line, `U` rectangle, `O` ellipse, `P` hexagon, `T` star, `F` vector fill, `C` eyedropper.
