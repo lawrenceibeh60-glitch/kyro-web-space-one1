@@ -77,7 +77,23 @@ def provider_request(profile, path, method="GET", payload=None, timeout=30):
         with urlopen(req, timeout=timeout) as response:
             return json.loads(response.read(4 * 1024 * 1024).decode("utf-8"))
     except HTTPError as exc:
-        raise ApiError(502, f"{profile['label']} returned HTTP {exc.code}. Check the key, account access, and model permissions.") from exc
+        # Provider error bodies are essential for diagnosing model/permission mismatches.
+        # Never return a body that contains the submitted secret.
+        try:
+            raw_detail = exc.read(4096).decode("utf-8", "replace")
+            parsed_detail = json.loads(raw_detail)
+            error_obj = parsed_detail.get("error", parsed_detail)
+            if isinstance(error_obj, dict):
+                detail = str(error_obj.get("message") or error_obj.get("detail") or error_obj.get("type") or "")
+            else:
+                detail = str(error_obj)
+        except (OSError, ValueError):
+            detail = ""
+        detail = re.sub(re.escape(profile["api_key"]), "[REDACTED]", detail, flags=re.I) if profile.get("api_key") else detail
+        detail = re.sub(r"(?i)(bearer\s+)[^\s,;]+", r"\1[REDACTED]", detail)[:420]
+        if not detail:
+            detail = "Check the API key, account access, endpoint, and model permissions."
+        raise ApiError(502, f"{profile['label']} returned HTTP {exc.code}: {detail}") from exc
     except (URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise ApiError(502, f"Could not reach {profile['label']} ({type(exc).__name__}). Check the base URL and network.") from exc
 
@@ -109,12 +125,27 @@ def completion(profile, messages, temperature=0.2, timeout=90):
                             raise ApiError(400, "Claude image analysis requires base64 JPEG, PNG, GIF, or WebP frames.")
                 content = blocks
             conversation.append({"role": item["role"], "content": content})
-        result = provider_request(profile, "/messages", "POST", {"model": model, "max_tokens": 4096, "temperature": temperature, "system": system, "messages": conversation}, timeout)
+        payload = {"model": model, "max_tokens": 4096, "system": system, "messages": conversation}
+        if temperature is not None:
+            payload["temperature"] = temperature
+        result = provider_request(profile, "/messages", "POST", payload, timeout)
         reply = "\n".join(block.get("text", "") for block in result.get("content", []) if isinstance(block, dict) and block.get("type") == "text")
         if not reply.strip():
             raise ApiError(502, "Claude returned no text response.")
         return reply.strip(), result.get("model", model)
-    result = provider_request(profile, "/chat/completions", "POST", {"model": model, "messages": messages, "temperature": temperature}, timeout)
+    payload = {"model": model, "messages": messages}
+    if temperature is not None:
+        payload["temperature"] = temperature
+    try:
+        result = provider_request(profile, "/chat/completions", "POST", payload, timeout)
+    except ApiError as exc:
+        # Some hosted/reasoning models reject temperature even though their provider
+        # implements the OpenAI-compatible API. Retry only for that specific parameter error.
+        message = str(exc).lower()
+        if temperature is None or "temperature" not in message or not any(word in message for word in ("unsupported", "not support", "does not support", "invalid", "only the default")):
+            raise
+        payload.pop("temperature", None)
+        result = provider_request(profile, "/chat/completions", "POST", payload, timeout)
     choices = result.get("choices") or []
     content = choices[0].get("message", {}).get("content") if choices else None
     if isinstance(content, list):
@@ -143,5 +174,7 @@ def list_models():
 @bp.post("/ai/providers/test")
 def test_connection():
     profile = read_profile(request.get_json(silent=True) or {})
-    reply, used_model = completion(profile, [{"role": "user", "content": "Reply with exactly: KAE connection successful"}], temperature=0, timeout=35)
+    # Keep the probe minimal: some models reject temperature=0 or expose only
+    # a restricted subset of OpenAI-compatible parameters.
+    reply, used_model = completion(profile, [{"role": "user", "content": "Reply with exactly: KAE connection successful"}], temperature=None, timeout=35)
     return jsonify(ok=True, provider=profile["label"], model=used_model, reply=reply[:160], message="Provider connected and returned a response.")
