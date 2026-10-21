@@ -60,7 +60,11 @@ def read_profile(data):
 
 
 def provider_request(profile, path, method="GET", payload=None, timeout=30):
-    headers = {"Accept": "application/json"}
+    # Identify KAE honestly as an API client; do not impersonate a browser.
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "KYRO-Animation-Engine/1.0 (+https://kyro-animation-engine.onrender.com; provider API client)",
+    }
     if profile["provider"] == "anthropic":
         headers["x-api-key"] = profile["api_key"]
         headers["anthropic-version"] = "2023-06-01"
@@ -80,14 +84,23 @@ def provider_request(profile, path, method="GET", payload=None, timeout=30):
         # Provider error bodies are essential for diagnosing model/permission mismatches.
         # Never return a body that contains the submitted secret.
         try:
-            raw_detail = exc.read(4096).decode("utf-8", "replace")
-            parsed_detail = json.loads(raw_detail)
-            error_obj = parsed_detail.get("error", parsed_detail)
-            if isinstance(error_obj, dict):
-                detail = str(error_obj.get("message") or error_obj.get("detail") or error_obj.get("type") or "")
-            else:
-                detail = str(error_obj)
-        except (OSError, ValueError):
+            raw_detail = exc.read(8192).decode("utf-8", "replace")
+            try:
+                parsed_detail = json.loads(raw_detail)
+                error_obj = parsed_detail.get("error", parsed_detail)
+                if isinstance(error_obj, dict):
+                    detail = str(error_obj.get("message") or error_obj.get("detail") or error_obj.get("type") or "")
+                else:
+                    detail = str(error_obj)
+            except ValueError:
+                # Security gateways often return HTML (for example, a browser-signature
+                # block page) instead of the provider JSON error format.
+                title = re.search(r"(?is)<title[^>]*>(.*?)</title>", raw_detail)
+                text_only = re.sub(r"(?is)<(script|style).*?>.*?</\\1>", " ", raw_detail)
+                text_only = re.sub(r"(?s)<[^>]+>", " ", text_only)
+                text_only = re.sub(r"\\s+", " ", text_only).strip()
+                detail = (title.group(1).strip() + ": " if title else "") + text_only[:500]
+        except OSError:
             detail = ""
         detail = re.sub(re.escape(profile["api_key"]), "[REDACTED]", detail, flags=re.I) if profile.get("api_key") else detail
         detail = re.sub(r"(?i)(bearer\s+)[^\s,;]+", r"\1[REDACTED]", detail)[:420]
