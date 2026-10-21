@@ -694,10 +694,19 @@ export function initAIStudio() {
     const providerPayload = activeProviderPayload();
     if (!currentProject?.id) throw new Error('Open a KAE project before drawing a story.');
     root.hidden = true;
+    let mainProgress = document.getElementById('kaeAIDrawingProgress');
+    if (!mainProgress) {
+      mainProgress = el('div', { id: 'kaeAIDrawingProgress' });
+      mainProgress.style.cssText = 'position:fixed;z-index:2000;left:16px;bottom:16px;max-width:min(560px,calc(100vw - 32px));padding:12px 16px;background:#0b1017;border:1px solid var(--accent,#e8c547);color:var(--text,#eef2f7);font:12px/1.55 ui-monospace,monospace;box-shadow:0 10px 40px #0009;white-space:pre-wrap';
+      document.body.append(mainProgress);
+    }
+    mainProgress.hidden = false;
+    mainProgress.textContent = 'KYRO STORY DIRECTOR\nReading story and planning the full scene sequence…';
     const outlineResult = await request('POST', '/api/ai/story/outline', {
       story: rawStory, project: projectSummary(), ...providerPayload,
     });
     const outline = outlineResult;
+    mainProgress.textContent = 'KYRO STORY LOCKED · ' + outline.title + '\n' + outline.scenes.length + ' scenes planned. Preparing native canvas drawings…';
     addMessage('assistant', 'STORY LOCKED · ' + outline.title + '\n' + outline.logline +
       '\n\nStyle: ' + outline.style_bible + '\n\n' +
       outline.scenes.map(scene => scene.scene_number + '. ' + scene.title + ' — ' + scene.action).join('\n'));
@@ -705,6 +714,7 @@ export function initAIStudio() {
     for (let index = 0; index < total; index++) {
       const scene = outline.scenes[index];
       storyStatus.textContent = 'Scene ' + (index + 1) + '/' + total + ' · asking KAE to draw native vector paths…';
+      mainProgress.textContent = 'KYRO DRAWING · ' + outline.title + '\nScene ' + (index + 1) + '/' + total + ': ' + scene.title + '\nBuilding editable vector paths…';
       const direction = [
         'WHOLE STORY: ' + outline.title + ' — ' + outline.logline,
         'GLOBAL STYLE BIBLE: ' + outline.style_bible,
@@ -734,6 +744,8 @@ export function initAIStudio() {
       });
     }
     storyStatus.textContent = 'Story drawing complete · ' + total + ' scenes added to the editable KAE timeline.';
+    mainProgress.textContent = 'STORY DRAWING COMPLETE · ' + outline.title + '\n' + total +
+      ' scenes drawn as native editable vector cels and saved to the KAE project.';
     addMessage('assistant', 'DRAWING COMPLETE · ' + outline.title + '\n' + total +
       ' story scenes have been drawn as native editable vector cels on the main canvas and saved to your KAE project.');
     root.hidden = true;
