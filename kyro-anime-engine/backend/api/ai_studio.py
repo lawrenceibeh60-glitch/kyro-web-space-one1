@@ -661,6 +661,72 @@ def direct_animation_blueprint():
     )
 
 
+@bp.post("/ai/story/outline")
+def expand_story_outline():
+    """Expand imported story JSON into an ordered, animation-ready scene list."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        raise ApiError(400, "Request body must be a JSON object")
+    story = data.get("story")
+    if not isinstance(story, (dict, list, str)):
+        raise ApiError(400, "Import a story JSON object, array, or text field.")
+    story_text = json.dumps(story, ensure_ascii=False) if not isinstance(story, str) else story
+    if not story_text.strip() or len(story_text) > 30000:
+        raise ApiError(413, "Story JSON must contain text and be under 30,000 characters.")
+    if not isinstance(data.get("provider_config"), dict):
+        raise ApiError(400, "Connect an AI chat provider in KAE AI settings first.")
+    profile = read_provider_profile(data)
+    project = data.get("project") if isinstance(data.get("project"), dict) else {}
+    prompt = (
+        "Turn the imported story into a complete, coherent animation production outline. Return ONLY JSON with "
+        "keys title (string), logline (string), style_bible (string), characters (array of concise character design "
+        "descriptions), scenes (array of 1 to 12 objects). Each scene must have scene_number (integer), title (string), "
+        "location (string), mood (string), characters (array of names), action (string), visual_description (string), "
+        "continuity_notes (string), and dialogue (string). Preserve the user's story events and ending; do not invent "
+        "major plot twists that contradict the source. Split action into drawable scenes with clear beginnings and "
+        "endings. Every visual_description must describe what is visibly on the canvas, including foreground, "
+        "background, lighting, character pose, costume, and props. Keep character appearance consistent between scenes. "
+        "Limit the outline to 12 scenes so each can be drawn as native vector cels. No markdown.\n\n"
+        "PROJECT CANVAS: " + json.dumps(project.get("settings", {}), ensure_ascii=False)[:1000] + "\n"
+        "IMPORTED STORY JSON:\n" + story_text
+    )
+    raw, used_model = provider_completion(profile, [
+        {"role": "system", "content": "You are KAE's story editor and animation director. Return compact valid JSON only."},
+        {"role": "user", "content": prompt},
+    ], temperature=0.2, timeout=180)
+    outline = _parse_model_json(raw)
+    if not isinstance(outline, dict) or not isinstance(outline.get("scenes"), list) or not 1 <= len(outline["scenes"]) <= 12:
+        raise ApiError(502, "The story director must return between 1 and 12 scenes.")
+    required = ("title", "logline", "style_bible")
+    for field in required:
+        if not isinstance(outline.get(field), str) or not outline[field].strip():
+            raise ApiError(502, f"Story director omitted {field}.")
+        outline[field] = outline[field].strip()[:3000]
+    scenes = []
+    for index, scene in enumerate(outline["scenes"]):
+        if not isinstance(scene, dict):
+            raise ApiError(502, f"Story scene {index + 1} is invalid.")
+        normalized = {"scene_number": index + 1}
+        for field in ("title", "location", "mood", "action", "visual_description", "continuity_notes", "dialogue"):
+            value = scene.get(field, "")
+            if not isinstance(value, str):
+                value = str(value)
+            normalized[field] = value.strip()[:3500]
+        chars = scene.get("characters", [])
+        normalized["characters"] = [str(name)[:120] for name in chars[:12]] if isinstance(chars, list) else []
+        if not normalized["title"] or not normalized["visual_description"]:
+            raise ApiError(502, f"Story scene {index + 1} needs a title and visual description.")
+        scenes.append(normalized)
+    cast = outline.get("characters", [])
+    if not isinstance(cast, list):
+        cast = []
+    return jsonify(
+        title=outline["title"], logline=outline["logline"], style_bible=outline["style_bible"],
+        characters=[str(item)[:1200] for item in cast[:20]],
+        scenes=scenes, model=used_model, status="outlined",
+    )
+
+
 @bp.post("/ai/story/vector-plan")
 def plan_story_vector_animation():
     """Translate one story beat into editable native vector animation cels (no generated images)."""
