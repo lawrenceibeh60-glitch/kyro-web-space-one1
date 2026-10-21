@@ -50,6 +50,35 @@ class AIProviderHubTests(unittest.TestCase):
         })
         self.assertEqual(response.status_code, 400)
 
+    def test_provider_error_explains_model_problem_without_leaking_key(self):
+        from urllib.error import HTTPError
+        from io import BytesIO
+        body = b'{"error":{"message":"model not available for this key"}}'
+        error = HTTPError("https://api.groq.com/openai/v1/chat/completions", 404, "Not Found", {}, BytesIO(body))
+        with patch("backend.api.ai_providers.urlopen", side_effect=error):
+            response = self.client.post("/api/ai/providers/test", json={
+                "provider_config": {"provider": "groq", "api_key": "secret-test-key", "model": "bad-model"}
+            })
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("model not available", response.get_json()["error"])
+        self.assertNotIn("secret-test-key", response.get_data(as_text=True))
+
+    def test_completion_retries_without_unsupported_temperature(self):
+        from backend.app.exceptions import ApiError
+        from backend.api.ai_providers import completion, read_profile
+        profile = read_profile({"provider_config": {
+            "provider": "groq", "api_key": "secret-test-key", "model": "openai/gpt-oss-120b"
+        }})
+        with patch("backend.api.ai_providers.provider_request", side_effect=[
+            ApiError(502, "Groq returned HTTP 400: temperature is not supported for this model"),
+            {"choices": [{"message": {"content": "works"}}], "model": "openai/gpt-oss-120b"},
+        ]) as mocked:
+            reply, model = completion(profile, [{"role": "user", "content": "hello"}], temperature=0.2)
+        self.assertEqual(reply, "works")
+        self.assertEqual(model, "openai/gpt-oss-120b")
+        self.assertEqual(mocked.call_count, 2)
+        self.assertNotIn("temperature", mocked.call_args_list[1].args[3])
+
 
 if __name__ == "__main__":
     unittest.main()
