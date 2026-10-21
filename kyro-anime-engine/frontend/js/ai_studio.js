@@ -658,9 +658,13 @@ export function initAIStudio() {
     if (!scenes.length) sceneSelect.append(el('option', { value: '' }, 'Open a project with a scene first'));
     setBusy(false);
     request('GET', '/api/ai/status').then(result => {
-      status.textContent = result.configured
-        ? 'KAE AI connected · chat ' + result.chat_model + ' · image model ' + result.image_model
-        : 'xKiro not configured: set XKIRO_API_KEY on the server or use ignored xkiro.txt.';
-    }).catch(() => { status.textContent = 'Could not check AI configuration.'; });
+      if (connectedProvider) {
+        status.textContent = 'AI provider session configured · ' + connectedProvider.provider + ' · ' + connectedProvider.model;
+      } else {
+        status.textContent = result.configured
+          ? 'KAE AI connected · chat ' + result.chat_model + ' · image model ' + result.image_model
+          : 'Choose a provider, enter your API key, and press Test & connect.';
+      }
+    }).catch(() => { if (!connectedProvider) status.textContent = 'Could not check AI configuration.'; });
   });
 }
