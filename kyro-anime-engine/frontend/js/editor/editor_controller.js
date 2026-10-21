@@ -398,6 +398,108 @@ async function boot() {
   bus.on('history', updateUI);
   bus.on('preview', updateFields);
   bus.on('playback', updateUI);
+
+  // KAE AI writes native editable vector paths directly into the active project.
+  window.addEventListener('kae:ai-draw-frames', async event => {
+    const task = event.detail || {};
+    const finish = (kind, value) => {
+      if (kind === 'reject') task.reject?.(value);
+      else task.resolve?.(value);
+    };
+    let overlay = document.getElementById('kaeAIDrawingProgress');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'kaeAIDrawingProgress';
+      overlay.style.cssText = 'position:fixed;z-index:2000;left:16px;bottom:16px;max-width:min(560px,calc(100vw - 32px));padding:12px 16px;background:#0b1017;border:1px solid var(--accent,#e8c547);color:var(--text,#eef2f7);font:12px/1.55 ui-monospace,monospace;box-shadow:0 10px 40px #0009;white-space:pre-wrap';
+      document.body.append(overlay);
+    }
+    const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+    try {
+      if (!state.project || !Array.isArray(task.frames) || task.frames.length !== 4) {
+        throw new Error('KAE editor is not ready or the AI did not return four vector frames.');
+      }
+      const scene = getScene();
+      if (!scene) throw new Error('Select a valid scene in the main editor first.');
+      const settings = state.project.settings;
+      const frames = task.frames;
+      const frameSpan = 3;
+      const sceneLength = frames.length * frameSpan;
+      const hasArt = Object.values(state.project.drawings || {}).some(drawing => drawing?.strokes?.length);
+      const lastOccupied = scene.layers.reduce((maximum, layer) =>
+        Math.max(maximum, ...(layer.exposures || []).map(exposure => (exposure.start || 0) + (exposure.length || 1))), 0);
+      const startFrame = hasArt ? lastOccupied : 0;
+      const endFrame = startFrame + sceneLength;
+      if (endFrame > 2000) throw new Error('This story would exceed KAE’s 2,000-frame project limit.');
+      if (settings.duration_frames < endFrame) {
+        execute(setValue(['settings', 'duration_frames'], endFrame, 'Extend timeline for AI story'));
+      }
+      const token = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const drawings = [];
+      const exposures = [];
+      for (let index = 0; index < frames.length; index++) {
+        const drawingId = 'ai_d_' + token + '_' + index;
+        const drawing = { id: drawingId, name: (task.title || 'AI Story') + ' · Cel ' + (index + 1), strokes: [] };
+        execute(setValue(['drawings', drawingId], drawing, 'Create AI drawing cel'));
+        drawings.push(drawingId);
+        exposures.push({ start: startFrame + index * frameSpan, length: frameSpan, drawing: drawingId });
+      }
+      const layerId = 'ai_story_' + token;
+      const layer = {
+        id: layerId, name: (task.title || 'AI Story').slice(0, 90),
+        type: 'drawing', visible: true, locked: false, opacity: 1, depth: 1,
+        blend: 'normal', exposures, tracks: {},
+      };
+      const currentSceneIndex = state.project.scenes.findIndex(item => item.id === scene.id);
+      execute(insertAt(['scenes', currentSceneIndex, 'layers'], scene.layers.length, layer, 'Add AI story drawing layer'));
+      setState({ sceneId: scene.id, layerId, frame: startFrame, dirty: true });
+      bus.emit('project:changed', { label: 'AI story drawing started' });
+      overlay.hidden = false;
+      overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
+        '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
+        '\nFrame 1/4 · preparing canvas…';
+      for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
+        const drawingId = drawings[frameIndex];
+        const sourceStrokes = frames[frameIndex]?.strokes || [];
+        setFrame(startFrame + frameIndex * frameSpan);
+        setState({ sceneId: scene.id, layerId, frame: startFrame + frameIndex * frameSpan });
+        overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
+          '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
+          '\nFrame ' + (frameIndex + 1) + '/4 · drawing ' + sourceStrokes.length + ' vector strokes';
+        for (let strokeIndex = 0; strokeIndex < sourceStrokes.length; strokeIndex++) {
+          const source = sourceStrokes[strokeIndex];
+          if (!Array.isArray(source.commands) || source.commands.length < 2) continue;
+          const stroke = {
+            ...source,
+            id: 'ai_st_' + token + '_' + frameIndex + '_' + strokeIndex,
+            commands: [source.commands[0]],
+          };
+          const strokePath = ['drawings', drawingId, 'strokes'];
+          execute(insertAt(strokePath, state.project.drawings[drawingId].strokes.length, stroke, 'AI draw vector stroke'));
+          const liveStroke = state.project.drawings[drawingId].strokes[state.project.drawings[drawingId].strokes.length - 1];
+          for (let commandIndex = 1; commandIndex < source.commands.length; commandIndex++) {
+            liveStroke.commands.push(source.commands[commandIndex]);
+            bus.emit('project:changed', { label: 'AI is drawing' });
+            await pause(16);
+          }
+          overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
+            '\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
+            '\nFrame ' + (frameIndex + 1) + '/4 · completed stroke ' + (strokeIndex + 1) + '/' + sourceStrokes.length;
+        }
+        bus.emit('project:changed', { label: 'AI frame drawn' });
+        await pause(180);
+      }
+      setFrame(startFrame);
+      await save({ silent: true });
+      if (state.dirty) throw new Error('The drawing is on the canvas, but saving failed. Press Save in the editor and check the toast message.');
+      overlay.textContent = 'DRAWING SAVED · ' + (task.title || 'Story') +
+        '\nNative vector cels are now editable on the main canvas and timeline.';
+      finish('resolve', { layerId, startFrame, endFrame });
+    } catch (error) {
+      if (overlay) overlay.textContent = 'DRAWING PAUSED · ' + error.message + '\nYour current canvas changes remain in the editor.';
+      finish('reject', error);
+    }
+  });
+
   window.addEventListener('beforeunload', e => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   syncOpts(); renderSwatches(); renderLayers(); layout.apply(layout.current());
