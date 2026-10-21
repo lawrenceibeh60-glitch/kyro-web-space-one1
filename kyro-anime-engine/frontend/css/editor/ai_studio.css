@@ -52,3 +52,29 @@
 .ai-vector-label { margin-bottom:6px; color:var(--muted,#9aa4b2); font:10px/1.4 ui-monospace,monospace; }
 .ai-vector-card svg { display:block; width:100%; max-height:180px; aspect-ratio:16/9; background:#f2f0e9; }
 @media(max-width:520px) { .ai-vector-preview { grid-template-columns:minmax(0,1fr); max-height:28vh; } }
+
+
+/* AI provider hub */
+.ai-provider-panel { padding: 10px; border-bottom: 1px solid var(--line); background: #171b22; }
+.ai-provider-panel .ai-section-title { margin-bottom: 8px; color: #aab8ca; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.ai-provider-status { display: flex; align-items: center; gap: 8px; margin: 0 0 9px; color: #aeb8c7; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.ai-provider-dot { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: #697382; box-shadow: 0 0 0 3px #69738222; }
+.ai-provider-dot.checking { background: #e3b341; box-shadow: 0 0 0 3px #e3b34125; animation: kae-provider-pulse 1s ease-in-out infinite; }
+.ai-provider-dot.good { background: #29d391; box-shadow: 0 0 0 3px #29d39125, 0 0 12px #29d39166; }
+.ai-provider-dot.bad { background: #ff5f67; box-shadow: 0 0 0 3px #ff5f6725, 0 0 12px #ff5f6755; }
+.ai-provider-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 7px; }
+.ai-provider-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; color: #8492a6; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.ai-provider-field:nth-child(3), .ai-provider-field:nth-child(4), .ai-provider-field:nth-child(5) { grid-column: 1 / -1; }
+.ai-provider-control { width: 100%; min-width: 0; height: 31px; padding: 0 8px; color: var(--text); background: #0f1319; border: 1px solid #333d4c; border-radius: 3px; font: 11px var(--font); user-select: text; }
+.ai-provider-control:focus { outline: 1px solid #4ea6ff; border-color: #4ea6ff; }
+.ai-provider-control:disabled { opacity: .6; }
+.ai-provider-actions { display: flex; gap: 7px; margin-top: 9px; }
+.ai-provider-actions button { flex: 1; height: 32px; font-size: 11px; }
+.ai-provider-actions button.primary { background: #1977d2; border-color: #278de9; }
+.ai-provider-help { margin: 8px 0 0; color: #778394; font-size: 10px; line-height: 1.5; }
+@keyframes kae-provider-pulse { 50% { opacity: .45; transform: scale(.85); } }
+@media (max-width: 760px) {
+  .ai-provider-grid { grid-template-columns: minmax(0, 1fr); }
+  .ai-provider-field:nth-child(n) { grid-column: 1; }
+  .ai-provider-actions button { min-height: 34px; }
+}

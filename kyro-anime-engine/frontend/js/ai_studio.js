@@ -52,6 +52,36 @@ export function initAIStudio() {
   head.append(el('span', {}, 'KAE / ENGINE AI'));
   const close = el('button', { type: 'button', 'aria-label': 'Close AI workspace' }, 'Close');
   head.append(close);
+  const providerPanel = el('section', { class: 'ai-provider-panel', 'aria-label': 'AI provider settings' });
+  providerPanel.append(el('div', { class: 'ai-section-title' }, 'AI PROVIDER CONNECTION'));
+  const providerStatus = el('div', { class: 'ai-provider-status' });
+  const providerDot = el('span', { class: 'ai-provider-dot', 'aria-hidden': 'true' });
+  const providerStatusText = el('span', {}, 'Not connected · key stays in this browser session');
+  providerStatus.append(providerDot, providerStatusText);
+  const providerGrid = el('div', { class: 'ai-provider-grid' });
+  const providerSelect = el('select', { class: 'ai-provider-control', 'aria-label': 'AI company' });
+  const baseUrl = el('input', { class: 'ai-provider-control', type: 'url', placeholder: 'https://api.example.com/v1', 'aria-label': 'API base URL' });
+  const apiKey = el('input', { class: 'ai-provider-control', type: 'password', placeholder: 'Paste API key (never shown again)', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Provider API key' });
+  const modelSelect = el('select', { class: 'ai-provider-control', 'aria-label': 'AI model' });
+  const customModel = el('input', { class: 'ai-provider-control', type: 'text', placeholder: 'Optional: custom model ID', autocomplete: 'off', 'aria-label': 'Custom model ID' });
+  const refreshModels = el('button', { type: 'button' }, 'Load models');
+  const testProvider = el('button', { type: 'button', class: 'primary' }, 'Test & connect');
+  const providerActions = el('div', { class: 'ai-provider-actions' });
+  providerActions.append(refreshModels, testProvider);
+  function providerField(label, control) {
+    const wrap = el('label', { class: 'ai-provider-field' });
+    wrap.append(el('span', {}, label), control);
+    return wrap;
+  }
+  providerGrid.append(
+    providerField('COMPANY', providerSelect),
+    providerField('MODEL', modelSelect),
+    providerField('API KEY', apiKey),
+    providerField('CUSTOM MODEL ID (OPTIONAL)', customModel),
+    providerField('API BASE URL', baseUrl),
+  );
+  providerPanel.append(providerStatus, providerGrid, providerActions,
+    el('p', { class: 'ai-provider-help' }, 'Keys are sent over HTTPS for your AI requests and kept only in this tab session. They are not saved to the KAE server. Claude uses its native API; other listed providers use OpenAI-compatible chat endpoints.'));
   const thread = el('div', { class: 'ai-thread', 'aria-live': 'polite' });
   const compose = el('form', { class: 'ai-compose' });
   const input = el('textarea', { placeholder: 'Describe a character, animation, or change to the current project…', maxlength: '12000' });
@@ -60,7 +90,7 @@ export function initAIStudio() {
   const generate = el('button', { type: 'button' }, 'Generate image');
   actions.append(send, generate);
   compose.append(input, actions);
-  side.append(head, thread, compose);
+  side.append(head, providerPanel, thread, compose);
 
   const preview = el('div', { class: 'ai-preview' });
   const previewHead = el('header', { class: 'ai-head' }, 'REFERENCE & OUTPUT');
@@ -104,6 +134,105 @@ export function initAIStudio() {
     thread.append(message);
     thread.scrollTop = thread.scrollHeight;
   }
+  const providerCatalog = [
+    {id:'openai',label:'OpenAI',base_url:'https://api.openai.com/v1',models:['gpt-4.1','gpt-4.1-mini','gpt-4o','gpt-4o-mini']},
+    {id:'anthropic',label:'Anthropic / Claude',base_url:'https://api.anthropic.com/v1',models:['claude-sonnet-4-5','claude-haiku-4-5','claude-opus-4-1']},
+    {id:'groq',label:'Groq',base_url:'https://api.groq.com/openai/v1',models:['openai/gpt-oss-120b','llama-3.3-70b-versatile','qwen/qwen3-32b']},
+    {id:'openrouter',label:'OpenRouter',base_url:'https://openrouter.ai/api/v1',models:['openai/gpt-4.1-mini','anthropic/claude-sonnet-4.5','google/gemini-2.5-flash']},
+    {id:'together',label:'Together AI',base_url:'https://api.together.xyz/v1',models:['openai/gpt-oss-120b','meta-llama/Llama-3.3-70B-Instruct-Turbo']},
+    {id:'deepseek',label:'DeepSeek',base_url:'https://api.deepseek.com/v1',models:['deepseek-chat','deepseek-reasoner']},
+    {id:'mistral',label:'Mistral',base_url:'https://api.mistral.ai/v1',models:['mistral-large-latest','mistral-small-latest','codestral-latest']},
+    {id:'xai',label:'xAI',base_url:'https://api.x.ai/v1',models:['grok-4','grok-3','grok-3-mini']},
+    {id:'cerebras',label:'Cerebras',base_url:'https://api.cerebras.ai/v1',models:['llama-3.3-70b','qwen-3-32b']},
+    {id:'fireworks',label:'Fireworks AI',base_url:'https://api.fireworks.ai/inference/v1',models:['accounts/fireworks/models/llama-v3p3-70b-instruct']},
+    {id:'perplexity',label:'Perplexity',base_url:'https://api.perplexity.ai',models:['sonar-pro','sonar']},
+    {id:'nvidia',label:'NVIDIA NIM',base_url:'https://integrate.api.nvidia.com/v1',models:['meta/llama-3.3-70b-instruct']},
+    {id:'xkiro',label:'xKiro',base_url:'https://api.xkiro.com/v1',models:['mistralai/devstral-medium']},
+    {id:'custom',label:'Custom OpenAI-compatible',base_url:'',models:[]},
+  ];
+  let connectedProvider = null;
+  function providerProfile() {
+    const selected = providerCatalog.find(item => item.id === providerSelect.value) || providerCatalog[0];
+    return {
+      provider: selected.id,
+      base_url: baseUrl.value.trim() || selected.base_url,
+      api_key: apiKey.value.trim(),
+      model: customModel.value.trim() || modelSelect.value,
+    };
+  }
+  function providerLight(state, message) {
+    providerDot.className = 'ai-provider-dot ' + state;
+    providerStatusText.textContent = message;
+  }
+  function populateModels(models, selected) {
+    modelSelect.replaceChildren();
+    for (const model of models) modelSelect.append(el('option', { value: model }, model));
+    if (selected && models.includes(selected)) modelSelect.value = selected;
+    if (!models.length) modelSelect.append(el('option', { value: '' }, 'Load models after entering an API key'));
+  }
+  function resetProviderForSelection() {
+    const item = providerCatalog.find(provider => provider.id === providerSelect.value) || providerCatalog[0];
+    baseUrl.value = item.base_url;
+    baseUrl.disabled = item.id !== 'custom';
+    customModel.value = '';
+    populateModels(item.models);
+    connectedProvider = null;
+    try { sessionStorage.removeItem('kae-ai-provider-config'); } catch (_) {}
+    providerLight('', 'Not connected · enter key and test');
+  }
+  providerCatalog.forEach(item => providerSelect.append(el('option', { value: item.id }, item.label)));
+  providerSelect.addEventListener('change', resetProviderForSelection);
+  refreshModels.addEventListener('click', async () => {
+    const profile = providerProfile();
+    if (!profile.api_key) { providerLight('bad', 'API key required to load provider models'); apiKey.focus(); return; }
+    refreshModels.disabled = true;
+    providerLight('checking', 'Fetching model list from ' + providerSelect.options[providerSelect.selectedIndex].text + '…');
+    try {
+      const result = await request('POST', '/api/ai/providers/models', { provider_config: profile });
+      populateModels(result.models || [], profile.model);
+      providerLight('', 'Models loaded · ' + (result.models || []).length + ' available');
+    } catch (error) {
+      const item = providerCatalog.find(provider => provider.id === profile.provider);
+      populateModels(item?.models || [], profile.model);
+      providerLight('bad', 'Could not fetch live models: ' + error.message + ' · showing fallback list');
+    } finally { refreshModels.disabled = false; }
+  });
+  testProvider.addEventListener('click', async () => {
+    const profile = providerProfile();
+    if (!profile.api_key) { providerLight('bad', 'API key required'); apiKey.focus(); return; }
+    if (!profile.model) { providerLight('bad', 'Choose a model first'); modelSelect.focus(); return; }
+    testProvider.disabled = true;
+    refreshModels.disabled = true;
+    providerLight('checking', 'Testing API key and waiting for a real model response…');
+    try {
+      const result = await request('POST', '/api/ai/providers/test', { provider_config: profile });
+      sessionStorage.setItem('kae-ai-provider-config', JSON.stringify(profile));
+      connectedProvider = profile;
+      providerLight('good', 'CONNECTED · ' + result.provider + ' / ' + result.model + ' responded');
+      status.textContent = 'AI connected · ' + result.provider + ' · ' + result.model;
+      addMessage('assistant', 'Provider connection verified. ' + result.provider + ' responded using ' + result.model + '. KAE AI chat and supported planning/analysis actions will use this connection.');
+    } catch (error) {
+      connectedProvider = null;
+      try { sessionStorage.removeItem('kae-ai-provider-config'); } catch (_) {}
+      providerLight('bad', 'CONNECTION FAILED · ' + error.message);
+      status.textContent = 'AI provider connection failed: ' + error.message;
+    } finally { testProvider.disabled = false; refreshModels.disabled = false; }
+  });
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('kae-ai-provider-config') || 'null');
+    if (saved) {
+      providerSelect.value = saved.provider || 'xkiro';
+      const selected = providerCatalog.find(item => item.id === providerSelect.value);
+      baseUrl.value = saved.base_url || selected?.base_url || '';
+      baseUrl.disabled = providerSelect.value !== 'custom';
+      apiKey.value = saved.api_key || '';
+      populateModels(selected?.models || [], saved.model);
+      customModel.value = (selected?.models || []).includes(saved.model) ? '' : (saved.model || '');
+      connectedProvider = saved;
+      providerLight('good', 'SESSION CONFIGURED · ' + (selected?.label || saved.provider) + ' · run Test & connect to verify');
+    } else resetProviderForSelection();
+  } catch (_) { resetProviderForSelection(); }
+
   function setBusy(value) {
     send.disabled = value;
     generate.disabled = value;
@@ -529,9 +658,13 @@ export function initAIStudio() {
     if (!scenes.length) sceneSelect.append(el('option', { value: '' }, 'Open a project with a scene first'));
     setBusy(false);
     request('GET', '/api/ai/status').then(result => {
-      status.textContent = result.configured
-        ? 'KAE AI connected · chat ' + result.chat_model + ' · image model ' + result.image_model
-        : 'xKiro not configured: set XKIRO_API_KEY on the server or use ignored xkiro.txt.';
-    }).catch(() => { status.textContent = 'Could not check AI configuration.'; });
+      if (connectedProvider) {
+        status.textContent = 'AI provider session configured · ' + connectedProvider.provider + ' · ' + connectedProvider.model;
+      } else {
+        status.textContent = result.configured
+          ? 'KAE AI connected · chat ' + result.chat_model + ' · image model ' + result.image_model
+          : 'Choose a provider, enter your API key, and press Test & connect.';
+      }
+    }).catch(() => { if (!connectedProvider) status.textContent = 'Could not check AI configuration.'; });
   });
 }

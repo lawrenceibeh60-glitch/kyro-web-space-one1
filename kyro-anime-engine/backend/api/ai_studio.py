@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 from flask import Blueprint, jsonify, request
 
 from backend.app.exceptions import ApiError
+from backend.api.ai_providers import read_profile as read_provider_profile, completion as provider_completion
 from backend.services.ai_capabilities import build_system_context, get_capabilities
 from backend.services import timeline_service
 from backend.storage import project_repository
@@ -40,7 +41,12 @@ def _load_api_key():
     return ""
 
 
-def _config():
+def _config(data=None):
+    if isinstance(data, dict) and isinstance(data.get("provider_config"), dict):
+        profile = read_provider_profile(data)
+        image_model = os.environ.get("XKIRO_IMAGE_MODEL", "openai/gpt-image-2.5").strip()
+        image_endpoint = os.environ.get("XKIRO_IMAGE_URL", "").strip() or f"{os.environ.get('XKIRO_BASE_URL', 'https://api.xkiro.com/v1').rstrip('/')}/images/generations"
+        return profile["api_key"], profile["base_url"], profile["model"], image_model, image_endpoint
     key = _load_api_key()
     base = os.environ.get("XKIRO_BASE_URL", "https://api.xkiro.com/v1").rstrip("/")
     chat_model = os.environ.get("XKIRO_CHAT_MODEL", "mistralai/devstral-medium").strip()
@@ -123,21 +129,24 @@ def chat():
     if len(message) > 12000:
         raise ApiError(413, "Message is too long (maximum 12000 characters)")
 
-    key, base, model, _, _ = _config()
+    key, base, model, _, _ = _config(data)
     if not key:
         raise ApiError(503, "xKiro is not configured. Set XKIRO_API_KEY in the server environment or add it to the ignored xkiro.txt file; never paste it into the browser.")
     project = data.get("project") if isinstance(data.get("project"), dict) else None
     messages = [{"role": "system", "content": build_system_context(project)}]
     messages.extend(_history_messages(data.get("history", [])))
     messages.append({"role": "user", "content": message.strip()})
-    result = _request_json(
-        f"{base}/chat/completions",
-        method="POST",
-        payload={"model": model, "messages": messages, "temperature": 0.3},
-        api_key=key,
-        timeout=90,
-    )
-    reply, used_model = _chat_reply(result, model)
+    if isinstance(data.get("provider_config"), dict):
+        reply, used_model = provider_completion(read_provider_profile(data), messages, temperature=0.3, timeout=90)
+    else:
+        result = _request_json(
+            f"{base}/chat/completions",
+            method="POST",
+            payload={"model": model, "messages": messages, "temperature": 0.3},
+            api_key=key,
+            timeout=90,
+        )
+        reply, used_model = _chat_reply(result, model)
     return jsonify(reply=reply, model=used_model)
 
 
@@ -154,7 +163,7 @@ def analyze_video_reference():
     frames = data.get("frames")
     if not isinstance(frames, list) or not 1 <= len(frames) <= 8:
         raise ApiError(400, "Provide between 1 and 8 sampled video frames.")
-    key, base, model, _, _ = _config()
+    key, base, model, _, _ = _config(data)
     if not key:
         raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
     project = data.get("project") if isinstance(data.get("project"), dict) else None
@@ -189,14 +198,17 @@ def analyze_video_reference():
         {"role": "system", "content": build_system_context(project)},
         {"role": "user", "content": content},
     ]
-    result = _request_json(
-        f"{base}/chat/completions",
-        method="POST",
-        payload={"model": model, "messages": messages, "temperature": 0.2},
-        api_key=key,
-        timeout=120,
-    )
-    reply, used_model = _chat_reply(result, model)
+    if isinstance(data.get("provider_config"), dict):
+        reply, used_model = provider_completion(read_provider_profile(data), messages, temperature=0.2, timeout=120)
+    else:
+        result = _request_json(
+            f"{base}/chat/completions",
+            method="POST",
+            payload={"model": model, "messages": messages, "temperature": 0.2},
+            api_key=key,
+            timeout=120,
+        )
+        reply, used_model = _chat_reply(result, model)
     return jsonify(analysis=reply, model=used_model, frames_analyzed=len(frames))
 
 
@@ -293,7 +305,7 @@ def plan_video_reconstruction():
     width, height = settings.get("width"), settings.get("height")
     if not isinstance(width, int) or not isinstance(height, int) or not 16 <= width <= 8192 or not 16 <= height <= 8192:
         raise ApiError(400, "Project canvas dimensions are invalid.")
-    key, base, model, _, _ = _config()
+    key, base, model, _, _ = _config(data)
     if not key:
         raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
     content = [{
@@ -320,17 +332,21 @@ def plan_video_reconstruction():
         if len(image_data) > 1_000_000:
             raise ApiError(413, f"Frame {index + 1} is too large; reduce the sample resolution.")
         content.append({"type": "image_url", "image_url": {"url": image_data, "detail": "high"}})
-    result = _request_json(
-        f"{base}/chat/completions",
-        method="POST",
-        payload={"model": model, "messages": [
-            {"role": "system", "content": build_system_context(project)},
-            {"role": "user", "content": content},
-        ], "temperature": 0.1},
-        api_key=key,
-        timeout=180,
-    )
-    raw, used_model = _chat_reply(result, model)
+    messages = [
+        {"role": "system", "content": build_system_context(project)},
+        {"role": "user", "content": content},
+    ]
+    if isinstance(data.get("provider_config"), dict):
+        raw, used_model = provider_completion(read_provider_profile(data), messages, temperature=0.1, timeout=180)
+    else:
+        result = _request_json(
+            f"{base}/chat/completions",
+            method="POST",
+            payload={"model": model, "messages": messages, "temperature": 0.1},
+            api_key=key,
+            timeout=180,
+        )
+        raw, used_model = _chat_reply(result, model)
     plan = _parse_model_json(raw)
     if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != len(frames):
         raise ApiError(502, "AI reconstruction must return one vector frame for each sampled reference frame.")
@@ -425,7 +441,7 @@ def create_animation_plan():
         raise ApiError(400, "Describe the creative changes or animation you want.")
     if len(direction) > 8000 or not isinstance(analysis, str) or len(analysis) > 16000:
         raise ApiError(413, "Animation direction or reference analysis is too long.")
-    key, base, model, _, _ = _config()
+    key, base, model, _, _ = _config(data)
     if not key:
         raise ApiError(503, "xKiro is not configured. Configure the key on the server.")
     project = project_repository.load(project_id)
@@ -451,21 +467,21 @@ def create_animation_plan():
         "REFERENCE VIDEO ANALYSIS:\n" + analysis + "\n"
         "ARTIST'S CREATIVE DIRECTION:\n" + direction
     )
-    result = _request_json(
-        f"{base}/chat/completions",
-        method="POST",
-        payload={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": build_system_context(project)},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.1,
-        },
-        api_key=key,
-        timeout=120,
-    )
-    raw, used_model = _chat_reply(result, model)
+    messages = [
+        {"role": "system", "content": build_system_context(project)},
+        {"role": "user", "content": prompt},
+    ]
+    if isinstance(data.get("provider_config"), dict):
+        raw, used_model = provider_completion(read_provider_profile(data), messages, temperature=0.1, timeout=120)
+    else:
+        result = _request_json(
+            f"{base}/chat/completions",
+            method="POST",
+            payload={"model": model, "messages": messages, "temperature": 0.1},
+            api_key=key,
+            timeout=120,
+        )
+        raw, used_model = _chat_reply(result, model)
     cleaned = raw.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.split("\n", 1)[-1]
