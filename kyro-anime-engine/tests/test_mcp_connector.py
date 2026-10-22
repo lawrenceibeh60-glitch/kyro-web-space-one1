@@ -31,6 +31,19 @@ class MCPConnectorTests(unittest.TestCase):
         result = mcp.handle_rpc({"jsonrpc": "2.0", "id": 3, "method": "made/up"})
         self.assertEqual(result["error"]["code"], -32601)
 
+    def test_non_object_params_returns_invalid_params(self):
+        result = mcp.handle_rpc({
+            "jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": ["not", "named"]
+        })
+        self.assertEqual(result["error"]["code"], -32602)
+        self.assertIn("params must be an object", result["error"]["message"])
+
+    def test_invalid_notification_params_do_not_return_response(self):
+        result = mcp.handle_rpc({
+            "jsonrpc": "2.0", "method": "notifications/initialized", "params": []
+        })
+        self.assertIsNone(result)
+
     def test_notifications_do_not_return_response(self):
         self.assertIsNone(mcp.handle_rpc({"jsonrpc": "2.0", "method": "notifications/initialized"}))
 
