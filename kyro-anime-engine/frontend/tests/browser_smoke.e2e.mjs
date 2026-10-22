@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { transformPoint } from '../js/animation/rig_deformer.js';
 
 const baseURL = process.env.KAE_BASE_URL || 'http://127.0.0.1:5000';
+
+test('hierarchical skinning moves child pivots with parent bones', () => {
+  const root = { id: 'root', pivot: { x: 0, y: 0 }, rotation: 90 };
+  const child = { id: 'child', parent_id: 'root', pivot: { x: 10, y: 0 }, rotation: 90 };
+  const rig = { bones: [root, child], constraints: [] };
+  const point = transformPoint([10, 10], [root, child], 0, null, rig);
+  assert.ok(Math.abs(point.x) < 1e-8, `expected x≈0, received ${point.x}`);
+  assert.ok(Math.abs(point.y) < 1e-8, `expected y≈0, received ${point.y}`);
+});
 
 test('browser boots editor, generates a character, authors a rig, and opens export', async () => {
   const browser = await chromium.launch({ headless: true });
