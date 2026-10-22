@@ -753,9 +753,12 @@ export function initAIStudio() {
     return card;
   }
 
-  function activeProviderPayload() {
+  function activeProviderPayload(requireXkiro = false) {
     if (!connectedProvider?.api_key || !connectedProvider?.model) {
       throw new Error('Connect your AI chat provider first in AI Provider Connection.');
+    }
+    if (requireXkiro && connectedProvider.provider !== 'xkiro') {
+      throw new Error('Story-to-JSON authoring uses xKiro as the primary text model to preserve your token budget. Select xKiro under AI Provider Connection and test the connection; Groq is not used for the heavy JSON-writing stages.');
     }
     return { provider_config: {
       provider: connectedProvider.provider, base_url: connectedProvider.base_url,
@@ -835,7 +838,7 @@ export function initAIStudio() {
     setOutputTab('json');
     jsonStatus.textContent = 'KAE visual director is analysing the story and the tagged native tool inventory…';
     try {
-      const providerPayload = activeProviderPayload();
+      const providerPayload = activeProviderPayload(true);
       if (!currentProject?.id) throw new Error('Open a KAE project before authoring a script to move into it.');
       if (!state.outline) {
         state.stage = 'outline';
