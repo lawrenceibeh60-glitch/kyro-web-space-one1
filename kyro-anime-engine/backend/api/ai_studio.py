@@ -750,21 +750,17 @@ def plan_story_vector_animation():
         raise ApiError(400, "Connect an AI chat provider in KAE AI settings first.")
     profile = read_provider_profile(data)
     prompt = (
-        "You are the native vector drawing engine for KAE, not an image generator. Convert the scene description into "
-        "a clean, readable, detailed hand-drawn 2D anime storyboard using editable vector strokes. Return ONLY JSON "
-        "with keys summary (string) and frames (array of exactly 4 frames). Each frame has timestamp_seconds (number) "
-        "and strokes (array of 8 to 24 objects). Each stroke has color (#RRGGBB), width (number 0.5 to 22), "
-        "closed (boolean), fill (null or #RRGGBB), and commands (array of 2 to 64 path commands). Coordinates are "
-        "normalized from 0 to 1000 in BOTH axes. Commands: ['M',x,y], ['L',x,y], ['Q',cx,cy,x,y], "
-        "['C',c1x,c1y,c2x,c2y,x,y], ['Z']. Start every path with M; use smooth curves and deliberate contours. "
-        "Keep all coordinates inside 0..1000. Use filled shapes for major silhouettes, faces, hair, clothing, props, "
-        "ground and background forms, then linework for details. Draw the background too; do not assume an image exists. "
-        "Use a coherent limited palette, readable foreground/midground/background, clean outlines and clear silhouettes. "
-        "Across all four frames, preserve the same character design, face, hairstyle, costume, proportions and palette. "
-        "Change poses and action progressively across anticipation, main action, follow-through and settled pose. "
-        "Avoid text, letters, logos and watermarks. This must be actual vector paths that KAE can draw on its canvas, "
-        "not a description of an image and not a raster image. Keep each frame understandable even at thumbnail size.\n\n"
-        "PROJECT CANVAS: " + str(width) + " x " + str(height) + "\n"
+        "You are KAE's native vector drawing engine. Return ONLY compact valid JSON with keys "
+        "summary (string) and frames (array of exactly 4 frames). Each frame contains timestamp_seconds "
+        "and 8 to 10 strokes. Each stroke contains color (#RRGGBB), width (0.5 to 22), closed (boolean), "
+        "fill (null or #RRGGBB), and commands. Each commands array has 2 to 18 commands and begins with "
+        "['M',x,y]; supported commands are ['L',x,y], ['Q',cx,cy,x,y], ['C',c1x,c1y,c2x,c2y,x,y], ['Z']. "
+        "All coordinates are integers from 0 to 1000. Use concise paths, smooth curves, and filled shapes for "
+        "the main character, face, hair, clothing, props, ground and background. Keep a limited palette and "
+        "clear silhouettes. Preserve the same character identity, costume and palette across all four frames; "
+        "progress from anticipation to action, follow-through and a settled pose. No markdown, prose, raster-image "
+        "claims, text, logos or watermarks. Return no extra keys or commentary.\n\n"
+        "CANVAS: " + str(width) + " x " + str(height) + "\n"
         "SCENE TITLE: " + str(scene_title)[:180] + "\n"
         "SCENE / STORY BEAT:\n" + direction.strip()
     )
@@ -775,10 +771,35 @@ def plan_story_vector_animation():
         )},
         {"role": "user", "content": prompt},
     ]
-    raw, used_model = provider_completion(profile, messages, temperature=0.15, timeout=180)
-    plan = _parse_model_json(raw)
+    raw, used_model = provider_completion(profile, messages, temperature=0.1, timeout=180)
+    try:
+        plan = _parse_model_json(raw)
+        if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
+            raise ValueError("The response did not contain exactly four frames.")
+    except (ApiError, ValueError):
+        # Some models truncate verbose path JSON or wrap it in commentary. Retry once
+        # with a deliberately small schema so the response fits typical output limits.
+        compact_prompt = (
+            "Return ONLY valid compact JSON: {summary:string,frames:[{timestamp_seconds:number,strokes:["
+            "{color:'#RRGGBB',width:number,closed:boolean,fill:null|string,commands:array}]}]}. "
+            "Exactly 4 frames, exactly 6 strokes per frame, at most 8 path commands per stroke. "
+            "Each path starts ['M',x,y]; other commands are ['L',x,y], ['Q',cx,cy,x,y], "
+            "['C',c1x,c1y,c2x,c2y,x,y], or ['Z']. Coordinates are integers 0..1000. "
+            "Use clear filled silhouettes and simple but recognizable anime character, clothing, props, "
+            "ground and background shapes. Preserve character identity across frames and vary the pose "
+            "through anticipation, action, follow-through, and a settled pose. No markdown or commentary.\n"
+            "CANVAS: " + str(width) + " x " + str(height) + "\n"
+            "SCENE: " + str(scene_title)[:180] + "\n"
+            "DIRECTION: " + direction.strip()
+        )
+        retry_messages = [
+            {"role": "system", "content": "Return only compact valid JSON for KAE's vector-cel renderer. No markdown."},
+            {"role": "user", "content": compact_prompt},
+        ]
+        raw, used_model = provider_completion(profile, retry_messages, temperature=0, timeout=180)
+        plan = _parse_model_json(raw)
     if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
-        raise ApiError(502, "The drawing model must return exactly four vector frames. Try a shorter, clearer scene beat.")
+        raise ApiError(502, "The drawing model returned an incomplete vector plan after one compact retry. Try a shorter scene description.")
     # The validator converts normalized coordinates and stroke widths into canvas pixels.
     frames = _validated_vector_frames(plan["frames"], width, height, coordinates_normalized=True)
     return jsonify(
