@@ -9,7 +9,7 @@
   "properties": {
     "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "scene_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-    "type": { "enum": ["lightning", "particles", "speed_lines", "camera_shake"] },
+    "type": { "enum": ["lightning", "particles", "speed_lines", "camera_shake", "glow", "impact_flash"] },
     "enabled": { "type": "boolean", "default": true },
     "start_frame": { "type": "integer", "minimum": 0 },
     "end_frame": { "type": "integer", "minimum": 0 },
