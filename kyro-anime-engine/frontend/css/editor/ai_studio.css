@@ -201,3 +201,103 @@
   .ai-json-workspace { padding: 8px; }
   .ai-json-editor { font-size: 10px; }
 }
+
+
+/* KAE GLASS / SHARP PASS — transparent iOS-style materials, zero pill geometry. */
+.ai-studio {
+  background: linear-gradient(132deg, rgb(14 25 40 / 58%), rgb(7 13 23 / 46%));
+  border: 1px solid rgb(170 220 255 / 30%);
+  border-radius: 0;
+  box-shadow: 0 28px 88px rgb(0 0 0 / 52%), inset 0 1px 0 rgb(255 255 255 / 10%), inset 0 0 0 1px rgb(255 255 255 / 2%);
+  -webkit-backdrop-filter: blur(30px) saturate(175%);
+  backdrop-filter: blur(30px) saturate(175%);
+}
+.ai-side, .ai-preview {
+  background: rgb(9 18 31 / 28%);
+}
+.ai-side { border-right-color: rgb(180 220 255 / 19%); }
+.ai-head, .ai-preview-tabs {
+  background: rgb(170 210 255 / 5%);
+  border-bottom-color: rgb(190 225 255 / 20%);
+  border-radius: 0;
+}
+.ai-head button, .ai-actions button, .ai-video-panel button,
+.ai-preview-tabs button, .ai-json-toolbar button, .topbar #aiLaunch {
+  border-radius: 0;
+  border: 1px solid rgb(178 218 255 / 34%);
+  background: rgb(210 232 255 / 6%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 9%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+}
+.ai-head button:hover, .ai-actions button:hover, .ai-video-panel button:hover,
+.ai-preview-tabs button:hover, .ai-json-toolbar button:hover, .topbar #aiLaunch:hover {
+  border-color: rgb(67 217 255 / 78%);
+  background: rgb(67 217 255 / 12%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%), 0 0 14px rgb(67 217 255 / 10%);
+  transform: translateY(-1px);
+}
+.ai-actions .primary, .ai-video-panel button.primary, .ai-json-toolbar button.primary {
+  color: #06121c;
+  border-color: rgb(160 239 255 / 72%);
+  background: linear-gradient(110deg, rgb(67 217 255 / 88%), rgb(140 231 255 / 82%) 70%, rgb(255 209 102 / 82%));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 42%), 0 5px 18px rgb(67 217 255 / 13%);
+}
+.ai-provider-panel {
+  background: rgb(19 34 52 / 40%);
+  border-bottom-color: rgb(180 220 255 / 18%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  backdrop-filter: blur(22px) saturate(165%);
+}
+.ai-provider-control, .ai-compose textarea, .ai-prompt, .ai-video-panel,
+.ai-plan-summary, .ai-json-status, .ai-json-editor, .ai-status,
+.ai-msg, .ai-image-stage, .ai-vector-card, .ai-scene-select {
+  border-radius: 0;
+}
+.ai-provider-control, .ai-compose textarea, .ai-prompt, .ai-video-panel,
+.ai-plan-summary, .ai-json-editor, .ai-scene-select {
+  background: rgb(4 11 20 / 42%);
+  border-color: rgb(165 205 242 / 25%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 3%);
+}
+.ai-provider-control:focus, .ai-compose textarea:focus, .ai-prompt:focus,
+.ai-json-editor:focus, .ai-scene-select:focus {
+  outline: 1px solid rgb(67 217 255 / 78%);
+  outline-offset: 0;
+  border-color: rgb(67 217 255 / 70%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 5%), 0 0 0 2px rgb(67 217 255 / 9%);
+}
+.ai-msg {
+  background: rgb(225 239 255 / 3%);
+  border-color: rgb(160 204 245 / 18%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.ai-msg.user { background: rgb(255 209 102 / 5%); }
+.ai-msg.assistant { background: rgb(67 217 255 / 4%); }
+.ai-image-stage { background-color: rgb(7 15 25 / 38%); border-color: rgb(160 204 245 / 23%); }
+.ai-vector-card { background: rgb(6 13 22 / 48%); border-color: rgb(160 204 245 / 20%); }
+.ai-json-workspace { background: rgb(5 12 22 / 34%); }
+.ai-json-status { background: rgb(67 217 255 / 5%); }
+.ai-json-editor { background: rgb(3 8 15 / 56%); }
+.ai-section-title { text-shadow: none; }
+.ai-status { background: rgb(225 239 255 / 3%); }
+.topbar { background: rgb(13 23 36 / 76%); }
+.topbar .primary, .wtabs button.active, .wtabs button[aria-selected="true"] {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%), 0 0 12px rgb(67 217 255 / 10%);
+}
+@media (max-width: 760px) {
+  .ai-studio { inset: 1vh 1vw; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .ai-studio, .ai-head button, .ai-actions button, .ai-video-panel button,
+  .ai-preview-tabs button, .ai-json-toolbar button, .ai-provider-panel {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: rgb(11 19 30 / 94%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-head button, .ai-actions button, .ai-video-panel button,
+  .ai-preview-tabs button, .ai-json-toolbar button { transition: none; transform: none; }
+}
