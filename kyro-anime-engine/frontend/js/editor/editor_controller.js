@@ -415,14 +415,14 @@ async function boot() {
     }
     const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     try {
-      if (!state.project || !Array.isArray(task.frames) || task.frames.length !== 4) {
-        throw new Error('KAE editor is not ready or the AI did not return four vector frames.');
+      if (!state.project || !Array.isArray(task.frames) || task.frames.length < 4 || task.frames.length > 6) {
+        throw new Error('KAE editor is not ready or the AI did not return 4–6 vector frames.');
       }
       const scene = getScene();
       if (!scene) throw new Error('Select a valid scene in the main editor first.');
       const settings = state.project.settings;
       const frames = task.frames;
-      const frameSpan = 3;
+      const frameSpan = Math.max(2, Math.floor(18 / frames.length));
       const sceneLength = frames.length * frameSpan;
       const occupiedEnds = scene.layers.flatMap(layer =>
         (layer.exposures || [])
