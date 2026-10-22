@@ -18,6 +18,31 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#canvas').waitFor({ state: 'visible' });
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
 
+    // Exercise the integrated AI workspace's sharp glass styling and safe JSON gating.
+    await page.locator('#aiLaunch').waitFor({ state: 'visible' });
+    await page.locator('#aiLaunch').click();
+    await page.locator('#aiStudio').waitFor({ state: 'visible' });
+    const glassStyle = await page.locator('#aiStudio').evaluate(node => {
+      const panel = getComputedStyle(node);
+      const button = getComputedStyle(node.querySelector('.ai-head button'));
+      return {
+        panelRadius: panel.borderRadius,
+        panelBlur: panel.backdropFilter || panel.webkitBackdropFilter,
+        panelBackground: panel.backgroundColor,
+        buttonRadius: button.borderRadius,
+      };
+    });
+    assert.equal(glassStyle.panelRadius, '0px', 'AI workspace panel should use sharp edges');
+    assert.equal(glassStyle.buttonRadius, '0px', 'AI workspace buttons should use sharp edges');
+    assert.match(glassStyle.panelBlur, /blur\(/, 'AI workspace should use a glass blur');
+    await page.getByRole('button', { name: 'JSON Script' }).click();
+    await page.locator('.ai-json-workspace').waitFor({ state: 'visible' });
+    assert.equal(await page.getByRole('button', { name: 'Move to Project' }).isHidden(), true,
+      'Move to Project must remain hidden until a complete validated story exists');
+    await page.getByRole('button', { name: 'Visual Lab' }).click();
+    await page.locator('#aiStudio button[aria-label="Close AI workspace"]').click();
+    await page.locator('#aiStudio').waitFor({ state: 'hidden' });
+
     await page.locator('[data-ws="studio"]').click();
     await page.locator('[data-studio-tab="character"]').click();
     await page.locator('#generatorId').fill('browser_hero');
