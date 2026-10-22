@@ -833,7 +833,7 @@ def plan_story_vector_animation():
         "cubic/quadratic Bézier curves, layered highlights/shadows and a controlled palette. Keep the main subject "
         "large enough to read clearly in the canvas. Use meaningful spatial composition, not random disconnected "
         "shapes. Maintain exact identity, costume, proportions and palette between frames; vary pose and camera/action "
-        "according to each pose beat. Use no text, captions, logos or watermarks.\n"
+        "according to each pose beat. Use no text, captions, logos or watermarks. Before returning JSON, perform a silent quality audit against the approved visual brief: check that face/eyes/hair/outfit/hands/feet/props/environment/light/shadows are represented, the silhouette reads clearly, paths are smooth and intentional, colors contrast with the project background, and all four poses preserve identity while showing meaningful action. Correct omissions before finalizing.\n"
         "Each stroke object: {color:'#RRGGBB',width:number,closed:boolean,fill:null|string,commands:array}. "
         "Width is 0.5..40 in normalized canvas units. Each commands array starts with ['M',x,y] and uses "
         "['L',x,y], ['Q',cx,cy,x,y], ['C',c1x,c1y,c2x,c2y,x,y], or ['Z']; up to 120 commands per stroke. "
