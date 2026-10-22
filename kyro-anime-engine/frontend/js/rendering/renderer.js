@@ -336,10 +336,19 @@ function facialStrokeVisible(stroke, effect, frame) {
   if (/^(left|right)-(eye-white|iris|pupil|glint)$/.test(id)) return !blink;
   if (id === 'mouth') return false;
   if (id === 'mouth-neutral' || id === 'mouth-smile' || id === 'mouth-open') {
-    const cycle = Math.max(4, Number(effect.mouth_cycle ?? 18));
-    const phase = (elapsed % cycle) / cycle;
-    const wanted = phase < 0.28 || phase >= 0.82 ? 'mouth-neutral'
-      : phase < 0.55 ? 'mouth-smile' : 'mouth-open';
+    const keys = Array.isArray(effect.mouth_keys) ? effect.mouth_keys : [];
+    const key = [...keys].filter(item => Number.isInteger(item.frame) && item.frame <= frame)
+      .sort((a, b) => b.frame - a.frame)[0];
+    const shapeName = key?.shape
+      ? ({ neutral: 'mouth-neutral', smile: 'mouth-smile', open: 'mouth-open' }[key.shape])
+      : null;
+    let wanted = shapeName;
+    if (!wanted) {
+      const cycle = Math.max(4, Number(effect.mouth_cycle ?? 18));
+      const phase = (elapsed % cycle) / cycle;
+      wanted = phase < 0.28 || phase >= 0.82 ? 'mouth-neutral'
+        : phase < 0.55 ? 'mouth-smile' : 'mouth-open';
+    }
     return id === wanted;
   }
   return true;
