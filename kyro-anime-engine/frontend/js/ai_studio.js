@@ -713,7 +713,7 @@ export function initAIStudio() {
     const total = outline.scenes.length;
     for (let index = 0; index < total; index++) {
       const scene = outline.scenes[index];
-      storyStatus.textContent = 'Scene ' + (index + 1) + '/' + total + ' · asking KAE to draw native vector paths…';
+      storyStatus.textContent = 'Scene ' + (index + 1) + '/' + total + ' · planning the visual design before writing vector JSON…';
       mainProgress.textContent = 'KYRO DRAWING · ' + outline.title + '\nScene ' + (index + 1) + '/' + total + ': ' + scene.title + '\nBuilding editable vector paths…';
       const direction = [
         'WHOLE STORY: ' + outline.title + ' — ' + outline.logline,
