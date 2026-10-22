@@ -1047,7 +1047,7 @@ def _check_node_graphs(project, errs):
     graph_ids = set()
     allowed = {
         "circle": (0, 1), "rectangle": (0, 1), "transform": (1, 1),
-        "join": (2, 1), "output": (1, 0),
+        "join": (2, 1), "array": (1, 1), "mirror": (1, 1), "output": (1, 0),
     }
     for gi, graph in enumerate(graphs):
         where = f"node_graphs[{gi}]"
