@@ -10,3 +10,6 @@ jsonschema>=4.18,<5
 
 # Managed PostgreSQL storage for persistent deployed projects
 psycopg[binary]>=3.2,<4
+
+# Optional durable S3-compatible storage for uploaded audio and other binary assets
+boto3>=1.34,<2
