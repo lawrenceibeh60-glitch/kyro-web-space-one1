@@ -10,7 +10,7 @@ import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreog
 import { withRotationLimit } from '../animation/rig_constraints.js';
 import { withTwoBoneIK } from '../animation/rig_ik.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
-import { pathCoordinateCount } from '../animation/rig_deformer.js';
+import { pathCoordinateCount, clearRigDeformationCache } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
 
 const $ = id => document.getElementById(id);
@@ -131,6 +131,32 @@ export function initStudioPanel({ onCharacterImported }) {
         row.append(makeControl('Depth range', 5, 100, Math.round((effect.range ?? 0.25) * 100),
           value => updateEffect(effect.id, { range: value / 100 })));
       }
+      const layerOptions = (state.project.scenes.find(item => item.id === sceneId)?.layers || [])
+        .filter(item => item.type === 'drawing')
+        .map(item => ({ id: item.id, name: item.name || item.id }));
+      const appendLayerSelect = (label, field, excludedId = '') => {
+        const wrap = document.createElement('label'); wrap.className = 'studio-control';
+        const title = document.createElement('span'); title.textContent = label;
+        const select = document.createElement('select'); select.setAttribute('aria-label', label);
+        for (const item of layerOptions.filter(item => item.id !== excludedId)) {
+          const option = document.createElement('option'); option.value = item.id; option.textContent = item.name;
+          select.append(option);
+        }
+        select.value = effect[field] || layerOptions.find(item => item.id !== excludedId)?.id || '';
+        select.onchange = () => updateEffect(effect.id, { [field]: select.value });
+        wrap.append(title, select); row.append(wrap);
+      };
+      if (effect.type === 'layer_mask') {
+        appendLayerSelect('Target layer', 'target_layer_id', effect.mask_layer_id || '');
+        appendLayerSelect('Mask source layer', 'mask_layer_id', effect.target_layer_id || '');
+      }
+      if (effect.type === 'facial_animation') {
+        appendLayerSelect('Character face layer', 'target_layer_id');
+        row.append(makeControl('Blink interval (frames)', 8, 240, effect.blink_interval ?? 48,
+          value => updateEffect(effect.id, { blink_interval: value })));
+        row.append(makeControl('Mouth cycle (frames)', 4, 120, effect.mouth_cycle ?? 18,
+          value => updateEffect(effect.id, { mouth_cycle: value })));
+      }
       if (effect.type !== 'camera_shake') {
         const color = document.createElement('input'); color.type = 'color'; color.value = effect.color || '#ffffff';
         color.setAttribute('aria-label', 'Effect color');
@@ -150,10 +176,26 @@ export function initStudioPanel({ onCharacterImported }) {
   function addEffect() {
     const id = nextId('fx', (state.project.effects || []).map(effect => effect.id));
     const type = $('effectType').value;
+    const scene = state.project.scenes.find(item => item.id === state.sceneId) || state.project.scenes[0];
+    const availableLayers = (scene?.layers || []).filter(item => item.type === 'drawing');
+    if (type === 'layer_mask' && availableLayers.length < 2) {
+      window.alert('Add at least two layers before creating a layer mask.');
+      return;
+    }
+    if (['layer_mask', 'facial_animation'].includes(type) && !availableLayers.length) {
+      window.alert('Add a drawing layer before creating this effect.');
+      return;
+    }
     const effect = {
-      id, scene_id: state.sceneId, type, enabled: true,
+      id, scene_id: scene?.id || state.sceneId, type, enabled: true,
       start_frame: 0, end_frame: state.project.settings.duration_frames - 1,
       intensity: 0.5, color: '#ffffff', count: 36, speed: 1, focus_depth: 0.5, range: 0.25,
+      blink_interval: 48, mouth_cycle: 18,
+      ...(type === 'facial_animation' ? { target_layer_id: availableLayers[0].id } : {}),
+      ...(type === 'layer_mask' ? {
+        target_layer_id: availableLayers[0].id,
+        mask_layer_id: availableLayers.find(item => item.id !== availableLayers[0].id)?.id,
+      } : {}),
     };
     changeProjectArray('effects', [...(state.project.effects || []), effect], 'Add effect');
   }
@@ -199,6 +241,7 @@ export function initStudioPanel({ onCharacterImported }) {
       });
     }
     if (changed) {
+      clearRigDeformationCache();
       weightPaint.changed = true;
       weightPaint.touched += changed;
       updateSkinStatus(`Painting ${weightPaint.boneName}: ${weightPaint.touched} point/control-point touches. Release to commit.`);

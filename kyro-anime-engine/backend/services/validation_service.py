@@ -330,6 +330,7 @@ def _check_studio_data(project, errs):
             for key in effect.keys() - {
                 "id", "scene_id", "type", "enabled", "start_frame", "end_frame",
                 "intensity", "count", "speed", "color", "focus_depth", "range",
+                "target_layer_id", "mask_layer_id", "blink_interval", "mouth_cycle",
             }:
                 errs.append(f"{where}.{key}: unknown property")
             effect_id = effect.get("id")
@@ -341,7 +342,7 @@ def _check_studio_data(project, errs):
             if not isinstance(scene_id, str) or scene_id not in scene_ids:
                 errs.append(f"{where}.scene_id: scene not found")
             effect_type = effect.get("type")
-            if not isinstance(effect_type, str) or effect_type not in {"lightning", "particles", "speed_lines", "camera_shake", "glow", "impact_flash", "soft_shadow", "depth_of_field"}:
+            if not isinstance(effect_type, str) or effect_type not in {"lightning", "particles", "speed_lines", "camera_shake", "glow", "impact_flash", "soft_shadow", "depth_of_field", "layer_mask", "facial_animation"}:
                 errs.append(f"{where}.type: unsupported effect")
             if "enabled" in effect and not isinstance(effect["enabled"], bool):
                 errs.append(f"{where}.enabled: boolean required")
@@ -372,6 +373,34 @@ def _check_studio_data(project, errs):
                     errs.append(f"{where}.focus_depth: number 0..1 required")
                 if not _num(depth_range) or not 0 < depth_range <= 1:
                     errs.append(f"{where}.range: number >0..1 required")
+            if effect_type in {"layer_mask", "facial_animation"}:
+                target_layer_id = effect.get("target_layer_id")
+                matching_scene = next((item for item in scenes if isinstance(item, dict) and item.get("id") == scene_id), None)
+                def collect_layer_ids(items):
+                    found = set()
+                    for item in items if isinstance(items, list) else []:
+                        if not isinstance(item, dict):
+                            continue
+                        if isinstance(item.get("id"), str):
+                            found.add(item["id"])
+                        found.update(collect_layer_ids(item.get("children", [])))
+                    return found
+                valid_layer_ids = collect_layer_ids(matching_scene.get("layers", [])) if matching_scene else set()
+                if not isinstance(target_layer_id, str) or target_layer_id not in valid_layer_ids:
+                    errs.append(f"{where}.target_layer_id: layer not found in scene")
+                if effect_type == "layer_mask":
+                    mask_layer_id = effect.get("mask_layer_id")
+                    if not isinstance(mask_layer_id, str) or mask_layer_id not in valid_layer_ids:
+                        errs.append(f"{where}.mask_layer_id: layer not found in scene")
+                    elif mask_layer_id == target_layer_id:
+                        errs.append(f"{where}.mask_layer_id: must differ from target layer")
+                if effect_type == "facial_animation":
+                    blink_interval = effect.get("blink_interval", 48)
+                    mouth_cycle = effect.get("mouth_cycle", 18)
+                    if not _int(blink_interval) or not 8 <= blink_interval <= 240:
+                        errs.append(f"{where}.blink_interval: integer 8..240 required")
+                    if not _int(mouth_cycle) or not 4 <= mouth_cycle <= 120:
+                        errs.append(f"{where}.mouth_cycle: integer 4..120 required")
 
     characters = {
         item.get("id"): item for item in project.get("characters", [])

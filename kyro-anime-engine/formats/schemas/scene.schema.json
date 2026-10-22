@@ -114,7 +114,11 @@
         "blend": { "enum": ["normal", "multiply", "screen", "overlay", "add"], "default": "normal" },
         "transform": { "$ref": "#/$defs/transform" },
         "exposures": { "$ref": "animation.schema.json#/properties/exposures" },
-        "tracks": { "$ref": "animation.schema.json#/properties/tracks" }
+        "tracks": { "$ref": "animation.schema.json#/properties/tracks" },
+        "clip_path": {
+          "$ref": "path.schema.json#/$defs/path",
+          "description": "Optional vector clipping path in this layer's local coordinates. Only content inside the path is rendered."
+        }
 
       }
     },

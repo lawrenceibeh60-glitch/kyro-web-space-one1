@@ -90,6 +90,25 @@ class StudioFeatureTests(unittest.TestCase):
         project["effects"][1]["range"] = 0
         self.assertTrue(any("range: number >0..1 required" in error for error in validate_project(project)))
 
+    def test_layer_mask_and_facial_animation_effects_validate(self):
+        project = deepcopy(self.project)
+        scene = project["scenes"][0]
+        if len(scene.get("layers", [])) < 2:
+            scene["layers"].append({
+                "id": "mask_source", "type": "drawing", "name": "Mask source",
+                "exposures": [{"start": 0, "length": project["settings"]["duration_frames"], "drawing": next(iter(project["drawings"]))}],
+            })
+        first, second = scene["layers"][0], scene["layers"][1]
+        project["effects"] = [
+            {"id": "fx_mask", "scene_id": scene["id"], "type": "layer_mask",
+             "target_layer_id": first["id"], "mask_layer_id": second["id"]},
+            {"id": "fx_face", "scene_id": scene["id"], "type": "facial_animation",
+             "target_layer_id": first["id"], "blink_interval": 40, "mouth_cycle": 16},
+        ]
+        self.assertEqual(validate_project(project), [])
+        project["effects"][0]["mask_layer_id"] = first["id"]
+        self.assertTrue(any("must differ from target layer" in error for error in validate_project(project)))
+
     def test_rig_validates_character_part_links_and_rejects_cycles(self):
         project = deepcopy(self.project)
         with patch.object(character_service.repo, "load", return_value=project), \

@@ -240,6 +240,11 @@ def build_head_strokes(cx, cy, sx, sy, skin, eyes, outline, expression):
                [pt(-20, 88), pt(-10, 94), pt(0, 96), pt(10, 94), pt(20, 88)]
                if expression == "smile" else [pt(-17, 92), pt(0, 92), pt(17, 92)],
                outline, None, 4 * sx),
+        _shape("mouth-neutral", [pt(-17, 92), pt(0, 92), pt(17, 92)], outline, None, 4 * sx),
+        _shape("mouth-smile", [pt(-20, 88), pt(-10, 94), pt(0, 96), pt(10, 94), pt(20, 88)], outline, None, 4 * sx),
+        _shape("mouth-open", [pt(-17, 90), pt(-12, 99), pt(0, 103), pt(12, 99), pt(17, 90), pt(0, 92)], outline, "#542d38", 3 * sx),
+        _shape("left-eye-closed", [pt(-84, 21), pt(-55, 30), pt(-26, 21)], outline, None, 4 * sx),
+        _shape("right-eye-closed", [pt(26, 21), pt(55, 30), pt(84, 21)], outline, None, 4 * sx),
         _shape("brow-left",
                [pt(-82, -42), pt(-55, -34), pt(-30, -30)]
                if expression == "determined" else [pt(-82, -31), pt(-55, -39), pt(-30, -31)],
