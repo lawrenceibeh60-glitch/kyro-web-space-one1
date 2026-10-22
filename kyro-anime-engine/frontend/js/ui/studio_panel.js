@@ -132,23 +132,23 @@ export function initStudioPanel({ onCharacterImported }) {
           value => updateEffect(effect.id, { range: value / 100 })));
       }
       const layerOptions = (state.project.scenes.find(item => item.id === sceneId)?.layers || [])
-        .filter(item => item.type === 'drawing')
-        .map(item => ({ id: item.id, name: item.name || item.id }));
-      const appendLayerSelect = (label, field, excludedId = '') => {
+        .filter(item => item.type === 'drawing' || item.type === 'group')
+        .map(item => ({ id: item.id, name: item.name || item.id, type: item.type }));
+      const appendLayerSelect = (label, field, excludedId = '', allowedTypes = ['drawing']) => {
         const wrap = document.createElement('label'); wrap.className = 'studio-control';
         const title = document.createElement('span'); title.textContent = label;
         const select = document.createElement('select'); select.setAttribute('aria-label', label);
-        for (const item of layerOptions.filter(item => item.id !== excludedId)) {
+        for (const item of layerOptions.filter(item => item.id !== excludedId && allowedTypes.includes(item.type))) {
           const option = document.createElement('option'); option.value = item.id; option.textContent = item.name;
           select.append(option);
         }
-        select.value = effect[field] || layerOptions.find(item => item.id !== excludedId)?.id || '';
+        select.value = effect[field] || layerOptions.find(item => item.id !== excludedId && allowedTypes.includes(item.type))?.id || '';
         select.onchange = () => updateEffect(effect.id, { [field]: select.value });
         wrap.append(title, select); row.append(wrap);
       };
       if (effect.type === 'layer_mask') {
-        appendLayerSelect('Target layer', 'target_layer_id', effect.mask_layer_id || '');
-        appendLayerSelect('Mask source layer', 'mask_layer_id', effect.target_layer_id || '');
+        appendLayerSelect('Target layer', 'target_layer_id', effect.mask_layer_id || '', ['drawing']);
+        appendLayerSelect('Mask source layer', 'mask_layer_id', effect.target_layer_id || '', ['drawing', 'group']);
       }
       if (effect.type === 'facial_animation') {
         appendLayerSelect('Character face layer', 'target_layer_id');
@@ -156,6 +156,46 @@ export function initStudioPanel({ onCharacterImported }) {
           value => updateEffect(effect.id, { blink_interval: value })));
         row.append(makeControl('Mouth cycle (frames)', 4, 120, effect.mouth_cycle ?? 18,
           value => updateEffect(effect.id, { mouth_cycle: value })));
+        const mouthKeyRow = document.createElement('div');
+        mouthKeyRow.className = 'xrow n';
+        const mouthShape = document.createElement('select');
+        mouthShape.setAttribute('aria-label', 'Mouth pose to key');
+        for (const [value, label] of [['neutral', 'Neutral'], ['smile', 'Smile'], ['open', 'Open']]) {
+          mouthShape.append(option(value, label));
+        }
+        const mouthKeyButton = document.createElement('button');
+        mouthKeyButton.type = 'button';
+        mouthKeyButton.textContent = 'Key';
+        mouthKeyButton.title = 'Key the selected mouth pose at the current timeline frame';
+        mouthKeyButton.onclick = () => {
+          const frame = Math.max(0, Math.min(state.project.settings.duration_frames - 1, Math.round(state.frame || 0)));
+          const keys = [...(effect.mouth_keys || []).filter(key => key.frame !== frame),
+            { frame, shape: mouthShape.value }].sort((a, b) => a.frame - b.frame);
+          updateEffect(effect.id, { mouth_keys: keys });
+        };
+        mouthKeyRow.append(mouthShape, mouthKeyButton);
+        row.append(mouthKeyRow);
+        const mouthKeys = [...(effect.mouth_keys || [])].sort((a, b) => a.frame - b.frame);
+        if (mouthKeys.length) {
+          const keyList = document.createElement('div');
+          keyList.className = 'studio-list';
+          for (const key of mouthKeys) {
+            const keyRow = document.createElement('div');
+            keyRow.className = 'studio-row-head';
+            const label = document.createElement('span');
+            label.textContent = `F${String(key.frame + 1).padStart(3, '0')} · ${key.shape}`;
+            const removeKey = document.createElement('button');
+            removeKey.type = 'button';
+            removeKey.textContent = '×';
+            removeKey.title = `Remove mouth key at frame ${key.frame + 1}`;
+            removeKey.onclick = () => updateEffect(effect.id, {
+              mouth_keys: (effect.mouth_keys || []).filter(item => item.frame !== key.frame),
+            });
+            keyRow.append(label, removeKey);
+            keyList.append(keyRow);
+          }
+          row.append(keyList);
+        }
       }
       if (effect.type !== 'camera_shake') {
         const color = document.createElement('input'); color.type = 'color'; color.value = effect.color || '#ffffff';

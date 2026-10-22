@@ -46,6 +46,10 @@ export function initPropertiesPanel({ fit, openExport, onProjectReplaced, onProj
     put('cam_zoom', Math.round(camera.zoom * 100));
     $('cam_zoomV').textContent = `${(camera.zoom * 100).toFixed(0)}%`;
     const selectedLayer = scene?.layers?.find(layer => layer.id === state.layerId);
+    const clipArea = $('layerClipPath');
+    if (clipArea && document.activeElement !== clipArea) {
+      clipArea.value = selectedLayer?.clip_path ? safeJsonText(selectedLayer.clip_path) : '';
+    }
     const depth = selectedLayer?.depth ?? 1;
     put('layerDepth', Math.round(depth * 100));
     $('layerDepthV').textContent = `${Math.round(depth * 100)}%`;
@@ -459,6 +463,43 @@ export function initPropertiesPanel({ fit, openExport, onProjectReplaced, onProj
   $('jsonDownload').onclick = downloadJson;
   $('layerRefresh').onclick = () => { const area = $('layerJson'); if (area) area.value = safeJsonText((state.project?.scenes || []).find(s => s.id === state.sceneId)?.layers?.find(l => l.id === state.layerId) || {}); };
   $('layerApply').onclick = applyLayerPatch;
+  function applyLayerClipPath(clear = false) {
+    if (!state.project) return;
+    const sceneIndex = state.project.scenes.findIndex(item => item.id === state.sceneId);
+    const scene = state.project.scenes[sceneIndex];
+    const layerIndex = scene?.layers?.findIndex(item => item.id === state.layerId) ?? -1;
+    const area = $('layerClipPath');
+    if (sceneIndex < 0 || layerIndex < 0 || !area) {
+      toast('Select a top-level layer before editing its clip path.', 'err');
+      return;
+    }
+    const nextLayer = { ...scene.layers[layerIndex] };
+    if (clear) {
+      delete nextLayer.clip_path;
+    } else {
+      let commands;
+      try { commands = JSON.parse(area.value); }
+      catch (_) { toast('Clip path must be valid JSON.', 'err'); return; }
+      const arity = { M: 3, L: 3, Q: 5, C: 7, Z: 1 };
+      if (!Array.isArray(commands) || commands.length < 2
+          || commands[0]?.[0] !== 'M'
+          || commands.some(command => !Array.isArray(command)
+            || !Object.prototype.hasOwnProperty.call(arity, command[0])
+            || command.length !== arity[command[0]]
+            || (command[0] === 'M' && commands.indexOf(command) !== 0)
+            || command.slice(1).some(value => typeof value !== 'number' || !Number.isFinite(value)))) {
+        toast('Clip path needs an M command followed by valid L, Q, C or Z commands.', 'err');
+        return;
+      }
+      nextLayer.clip_path = commands;
+    }
+    execute(setValue(['scenes', sceneIndex, 'layers', layerIndex], nextLayer,
+      clear ? 'Clear clipping path' : 'Edit clipping path'));
+    $('layerClipStatus').textContent = clear ? 'Clipping path removed.' : `Clip path applied (${nextLayer.clip_path.length} commands).`;
+    toast(clear ? 'Clipping path cleared' : 'Clipping path applied', 'ok');
+  }
+  $('layerClipApply').onclick = () => applyLayerClipPath(false);
+  $('layerClipClear').onclick = () => applyLayerClipPath(true);
   $('scriptSample').onclick = writeSampleScript;
   $('scriptApply').onclick = applyScript;
   $('jsonImportFile').onchange = async e => {

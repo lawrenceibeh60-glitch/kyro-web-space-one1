@@ -336,10 +336,19 @@ function facialStrokeVisible(stroke, effect, frame) {
   if (/^(left|right)-(eye-white|iris|pupil|glint)$/.test(id)) return !blink;
   if (id === 'mouth') return false;
   if (id === 'mouth-neutral' || id === 'mouth-smile' || id === 'mouth-open') {
-    const cycle = Math.max(4, Number(effect.mouth_cycle ?? 18));
-    const phase = (elapsed % cycle) / cycle;
-    const wanted = phase < 0.28 || phase >= 0.82 ? 'mouth-neutral'
-      : phase < 0.55 ? 'mouth-smile' : 'mouth-open';
+    const keys = Array.isArray(effect.mouth_keys) ? effect.mouth_keys : [];
+    const key = [...keys].filter(item => Number.isInteger(item.frame) && item.frame <= frame)
+      .sort((a, b) => b.frame - a.frame)[0];
+    const shapeName = key?.shape
+      ? ({ neutral: 'mouth-neutral', smile: 'mouth-smile', open: 'mouth-open' }[key.shape])
+      : null;
+    let wanted = shapeName;
+    if (!wanted) {
+      const cycle = Math.max(4, Number(effect.mouth_cycle ?? 18));
+      const phase = (elapsed % cycle) / cycle;
+      wanted = phase < 0.28 || phase >= 0.82 ? 'mouth-neutral'
+        : phase < 0.55 ? 'mouth-smile' : 'mouth-open';
+    }
     return id === wanted;
   }
   return true;
@@ -404,6 +413,29 @@ export function drawStroke(ctx, s) {
   }
   if (s.fill) { ctx.fillStyle = s.fill; ctx.fill(s.fill_rule ?? 'nonzero'); }
   ctx.stroke();
+  ctx.restore();
+}
+
+function drawMaskLayerTree(ctx, layer, project, frame, camera, width, height, root = true) {
+  if (!layer || layer.visible === false) return;
+  ctx.save();
+  if (root) applyCameraDepthTransform(ctx, width, height, camera, frame, layer.depth ?? 1);
+  const transform = getLayerTransform(layer, frame);
+  ctx.globalAlpha *= evaluateOpacity(layer, frame);
+  ctx.translate(transform.x || 0, transform.y || 0);
+  ctx.rotate((transform.rotation || 0) * Math.PI / 180);
+  ctx.scale(transform.scale_x ?? 1, transform.scale_y ?? 1);
+  ctx.translate(-(transform.anchor_x || 0), -(transform.anchor_y || 0));
+  if (layer.clip_path) applyVectorClip(ctx, layer.clip_path);
+  if (layer.type === 'group' || layer.type === 'character_instance') {
+    for (const child of layer.children || []) {
+      drawMaskLayerTree(ctx, child, project, frame, camera, width, height, false);
+    }
+  } else {
+    const exposure = findExposure(layer, frame);
+    const strokes = exposure ? (project.drawings?.[exposure.drawing]?.strokes || []) : [];
+    for (const stroke of strokes) drawStroke(ctx, stroke);
+  }
   ctx.restore();
 }
 
@@ -493,21 +525,12 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
       const maskEffect = maskEffects.find(effect => effect.target_layer_id === layer.id);
       if (maskEffect && maskCtx) {
         const maskLayer = (scene?.layers || []).find(item => item.id === maskEffect.mask_layer_id);
-        const maskExposure = maskLayer && findExposure(maskLayer, frame);
-        const maskStrokes = maskExposure ? (project.drawings[maskExposure.drawing]?.strokes || []) : [];
         maskCtx.setTransform(1, 0, 0, 1, 0, 0);
         maskCtx.clearRect(0, 0, width, height);
         if (maskLayer && maskLayer.visible !== false) {
-          const mt = getLayerTransform(maskLayer, frame);
           maskCtx.save();
           maskCtx.beginPath(); maskCtx.rect(0, 0, width, height); maskCtx.clip();
-          applyCameraDepthTransform(maskCtx, width, height, camera, frame, maskLayer.depth ?? 1);
-          maskCtx.translate(mt.x || 0, mt.y || 0);
-          maskCtx.rotate((mt.rotation || 0) * Math.PI / 180);
-          maskCtx.scale(mt.scale_x ?? 1, mt.scale_y ?? 1);
-          maskCtx.translate(-(mt.anchor_x || 0), -(mt.anchor_y || 0));
-          maskCtx.globalAlpha = maskLayer.opacity ?? 1;
-          for (const stroke of maskStrokes) drawStroke(maskCtx, stroke);
+          drawMaskLayerTree(maskCtx, maskLayer, project, frame, camera, width, height, true);
           maskCtx.restore();
         }
         layerCtx.save();

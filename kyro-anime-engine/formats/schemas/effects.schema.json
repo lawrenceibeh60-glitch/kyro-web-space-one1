@@ -22,6 +22,19 @@
     "target_layer_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "mask_layer_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
     "blink_interval": { "type": "integer", "minimum": 8, "maximum": 240 },
-    "mouth_cycle": { "type": "integer", "minimum": 4, "maximum": 120 }
+    "mouth_cycle": { "type": "integer", "minimum": 4, "maximum": 120 },
+    "mouth_keys": {
+      "type": "array",
+      "description": "Optional manually keyed mouth poses for frame-accurate dialogue timing.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["frame", "shape"],
+        "properties": {
+          "frame": { "type": "integer", "minimum": 0 },
+          "shape": { "enum": ["neutral", "smile", "open"] }
+        }
+      }
+    }
   }
 }
