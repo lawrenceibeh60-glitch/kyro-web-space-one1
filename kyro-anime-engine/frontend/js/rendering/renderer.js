@@ -345,7 +345,7 @@ function facialStrokeVisible(stroke, effect, frame) {
   return true;
 }
 
-function drawStroke(ctx, s) {
+export function drawStroke(ctx, s) {
   const p = s.points;
   const commands = s.commands;
   if ((!Array.isArray(p) || !p.length) && (!Array.isArray(commands) || !commands.length)) return;
