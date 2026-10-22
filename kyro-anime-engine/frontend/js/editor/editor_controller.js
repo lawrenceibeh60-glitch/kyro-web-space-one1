@@ -240,12 +240,17 @@ async function save(opts) {
   const silent = opts?.silent === true;
   if (!state.dirty) { if (!silent) toast('Nothing to save'); return; }
   try {
-    const saved = await Projects.save(state.projectId, state.project);
+    const saved = await Projects.save(state.projectId, state.project, state.project.modified);
     state.project.modified = saved.modified;
     setState({ dirty: false });
     if (!silent) toast('Saved', 'ok');
   } catch (e) {
-    toast(e.message + (e.details?.length ? ': ' + e.details.slice(0, 3).join('; ') : ''), 'err', 6000);
+    if (e.status === 409) {
+      toast('Save blocked: this project changed elsewhere. Reload the project before saving again.', 'err', 8000);
+      return;
+    }
+    const detail = Array.isArray(e.details) && e.details.length ? ': ' + e.details.slice(0, 3).join('; ') : '';
+    toast(e.message + detail, 'err', 6000);
   }
 }
 
