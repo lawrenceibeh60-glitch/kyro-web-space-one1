@@ -83,6 +83,7 @@ See [docs/architecture.md](docs/architecture.md) for an honest blueprint status 
 This pass adds a small but important quality and usability improvement without replacing the native vector workflow:
 
 - Generated characters include editable hair-sheen strokes, fringe highlights, jacket seams and buttons, sleeve-cuff seams, and shoe details. These remain ordinary strokes inside the existing stable character parts, so they can still be edited, rigged, and weighted.
+- Studio effects now include a screen-blended cinematic glow pass and a frame-pulsed impact flash, both saved as native scene effects and rendered in the same frame path used for previews and exports.
 - The mobile layout now keeps the timeline's bottom-area height independent from desktop workspace presets. The workspace selector previously set `--slotC-h` on the root element, overriding the intended phone-sized timeline height; the editor now applies a mobile-specific local value, with portrait and landscape adjustments.
 - Regression assertions verify the generated detail strokes and continue validating the character document against the canonical schema.
 
