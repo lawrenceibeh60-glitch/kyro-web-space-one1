@@ -20,6 +20,7 @@ export const WORKSPACES = {
   animate: { label: 'Animate', tool: 'move', tab: 'object', bottom: 'clamp(150px, 36vh, 260px)', slots: { A: 'outliner', B: 'properties', C: 'timeline' } },
   edit: { label: 'Edit', tool: 'edit', tab: 'tool', bottom: 'clamp(104px, 22vh, 140px)', slots: { A: 'history', B: 'properties', C: 'timeline' } },
   studio: { label: 'Studio', tool: 'move', tab: 'object', bottom: 'clamp(148px, 28vh, 230px)', slots: { A: 'outliner', B: 'studio', C: 'timeline' } },
+  nodes: { label: 'Nodes', tool: 'move', tab: 'object', bottom: 'clamp(148px, 28vh, 230px)', slots: { A: 'geometry', B: 'outliner', C: 'timeline' } },
 };
 
 const KEY = 'kae.layout';
