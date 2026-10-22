@@ -1039,6 +1039,86 @@ def _check_markers(project, errs):
             errs.append(f"{where}.color: hex color #RRGGBB required")
 
 
+def _check_node_graphs(project, errs):
+    graphs = project.get("node_graphs", [])
+    if not isinstance(graphs, list):
+        errs.append("node_graphs: must be a list")
+        return
+    graph_ids = set()
+    allowed = {
+        "circle": (0, 1), "rectangle": (0, 1), "transform": (1, 1),
+        "join": (2, 1), "output": (1, 0),
+    }
+    for gi, graph in enumerate(graphs):
+        where = f"node_graphs[{gi}]"
+        if not isinstance(graph, dict):
+            errs.append(f"{where}: must be an object")
+            continue
+        gid = graph.get("id")
+        if not isinstance(gid, str) or not ID_RE.match(gid):
+            errs.append(f"{where}.id: invalid")
+        elif gid in graph_ids:
+            errs.append(f"{where}.id: duplicate '{gid}'")
+        else:
+            graph_ids.add(gid)
+        nodes = graph.get("nodes", [])
+        links = graph.get("links", [])
+        if not isinstance(nodes, list) or not isinstance(links, list):
+            errs.append(f"{where}: nodes and links must be lists")
+            continue
+        node_map, node_ids = {}, set()
+        for ni, node in enumerate(nodes):
+            nw = f"{where}.nodes[{ni}]"
+            if not isinstance(node, dict):
+                errs.append(f"{nw}: must be an object")
+                continue
+            nid, ntype = node.get("id"), node.get("type")
+            if not isinstance(nid, str) or not ID_RE.match(nid):
+                errs.append(f"{nw}.id: invalid")
+            elif nid in node_ids:
+                errs.append(f"{nw}.id: duplicate '{nid}'")
+            else:
+                node_ids.add(nid)
+                node_map[nid] = node
+            if ntype not in allowed:
+                errs.append(f"{nw}.type: unsupported node type")
+        adjacency = {nid: [] for nid in node_map}
+        for li, link in enumerate(links):
+            lw = f"{where}.links[{li}]"
+            if not isinstance(link, dict):
+                errs.append(f"{lw}: must be an object")
+                continue
+            src, dst = link.get("from"), link.get("to")
+            if src not in node_map or dst not in node_map:
+                errs.append(f"{lw}: from/to must reference existing nodes")
+                continue
+            if src == dst:
+                errs.append(f"{lw}: self-links are not allowed")
+            adjacency[src].append(dst)
+            src_type, dst_type = node_map[src].get("type"), node_map[dst].get("type")
+            if src_type in allowed and dst_type in allowed:
+                if allowed[src_type][1] < 1 or allowed[dst_type][0] < 1:
+                    errs.append(f"{lw}: node socket direction is invalid")
+            input_index = link.get("input", 0)
+            if not isinstance(input_index, int) or isinstance(input_index, bool) or input_index < 0:
+                errs.append(f"{lw}.input: non-negative integer required")
+            elif dst_type in allowed and input_index >= allowed[dst_type][0]:
+                errs.append(f"{lw}.input: destination socket index is out of range")
+        visiting, visited = set(), set()
+        def visit(nid):
+            if nid in visiting:
+                return True
+            if nid in visited:
+                return False
+            visiting.add(nid)
+            has_cycle = any(visit(child) for child in adjacency.get(nid, []))
+            visiting.remove(nid)
+            visited.add(nid)
+            return has_cycle
+        if any(visit(nid) for nid in adjacency if nid not in visited):
+            errs.append(f"{where}.links: graph must be acyclic")
+
+
 def validate_project(p):
     errs = []
     if not isinstance(p, dict):
@@ -1079,4 +1159,5 @@ def validate_project(p):
     drawings = p.get("drawings") if isinstance(p.get("drawings"), dict) else {}
     _check_scenes(p.get("scenes"), drawings, errs)
     _check_studio_data(p, errs)
+    _check_node_graphs(p, errs)
     return errs[:MAX_ERRORS]
