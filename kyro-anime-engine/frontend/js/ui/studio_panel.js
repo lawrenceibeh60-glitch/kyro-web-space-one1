@@ -131,12 +131,9 @@ export function initStudioPanel({ onCharacterImported }) {
         row.append(makeControl('Depth range', 5, 100, Math.round((effect.range ?? 0.25) * 100),
           value => updateEffect(effect.id, { range: value / 100 })));
       }
-      const sceneLayers = (state.project.scenes.find(item => item.id === sceneId)?.layers || []);
-      const flattenLayers = (items, depth = 0) => items.flatMap(item => [
-        { id: item.id, name: `${'— '.repeat(depth)}${item.name || item.id}` },
-        ...flattenLayers(item.children || [], depth + 1),
-      ]);
-      const layerOptions = flattenLayers(sceneLayers);
+      const layerOptions = (state.project.scenes.find(item => item.id === sceneId)?.layers || [])
+        .filter(item => item.type === 'drawing')
+        .map(item => ({ id: item.id, name: item.name || item.id }));
       const appendLayerSelect = (label, field, excludedId = '') => {
         const wrap = document.createElement('label'); wrap.className = 'studio-control';
         const title = document.createElement('span'); title.textContent = label;
@@ -180,7 +177,7 @@ export function initStudioPanel({ onCharacterImported }) {
     const id = nextId('fx', (state.project.effects || []).map(effect => effect.id));
     const type = $('effectType').value;
     const scene = state.project.scenes.find(item => item.id === state.sceneId) || state.project.scenes[0];
-    const availableLayers = scene?.layers || [];
+    const availableLayers = (scene?.layers || []).filter(item => item.type === 'drawing');
     if (type === 'layer_mask' && availableLayers.length < 2) {
       window.alert('Add at least two layers before creating a layer mask.');
       return;
