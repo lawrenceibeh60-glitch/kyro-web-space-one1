@@ -810,7 +810,7 @@ export function initAIStudio() {
 
   async function runStoryAuthoring(state, answer = '') {
     if (answer.trim()) {
-      if (state.stage === 'clarify_outline') {
+      if (state.stage === 'clarify_outline' || !state.outline) {
         state.story += '\n\nUSER CLARIFICATION:\n' + answer.trim();
         state.outline = null;
         state.stage = 'outline';
@@ -831,6 +831,10 @@ export function initAIStudio() {
       if (!currentProject?.id) throw new Error('Open a KAE project before authoring a script to move into it.');
       if (!state.outline) {
         state.stage = 'outline';
+        jsonEditor.value = '';
+        authoredScript = null;
+        scriptComplete = false;
+        moveToProject.hidden = true;
         addMessage('assistant', 'VISUAL DIRECTOR · reading the story, filling reasonable gaps, and checking whether any essential design decision needs your input.');
         const outlineResult = await request('POST', '/api/ai/story/outline', {
           story: state.story, project: projectSummary(), ...providerPayload,
