@@ -419,20 +419,26 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   if (!opts?.transparent) { ctx.fillStyle = background || '#ffffff'; ctx.fillRect(0, 0, width, height); }
   const documentRef = ctx.canvas?.ownerDocument;
   const layerEffects = effects.filter(effect => ['soft_shadow', 'depth_of_field', 'layer_mask'].includes(effect.type));
-  let layerCanvas = null, layerCtx = null, shadowCanvas = null, shadowCtx = null, maskCanvas = null, maskCtx = null;
-  if (layerEffects.length && documentRef?.createElement) {
-    layerCanvas = documentRef.createElement('canvas');
-    shadowCanvas = documentRef.createElement('canvas');
-    maskCanvas = documentRef.createElement('canvas');
-    for (const canvas of [layerCanvas, shadowCanvas, maskCanvas]) { canvas.width = width; canvas.height = height; }
-    layerCtx = layerCanvas.getContext('2d');
-    shadowCtx = shadowCanvas.getContext('2d');
-    maskCtx = maskCanvas.getContext('2d');
-    if (!layerCtx || !shadowCtx || !maskCtx) { layerCtx = null; shadowCtx = null; maskCtx = null; }
-  }
   const shadowEffect = layerEffects.find(effect => effect.type === 'soft_shadow');
   const depthEffect = layerEffects.find(effect => effect.type === 'depth_of_field');
   const maskEffects = layerEffects.filter(effect => effect.type === 'layer_mask');
+  let layerCanvas = null, layerCtx = null, shadowCanvas = null, shadowCtx = null, maskCanvas = null, maskCtx = null;
+  if (layerEffects.length && documentRef?.createElement) {
+    layerCanvas = documentRef.createElement('canvas');
+    layerCanvas.width = width; layerCanvas.height = height;
+    layerCtx = layerCanvas.getContext('2d');
+    if (shadowEffect) {
+      shadowCanvas = documentRef.createElement('canvas');
+      shadowCanvas.width = width; shadowCanvas.height = height;
+      shadowCtx = shadowCanvas.getContext('2d');
+    }
+    if (maskEffects.length) {
+      maskCanvas = documentRef.createElement('canvas');
+      maskCanvas.width = width; maskCanvas.height = height;
+      maskCtx = maskCanvas.getContext('2d');
+    }
+    if (!layerCtx) { layerCanvas = null; shadowCtx = null; maskCtx = null; }
+  }
   for (const layer of scene?.layers || []) {
     if (layer.visible === false) continue;
     const ex = findExposure(layer, frame);
