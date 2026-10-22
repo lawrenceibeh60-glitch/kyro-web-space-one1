@@ -441,6 +441,14 @@ export function initAIStudio() {
     history.push({ role: 'user', content: message });
     if (latestVideoAnalysis) latestCreativeDirection = message;
 
+    if (storyAuthorState && /^(new story|start over|restart|discard this draft)\b/i.test(message)) {
+      storyAuthorState = null;
+      scriptComplete = false;
+      authoredScript = null;
+      jsonEditor.value = '';
+      moveToProject.hidden = true;
+      window.kaeAIAppliedSceneCount = 0;
+    }
     if (storyAuthorState) {
       await runStoryAuthoring(storyAuthorState, message);
       return;
