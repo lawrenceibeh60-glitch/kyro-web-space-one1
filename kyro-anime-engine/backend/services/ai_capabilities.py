@@ -10,6 +10,29 @@ import json
 import config
 
 
+
+def _tags_for(text):
+    """Stable semantic tags let the AI choose real KAE tools and fields by intent."""
+    source = str(text).lower()
+    groups = {
+        "project": ("project", "save", "open", "workspace"),
+        "scene": ("scene", "story", "shot", "composition"),
+        "drawing": ("drawing", "vector", "stroke", "path", "fill", "color", "colour", "canvas", "brush"),
+        "character": ("character", "face", "hair", "costume", "outfit", "expression", "silhouette"),
+        "animation": ("animation", "cel", "frame", "keyframe", "motion", "pose", "playback"),
+        "timeline": ("timeline", "marker", "range", "fps", "duration", "frame"),
+        "rigging": ("rig", "bone", "skin", "weight", "constraint", "skeleton"),
+        "camera": ("camera", "zoom", "pan", "focus", "lens", "fov"),
+        "render": ("render", "export", "video", "webm", "output"),
+        "validation": ("valid", "schema", "error", "constraint", "format"),
+        "ai": ("ai", "model", "provider", "prompt", "story", "vision", "image"),
+        "audio": ("audio", "sound", "voice", "dialogue", "music"),
+        "effects": ("effect", "filter", "composite", "transition", "light", "shadow"),
+        "assets": ("asset", "import", "reference", "texture", "image"),
+    }
+    tags = [tag for tag, words in groups.items() if any(word in source for word in words)]
+    return tags or ["general"]
+
 def _schema_inventory():
     items = []
     for path in sorted(config.SCHEMAS_DIR.glob("*.schema.json")):
@@ -21,6 +44,8 @@ def _schema_inventory():
                 "description": schema.get("description", ""),
                 "required": schema.get("required", []),
                 "properties": list((schema.get("properties") or {}).keys()),
+                "tags": _tags_for(path.stem + " " + schema.get("title", "") + " " + schema.get("description", "")),
+                "property_tags": {key: _tags_for(key + " " + str(value.get("description", ""))) for key, value in (schema.get("properties") or {}).items() if isinstance(value, dict)},
             })
         except (OSError, json.JSONDecodeError):
             continue
@@ -55,6 +80,8 @@ def get_capabilities():
         {"name": "ai.story.outline", "method": "POST", "path": "/api/ai/story/outline", "purpose": "Expand a story into continuity-aware scenes."},
         {"name": "ai.story.vector-plan", "method": "POST", "path": "/api/ai/story/vector-plan", "purpose": "Plan scene composition, then produce native vector-cel JSON."},
     ]
+    for tool in routes:
+        tool["tags"] = _tags_for(tool.get("name", "") + " " + tool.get("purpose", "") + " " + tool.get("path", ""))
     return {
         "engine": "Kyro Animation Engine (KAE)",
         "format": {"name": "kae", "versions": [1, 2]},
