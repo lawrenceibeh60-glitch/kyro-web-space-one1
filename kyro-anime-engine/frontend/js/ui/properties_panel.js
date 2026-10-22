@@ -486,6 +486,7 @@ export function initPropertiesPanel({ fit, openExport, onProjectReplaced, onProj
           || commands.some(command => !Array.isArray(command)
             || !Object.prototype.hasOwnProperty.call(arity, command[0])
             || command.length !== arity[command[0]]
+            || (command[0] === 'M' && commands.indexOf(command) !== 0)
             || command.slice(1).some(value => typeof value !== 'number' || !Number.isFinite(value)))) {
         toast('Clip path needs an M command followed by valid L, Q, C or Z commands.', 'err');
         return;
