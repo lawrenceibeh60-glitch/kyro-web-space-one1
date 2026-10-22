@@ -132,23 +132,23 @@ export function initStudioPanel({ onCharacterImported }) {
           value => updateEffect(effect.id, { range: value / 100 })));
       }
       const layerOptions = (state.project.scenes.find(item => item.id === sceneId)?.layers || [])
-        .filter(item => item.type === 'drawing')
-        .map(item => ({ id: item.id, name: item.name || item.id }));
-      const appendLayerSelect = (label, field, excludedId = '') => {
+        .filter(item => item.type === 'drawing' || item.type === 'group')
+        .map(item => ({ id: item.id, name: item.name || item.id, type: item.type }));
+      const appendLayerSelect = (label, field, excludedId = '', allowedTypes = ['drawing']) => {
         const wrap = document.createElement('label'); wrap.className = 'studio-control';
         const title = document.createElement('span'); title.textContent = label;
         const select = document.createElement('select'); select.setAttribute('aria-label', label);
-        for (const item of layerOptions.filter(item => item.id !== excludedId)) {
+        for (const item of layerOptions.filter(item => item.id !== excludedId && allowedTypes.includes(item.type))) {
           const option = document.createElement('option'); option.value = item.id; option.textContent = item.name;
           select.append(option);
         }
-        select.value = effect[field] || layerOptions.find(item => item.id !== excludedId)?.id || '';
+        select.value = effect[field] || layerOptions.find(item => item.id !== excludedId && allowedTypes.includes(item.type))?.id || '';
         select.onchange = () => updateEffect(effect.id, { [field]: select.value });
         wrap.append(title, select); row.append(wrap);
       };
       if (effect.type === 'layer_mask') {
-        appendLayerSelect('Target layer', 'target_layer_id', effect.mask_layer_id || '');
-        appendLayerSelect('Mask source layer', 'mask_layer_id', effect.target_layer_id || '');
+        appendLayerSelect('Target layer', 'target_layer_id', effect.mask_layer_id || '', ['drawing']);
+        appendLayerSelect('Mask source layer', 'mask_layer_id', effect.target_layer_id || '', ['drawing', 'group']);
       }
       if (effect.type === 'facial_animation') {
         appendLayerSelect('Character face layer', 'target_layer_id');
