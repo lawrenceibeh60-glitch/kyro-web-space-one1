@@ -259,7 +259,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
         if not isinstance(frame, dict) or not isinstance(frame.get("strokes"), list):
             raise ApiError(422, f"Vector frame {fi + 1} must contain a strokes array.")
         strokes = []
-        if not 1 <= len(frame["strokes"]) <= 24:
+        if not 1 <= len(frame["strokes"]) <= 64:
             raise ApiError(422, f"Vector frame {fi + 1} must contain 1 to 24 strokes.")
         for si, stroke in enumerate(frame["strokes"]):
             if not isinstance(stroke, dict):
@@ -277,7 +277,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid closed flag.")
             if fill is not None and (not isinstance(fill, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", fill)):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid fill color.")
-            if not isinstance(commands, list) or not 2 <= len(commands) <= 64:
+            if not isinstance(commands, list) or not 2 <= len(commands) <= 120:
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} must contain 2–64 path commands.")
             checked_commands = []
             for ci, command in enumerate(commands):
@@ -304,8 +304,8 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
                 "commands": checked_commands,
             })
             total_strokes += 1
-            if total_strokes > 96:
-                raise ApiError(422, "Vector reconstruction exceeds the 96-stroke total limit.")
+            if total_strokes > 360:
+                raise ApiError(422, "Vector drawing exceeds the 360-stroke total limit.")
         output.append({"timestamp_seconds": frame.get("timestamp_seconds", fi), "strokes": strokes})
     return output
 
@@ -729,7 +729,7 @@ def expand_story_outline():
 
 @bp.post("/ai/story/vector-plan")
 def plan_story_vector_animation():
-    """Translate one story beat into editable native vector animation cels (no generated images)."""
+    """Plan the visual composition first, then return validated native KAE vector cels."""
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         raise ApiError(400, "Request body must be a JSON object")
@@ -738,8 +738,8 @@ def plan_story_vector_animation():
     project = data.get("project")
     if not isinstance(direction, str) or not direction.strip():
         raise ApiError(400, "A story scene description is required.")
-    if len(direction) > 8000:
-        raise ApiError(413, "Story scene description is too long (maximum 8000 characters).")
+    if len(direction) > 12000:
+        raise ApiError(413, "Story scene description is too long (maximum 12000 characters).")
     if not isinstance(project, dict) or not isinstance(project.get("settings"), dict):
         raise ApiError(400, "Open a KAE project before drawing a story.")
     settings = project["settings"]
@@ -749,79 +749,98 @@ def plan_story_vector_animation():
     if not isinstance(data.get("provider_config"), dict):
         raise ApiError(400, "Connect an AI chat provider in KAE AI settings first.")
     profile = read_provider_profile(data)
-    prompt = (
-        "You are KAE's native vector drawing engine. Return ONLY compact valid JSON with keys "
-        "summary (string) and frames (array of exactly 4 frames). Each frame contains timestamp_seconds "
-        "and 8 to 10 strokes. Each stroke contains color (#RRGGBB), width (0.5 to 22), closed (boolean), "
-        "fill (null or #RRGGBB), and commands. Each commands array has 2 to 18 commands and begins with "
-        "['M',x,y]; supported commands are ['L',x,y], ['Q',cx,cy,x,y], ['C',c1x,c1y,c2x,c2y,x,y], ['Z']. "
-        "All coordinates are integers from 0 to 1000. Use concise paths, smooth curves, and filled shapes for "
-        "the main character, face, hair, clothing, props, ground and background. Keep a limited palette and "
-        "clear silhouettes. Preserve the same character identity, costume and palette across all four frames; "
-        "progress from anticipation to action, follow-through and a settled pose. No markdown, prose, raster-image "
-        "claims, text, logos or watermarks. Return no extra keys or commentary.\n\n"
-        "CANVAS: " + str(width) + " x " + str(height) + "\n"
-        "SCENE TITLE: " + str(scene_title)[:180] + "\n"
-        "SCENE / STORY BEAT:\n" + direction.strip()
+
+    # Pull the live native tool/schema inventory from the KAE backend. The model is
+    # instructed to use only these native capabilities; no external drawing tool is assumed.
+    capability_context = build_system_context(project)
+    visual_brief_prompt = (
+        "You are the visual pre-production director for KAE, an anime-first native vector animation engine. "
+        "Create a concise FINAL ART-DIRECTION BRIEF, not private chain-of-thought. Imagine the finished shot "
+        "as a composed frame before any path JSON is written. Specify: character silhouette and proportions; "
+        "face, eyes, hair masses and strand accents; outfit construction and folds; hands/feet/pose; props; "
+        "foreground, midground and background; camera framing; light direction; shadow shapes; palette; "
+        "depth ordering; and how the design stays consistent across motion. Identify the visual focal point "
+        "and avoid tiny details that would disappear at the target canvas size. Return ONLY JSON with keys "
+        "composition, character_design, pose_sequence (array of 4 to 6 short entries), palette (array of hex colors), "
+        "environment_design, lighting, continuity_rules, and quality_check. Do not output hidden reasoning, "
+        "markdown, image URLs, or claims that a raster image exists. Make the brief concrete and drawable using "
+        "KAE's native paths and fills.\\n\\n"
+        "CANVAS: " + str(width) + " x " + str(height) + " pixels; aspect ratio " +
+        str(round(width / height, 4)) + ".\\n"
+        "SCENE TITLE: " + str(scene_title)[:180] + "\\n"
+        "STORY / SCENE DIRECTION:\\n" + direction.strip()
     )
-    messages = [
-        {"role": "system", "content": (
-            "You produce valid compact JSON for a vector drawing engine. Never return markdown. "
-            "Never claim a raster image was generated. Favor smooth Bézier paths, layered silhouettes and visual continuity."
-        )},
-        {"role": "user", "content": prompt},
+    planning_messages = [
+        {"role": "system", "content": capability_context + "\\nYou are the visual design stage of a two-stage KAE drawing pipeline. Use only real native KAE drawing capabilities."},
+        {"role": "user", "content": visual_brief_prompt},
     ]
     try:
-        raw, used_model = provider_completion(profile, messages, temperature=0.1, timeout=180)
-    except ApiError as exc:
-        # Retry transient upstream errors once at deterministic temperature.
-        message = str(exc).lower()
-        if exc.status != 502 or not any(code in message for code in ('http 502', 'http 503', 'http 504', 'timeout', 'timed out')):
+        brief_raw, used_model = provider_completion(profile, planning_messages, temperature=0.25, timeout=180)
+        visual_brief = _parse_model_json(brief_raw)
+        if not isinstance(visual_brief, dict):
+            raise ValueError("Visual design brief must be a JSON object.")
+        for field in ("composition", "character_design", "environment_design", "lighting", "continuity_rules", "quality_check"):
+            if not isinstance(visual_brief.get(field), str) or not visual_brief[field].strip():
+                raise ValueError("Visual design brief omitted " + field + ".")
+        poses = visual_brief.get("pose_sequence")
+        if not isinstance(poses, list) or not 4 <= len(poses) <= 6:
+            raise ValueError("Visual design brief must include 4 to 6 pose beats.")
+        palette = visual_brief.get("palette", [])
+        if not isinstance(palette, list):
+            palette = []
+        visual_brief = {
+            "composition": visual_brief["composition"][:3000],
+            "character_design": visual_brief["character_design"][:5000],
+            "pose_sequence": [str(item)[:800] for item in poses[:6]],
+            "palette": [str(color)[:9] for color in palette[:24]],
+            "environment_design": visual_brief["environment_design"][:3500],
+            "lighting": visual_brief["lighting"][:2500],
+            "continuity_rules": visual_brief["continuity_rules"][:2500],
+            "quality_check": visual_brief["quality_check"][:2500],
+        }
+    except (ApiError, ValueError) as exc:
+        if isinstance(exc, ApiError):
             raise
-        compact_messages = [
-            {"role": "system", "content": "Return only compact valid JSON for KAE's vector-cel renderer."},
-            {"role": "user", "content": (
-                "Return JSON {summary,frames:[{timestamp_seconds,strokes:[{color,width,closed,fill,commands}]}]}. "
-                "Exactly 4 frames, 4 strokes per frame, 5 commands max per stroke. Coordinates 0..1000. "
-                "Commands: ['M',x,y], ['L',x,y], ['Q',cx,cy,x,y], ['Z']. Use simple recognizable filled "
-                "anime silhouettes and vary the pose across frames. No markdown. Canvas " + str(width) + "x" +
-                str(height) + ". Scene: " + str(scene_title)[:120] + ". Direction: " + direction.strip()
-            )},
-        ]
-        raw, used_model = provider_completion(profile, compact_messages, temperature=0, timeout=180)
-    try:
-        plan = _parse_model_json(raw)
-        if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
-            raise ValueError("The response did not contain exactly four frames.")
-    except (ApiError, ValueError):
-        # Some models truncate verbose path JSON or wrap it in commentary. Retry once
-        # with a deliberately small schema so the response fits typical output limits.
-        compact_prompt = (
-            "Return ONLY valid compact JSON: {summary:string,frames:[{timestamp_seconds:number,strokes:["
-            "{color:'#RRGGBB',width:number,closed:boolean,fill:null|string,commands:array}]}]}. "
-            "Exactly 4 frames, exactly 6 strokes per frame, at most 8 path commands per stroke. "
-            "Each path starts ['M',x,y]; other commands are ['L',x,y], ['Q',cx,cy,x,y], "
-            "['C',c1x,c1y,c2x,c2y,x,y], or ['Z']. Coordinates are integers 0..1000. "
-            "Use clear filled silhouettes and simple but recognizable anime character, clothing, props, "
-            "ground and background shapes. Preserve character identity across frames and vary the pose "
-            "through anticipation, action, follow-through, and a settled pose. No markdown or commentary.\n"
-            "CANVAS: " + str(width) + " x " + str(height) + "\n"
-            "SCENE: " + str(scene_title)[:180] + "\n"
-            "DIRECTION: " + direction.strip()
-        )
-        retry_messages = [
-            {"role": "system", "content": "Return only compact valid JSON for KAE's vector-cel renderer. No markdown."},
-            {"role": "user", "content": compact_prompt},
-        ]
-        raw, used_model = provider_completion(profile, retry_messages, temperature=0, timeout=180)
-        plan = _parse_model_json(raw)
-    if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
-        raise ApiError(502, "The drawing model returned an incomplete vector plan after one compact retry. Try a shorter scene description.")
-    # The validator converts normalized coordinates and stroke widths into canvas pixels.
+        raise ApiError(502, "The visual planning stage returned an incomplete art-direction brief: " + str(exc)) from exc
+
+    frame_count = len(visual_brief["pose_sequence"])
+    drawing_prompt = (
+        "Now produce the native KAE drawing JSON using the approved visual brief below. This is stage 2: "
+        "write the actual drawable paths, not another plan. Return ONLY valid JSON with keys summary and frames. "
+        "Return exactly " + str(frame_count) + " frames in pose-sequence order. Each frame has timestamp_seconds "
+        "and 12 to 48 strokes. Use enough separate paths to make a finished, richly designed anime character and "
+        "scene, not an icon or stick figure. Recommended visual construction order: broad environment/background "
+        "shapes, ground and cast shadows, rear hair, legs and shoes, torso and clothing panels, arms and hands, "
+        "neck and face silhouette, ears, eyes with whites/iris/pupil/highlights, brows, nose and mouth, front hair "
+        "locks, clothing seams/folds, accessories/props, rim lights and small accents. Do not skip the face, hair, "
+        "outfit or background. Use filled closed silhouettes with clean dark linework, varied path widths, smooth "
+        "cubic/quadratic Bézier curves, layered highlights/shadows and a controlled palette. Keep the main subject "
+        "large enough to read clearly in the canvas. Use meaningful spatial composition, not random disconnected "
+        "shapes. Maintain exact identity, costume, proportions and palette between frames; vary pose and camera/action "
+        "according to each pose beat. Use no text, captions, logos or watermarks.\\n"
+        "Each stroke object: {color:'#RRGGBB',width:number,closed:boolean,fill:null|string,commands:array}. "
+        "Width is 0.5..40 in normalized canvas units. Each commands array starts with ['M',x,y] and uses "
+        "['L',x,y], ['Q',cx,cy,x,y], ['C',c1x,c1y,c2x,c2y,x,y], or ['Z']; up to 120 commands per stroke. "
+        "Coordinates are numbers 0..1000. Fill is null or a hex color. Use separate paths for details instead of "
+        "overloading one path. Avoid over-simplifying and avoid duplicating the same path many times. No extra keys.\\n\\n"
+        "CANVAS: " + str(width) + " x " + str(height) + "\\n"
+        "SCENE: " + str(scene_title)[:180] + "\\n"
+        "STORY DIRECTION:\\n" + direction.strip() + "\\n\\n"
+        "APPROVED VISUAL DESIGN BRIEF:\\n" + json.dumps(visual_brief, ensure_ascii=False, separators=(",", ":"))
+    )
+    drawing_messages = [
+        {"role": "system", "content": capability_context + "\\nYou are KAE's native vector-cel renderer. Produce paths only for KAE's existing command schema. Never invent external tools, schemas, or endpoints."},
+        {"role": "user", "content": drawing_prompt},
+    ]
+    raw, used_model = provider_completion(profile, drawing_messages, temperature=0.15, timeout=240)
+    plan = _parse_model_json(raw)
+    if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != frame_count:
+        raise ApiError(502, "The drawing model returned an incomplete vector plan. KAE expected " + str(frame_count) + " frames after visual planning.")
     frames = _validated_vector_frames(plan["frames"], width, height, coordinates_normalized=True)
     return jsonify(
         title=str(scene_title)[:180],
-        summary=str(plan.get("summary") or "Editable native vector animation")[:2000],
+        summary=str(plan.get("summary") or "Visual plan converted into editable native vector animation")[:2000],
+        visual_brief=visual_brief,
         frames=frames,
         canvas={"width": width, "height": height},
         model=used_model,
