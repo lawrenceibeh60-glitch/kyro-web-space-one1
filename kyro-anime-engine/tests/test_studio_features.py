@@ -108,6 +108,14 @@ class StudioFeatureTests(unittest.TestCase):
         self.assertEqual(validate_project(project), [])
         project["effects"][0]["mask_layer_id"] = first["id"]
         self.assertTrue(any("must differ from target layer" in error for error in validate_project(project)))
+        project["effects"][1]["mouth_keys"] = [
+            {"frame": 0, "shape": "neutral"},
+            {"frame": 8, "shape": "open"},
+            {"frame": 16, "shape": "smile"},
+        ]
+        self.assertEqual(validate_project(project), [])
+        project["effects"][1]["mouth_keys"][1]["shape"] = "invalid"
+        self.assertTrue(any("mouth_keys[1].shape" in error for error in validate_project(project)))
 
     def test_rig_validates_character_part_links_and_rejects_cycles(self):
         project = deepcopy(self.project)
