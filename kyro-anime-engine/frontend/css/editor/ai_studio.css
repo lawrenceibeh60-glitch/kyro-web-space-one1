@@ -301,3 +301,139 @@
   .ai-head button, .ai-actions button, .ai-video-panel button,
   .ai-preview-tabs button, .ai-json-toolbar button { transition: none; transform: none; }
 }
+
+
+/* ACCESSIBILITY + SMALL-VIEWPORT PASS
+   Keep every AI control reachable: provider settings, conversation, composer,
+   visual tools and JSON editor each get a bounded, independent scroll area. */
+.ai-studio {
+  min-width: 0;
+  min-height: 0;
+  max-height: calc(100dvh - 2vh);
+}
+.ai-side,
+.ai-preview {
+  min-width: 0;
+  min-height: 0;
+}
+.ai-side {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.ai-provider-panel {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-height: 42vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.ai-thread {
+  flex: 1 0 140px;
+  min-height: 140px;
+  max-height: 30vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.ai-compose {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.ai-preview {
+  overflow: hidden;
+}
+.ai-preview-body {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.ai-video-panel,
+.ai-image-stage,
+.ai-preview-actions,
+.ai-note,
+.ai-compose,
+.ai-json-toolbar {
+  flex-shrink: 0;
+}
+.ai-image-stage {
+  min-width: 0;
+}
+.ai-json-workspace {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.ai-json-editor {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.ai-provider-panel,
+.ai-thread,
+.ai-preview-body,
+.ai-json-editor {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(111 190 235 / 45%) transparent;
+}
+.ai-provider-panel::-webkit-scrollbar,
+.ai-thread::-webkit-scrollbar,
+.ai-preview-body::-webkit-scrollbar,
+.ai-json-editor::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.ai-provider-panel::-webkit-scrollbar-thumb,
+.ai-thread::-webkit-scrollbar-thumb,
+.ai-preview-body::-webkit-scrollbar-thumb,
+.ai-json-editor::-webkit-scrollbar-thumb {
+  background: rgb(111 190 235 / 35%);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+@media (max-width: 760px) {
+  .ai-studio {
+    inset: 1vh 1vw;
+    max-height: 98dvh;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .ai-side {
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .ai-provider-panel {
+    max-height: 30vh;
+  }
+  .ai-thread {
+    min-height: 100px;
+    max-height: 24vh;
+  }
+  .ai-preview-body {
+    padding: 10px;
+  }
+  .ai-image-stage {
+    min-height: 150px;
+  }
+  .ai-image-stage img {
+    max-height: 30vh;
+  }
+  .ai-json-workspace {
+    padding: 8px;
+  }
+}
+@media (max-height: 720px) and (min-width: 761px) {
+  .ai-provider-panel { max-height: 34vh; }
+  .ai-thread { min-height: 110px; max-height: 24vh; }
+  .ai-compose textarea { min-height: 64px; max-height: 18vh; }
+}
