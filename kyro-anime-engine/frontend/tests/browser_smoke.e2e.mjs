@@ -249,6 +249,48 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
 });
 
 
+test('Geometry Nodes builds procedural shapes and persists graph data in the project', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  try {
+    await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.locator('#newName').fill('KAE Geometry Nodes Smoke');
+    await page.locator('#create').click();
+    await page.waitForURL(/editor\.html\?project=/);
+    await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
+    await page.locator('#wtabs [data-ws="nodes"]').click();
+    await page.locator('#geoCanvas').waitFor({ state: 'visible' });
+    await page.locator('#geoCanvas .geo-node').first().click();
+    const radius = page.locator('#geoInspector input').first();
+    await radius.fill('64');
+    await radius.press('Enter');
+    await page.locator('#geoNodeType').selectOption('array');
+    await page.locator('#geoAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.node_graphs?.[0]?.nodes?.some(node => node.type === 'array'));
+    await page.locator('#save').click();
+    await page.waitForFunction(() => window.kae.state.dirty === false);
+    const projectUrl = page.url();
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.kae?.state?.project?.node_graphs?.length > 0);
+    const saved = await page.evaluate(() => {
+      const graph = window.kae.state.project.node_graphs[0];
+      return {
+        radius: graph.nodes.find(node => node.type === 'circle')?.params?.radius,
+        hasArray: graph.nodes.some(node => node.type === 'array'),
+        graphCount: window.kae.state.project.node_graphs.length,
+      };
+    });
+    assert.equal(saved.radius, 64);
+    assert.equal(saved.hasArray, true);
+    assert.ok(saved.graphCount >= 1);
+    assert.deepEqual(pageErrors, [], 'geometry node runtime errors: ' + pageErrors.join('; '));
+  } finally {
+    await browser.close();
+  }
+});
+
 test('Android-sized browser keeps editor tools and timeline reachable without an AI workspace overlay', async () => {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
