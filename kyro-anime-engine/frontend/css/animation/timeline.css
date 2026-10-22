@@ -23,3 +23,16 @@
   #firstF, #lastF { display: none; }
   .tl-drawing-actions > button { padding: 0 4px; }
 }
+
+.timeline-markers { display:flex; align-items:center; gap:5px; min-height:30px; padding:3px 7px; overflow:hidden; border-bottom:1px solid var(--line); background:#202a36; }
+.marker-heading { flex:0 0 auto; color:var(--dim); font-size:9px; font-weight:700; letter-spacing:.12em; }
+.timeline-markers > button { flex:0 0 auto; height:22px; padding:0 7px; font-size:10px; }
+.timeline-markers > button:disabled { opacity:.38; cursor:default; }
+.marker-list { display:flex; align-items:center; gap:4px; min-width:0; overflow-x:auto; scrollbar-width:thin; }
+.frame-marker { flex:0 0 auto; max-width:190px; height:22px; padding:0 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#dce8f4; border:1px solid var(--marker-color,#36c5d8); border-left:3px solid var(--marker-color,#36c5d8); background:#172333; font-size:10px; }
+.frame-marker.selected { color:#fff; background:#29445b; box-shadow:inset 0 0 0 1px var(--marker-color,#36c5d8); }
+.marker-empty { color:var(--dim); font-size:10px; white-space:nowrap; }
+@media (max-width:700px) {
+  .timeline-markers { flex-wrap:wrap; align-items:flex-start; }
+  .marker-list { flex:1 1 100%; max-width:100%; }
+}
