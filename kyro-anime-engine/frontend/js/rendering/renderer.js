@@ -46,6 +46,32 @@ function seededRandom(seed) {
   };
 }
 
+function drawGlowComposite(ctx, effects, width, height) {
+  const glow = effects.filter(effect => effect.type === 'glow');
+  if (!glow.length) return;
+  // Progressive enhancement: skip the glow pass on non-DOM test contexts.
+  const documentRef = ctx.canvas?.ownerDocument;
+  if (!documentRef?.createElement) return;
+  const source = documentRef.createElement('canvas');
+  source.width = width;
+  source.height = height;
+  const sourceCtx = source.getContext('2d');
+  if (!sourceCtx) return;
+  sourceCtx.drawImage(ctx.canvas, 0, 0, width, height);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'screen';
+  for (const effect of glow) {
+    const intensity = Math.max(0, Math.min(1, Number(effect.intensity ?? 0.5)));
+    if (!intensity) continue;
+    ctx.globalAlpha = intensity * 0.55;
+    ctx.filter = `blur(${Math.round(3 + intensity * 18)}px) saturate(1.2)`;
+    ctx.drawImage(source, 0, 0, width, height);
+  }
+  ctx.filter = 'none';
+  ctx.restore();
+}
+
 function drawEffects(ctx, effects, width, height, frame) {
   for (const effect of effects) {
     const speed = effect.speed ?? 1;
@@ -59,6 +85,15 @@ function drawEffects(ctx, effects, width, height, frame) {
       drawParticles(ctx, effect, width, height, frame, random);
     } else if (effect.type === 'speed_lines') {
       drawSpeedLines(ctx, effect, width, height, frame, random);
+    } else if (effect.type === 'impact_flash') {
+      const elapsed = Math.max(0, frame - (effect.start_frame ?? 0));
+      const pulse = 1 - ((elapsed * Math.max(0.1, speed)) % 8) / 8;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = Math.max(0, Math.min(1, Number(effect.intensity ?? 0.5))) * pulse;
+      ctx.fillStyle = /^#[0-9a-f]{6}$/i.test(effect.color || '') ? effect.color : '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
     }
   }
 }
@@ -404,6 +439,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     }
     ctx.restore();
   }
+  drawGlowComposite(ctx, effects, width, height);
   ctx.save();
   applyCameraTransform(ctx, width, height, camera, frame);
   drawEffects(ctx, effects, width, height, frame);
