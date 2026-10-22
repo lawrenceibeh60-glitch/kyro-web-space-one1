@@ -445,6 +445,7 @@ export function initAIStudio() {
     if (storyAuthorState && /^(new story|start over|restart|discard this draft)\b/i.test(message)) {
       storyAuthorState = null;
       scriptComplete = false;
+      projectApplied = false;
       authoredScript = null;
       jsonEditor.value = '';
       moveToProject.hidden = true;
@@ -457,6 +458,7 @@ export function initAIStudio() {
     if (storyLikeMessage(message)) {
       window.kaeAIAppliedSceneCount = 0;
       scriptComplete = false;
+      projectApplied = false;
       authoredScript = null;
       const state = { story: message, continuation: '', outline: null, scenes: [], nextScene: 0, stage: 'outline', correctionPasses: 0 };
       await runStoryAuthoring(state);
