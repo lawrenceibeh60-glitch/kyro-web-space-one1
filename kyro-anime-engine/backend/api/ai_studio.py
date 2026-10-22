@@ -260,7 +260,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
             raise ApiError(422, f"Vector frame {fi + 1} must contain a strokes array.")
         strokes = []
         if not 1 <= len(frame["strokes"]) <= 64:
-            raise ApiError(422, f"Vector frame {fi + 1} must contain 1 to 24 strokes.")
+            raise ApiError(422, f"Vector frame {fi + 1} must contain 1 to 64 strokes.")
         for si, stroke in enumerate(frame["strokes"]):
             if not isinstance(stroke, dict):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} is invalid.")
@@ -278,7 +278,7 @@ def _validated_vector_frames(frames, width, height, coordinates_normalized=True)
             if fill is not None and (not isinstance(fill, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", fill)):
                 raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} has an invalid fill color.")
             if not isinstance(commands, list) or not 2 <= len(commands) <= 120:
-                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} must contain 2–64 path commands.")
+                raise ApiError(422, f"Frame {fi + 1}, stroke {si + 1} must contain 2–120 path commands.")
             checked_commands = []
             for ci, command in enumerate(commands):
                 if not isinstance(command, list) or not command or command[0] not in ("M", "L", "Q", "C", "Z"):
