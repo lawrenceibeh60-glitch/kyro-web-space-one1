@@ -308,7 +308,44 @@ export function drawWeightOverlay(ctx, project, sceneId, layerId, frame, boneId,
   ctx.restore();
 }
 
-export function drawStroke(ctx, s) {
+export function applyVectorClip(ctx, commands) {
+  if (!Array.isArray(commands) || commands.length < 2) return false;
+  ctx.beginPath();
+  for (const command of commands) {
+    if (!Array.isArray(command)) continue;
+    switch (command[0]) {
+      case 'M': ctx.moveTo(command[1], command[2]); break;
+      case 'L': ctx.lineTo(command[1], command[2]); break;
+      case 'Q': ctx.quadraticCurveTo(...command.slice(1)); break;
+      case 'C': ctx.bezierCurveTo(...command.slice(1)); break;
+      case 'Z': ctx.closePath(); break;
+    }
+  }
+  ctx.clip();
+  return true;
+}
+
+function facialStrokeVisible(stroke, effect, frame) {
+  if (!effect) return true;
+  const id = String(stroke?.id || '');
+  const elapsed = Math.max(0, frame - (effect.start_frame ?? 0));
+  const interval = Math.max(8, Number(effect.blink_interval ?? 48));
+  const blinkPhase = elapsed % interval;
+  const blink = blinkPhase < 2 || blinkPhase === interval - 1;
+  if (/^(left|right)-eye-closed$/.test(id)) return blink;
+  if (/^(left|right)-(eye-white|iris|pupil|glint)$/.test(id)) return !blink;
+  if (id === 'mouth') return false;
+  if (id === 'mouth-neutral' || id === 'mouth-smile' || id === 'mouth-open') {
+    const cycle = Math.max(4, Number(effect.mouth_cycle ?? 18));
+    const phase = (elapsed % cycle) / cycle;
+    const wanted = phase < 0.28 || phase >= 0.82 ? 'mouth-neutral'
+      : phase < 0.55 ? 'mouth-smile' : 'mouth-open';
+    return id === wanted;
+  }
+  return true;
+}
+
+function drawStroke(ctx, s) {
   const p = s.points;
   const commands = s.commands;
   if ((!Array.isArray(p) || !p.length) && (!Array.isArray(commands) || !commands.length)) return;
@@ -381,19 +418,21 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
   if (!opts?.transparent) { ctx.fillStyle = background || '#ffffff'; ctx.fillRect(0, 0, width, height); }
   const documentRef = ctx.canvas?.ownerDocument;
-  const layerEffects = effects.filter(effect => effect.type === 'soft_shadow' || effect.type === 'depth_of_field');
-  let layerCanvas = null, layerCtx = null, shadowCanvas = null, shadowCtx = null;
+  const layerEffects = effects.filter(effect => ['soft_shadow', 'depth_of_field', 'layer_mask'].includes(effect.type));
+  let layerCanvas = null, layerCtx = null, shadowCanvas = null, shadowCtx = null, maskCanvas = null, maskCtx = null;
   if (layerEffects.length && documentRef?.createElement) {
     layerCanvas = documentRef.createElement('canvas');
     shadowCanvas = documentRef.createElement('canvas');
-    layerCanvas.width = shadowCanvas.width = width;
-    layerCanvas.height = shadowCanvas.height = height;
+    maskCanvas = documentRef.createElement('canvas');
+    for (const canvas of [layerCanvas, shadowCanvas, maskCanvas]) { canvas.width = width; canvas.height = height; }
     layerCtx = layerCanvas.getContext('2d');
     shadowCtx = shadowCanvas.getContext('2d');
-    if (!layerCtx || !shadowCtx) { layerCtx = null; shadowCtx = null; }
+    maskCtx = maskCanvas.getContext('2d');
+    if (!layerCtx || !shadowCtx || !maskCtx) { layerCtx = null; shadowCtx = null; maskCtx = null; }
   }
   const shadowEffect = layerEffects.find(effect => effect.type === 'soft_shadow');
   const depthEffect = layerEffects.find(effect => effect.type === 'depth_of_field');
+  const maskEffects = layerEffects.filter(effect => effect.type === 'layer_mask');
   for (const layer of scene?.layers || []) {
     if (layer.visible === false) continue;
     const ex = findExposure(layer, frame);
@@ -420,7 +459,9 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     targetCtx.rotate((t.rotation || 0) * Math.PI / 180);
     targetCtx.scale(t.scale_x ?? 1, t.scale_y ?? 1);
     targetCtx.translate(-(t.anchor_x || 0), -(t.anchor_y || 0));
+    if (layer.clip_path) applyVectorClip(targetCtx, layer.clip_path);
     const hide = pv && pv.drawingId === ex?.drawing ? pv.hidden : null;
+    const facialEffect = effects.find(effect => effect.type === 'facial_animation' && effect.target_layer_id === layer.id);
     const yawPivotX = t.anchor_x || width / 2;
     const yawPivotY = t.anchor_y || height / 2;
     const drawRiggedStroke = sourceStroke => {
@@ -436,11 +477,39 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
       drawStroke(targetCtx, stroke);
       targetCtx.restore();
     };
-    for (const stroke of strokes) if (!hide?.has(stroke.id)) drawRiggedStroke(stroke);
+    for (const stroke of strokes) {
+      if (!hide?.has(stroke.id) && facialStrokeVisible(stroke, facialEffect, frame)) drawRiggedStroke(stroke);
+    }
     if (pv?.stroke) drawRiggedStroke(pv.stroke);
     targetCtx.restore();
 
     if (targetCtx === layerCtx) {
+      const maskEffect = maskEffects.find(effect => effect.target_layer_id === layer.id);
+      if (maskEffect && maskCtx) {
+        const maskLayer = (scene?.layers || []).find(item => item.id === maskEffect.mask_layer_id);
+        const maskExposure = maskLayer && findExposure(maskLayer, frame);
+        const maskStrokes = maskExposure ? (project.drawings[maskExposure.drawing]?.strokes || []) : [];
+        maskCtx.setTransform(1, 0, 0, 1, 0, 0);
+        maskCtx.clearRect(0, 0, width, height);
+        if (maskLayer && maskLayer.visible !== false) {
+          const mt = getLayerTransform(maskLayer, frame);
+          maskCtx.save();
+          maskCtx.beginPath(); maskCtx.rect(0, 0, width, height); maskCtx.clip();
+          applyCameraDepthTransform(maskCtx, width, height, camera, frame, maskLayer.depth ?? 1);
+          maskCtx.translate(mt.x || 0, mt.y || 0);
+          maskCtx.rotate((mt.rotation || 0) * Math.PI / 180);
+          maskCtx.scale(mt.scale_x ?? 1, mt.scale_y ?? 1);
+          maskCtx.translate(-(mt.anchor_x || 0), -(mt.anchor_y || 0));
+          maskCtx.globalAlpha = maskLayer.opacity ?? 1;
+          for (const stroke of maskStrokes) drawStroke(maskCtx, stroke);
+          maskCtx.restore();
+        }
+        layerCtx.save();
+        layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+        layerCtx.globalCompositeOperation = 'destination-in';
+        layerCtx.drawImage(maskCanvas, 0, 0);
+        layerCtx.restore();
+      }
       ctx.save();
       if (shadowEffect && shadowCtx) {
         shadowCtx.setTransform(1, 0, 0, 1, 0, 0);
