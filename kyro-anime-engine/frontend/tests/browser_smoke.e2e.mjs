@@ -28,6 +28,23 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#canvas').waitFor({ state: 'visible' });
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
 
+    // Exercise the editable clipping-path controls and verify undoable project data.
+    await page.locator('[data-tab="object"]').click();
+    await page.locator('#layerClipPath').fill('[["M",0,0],["L",200,0],["L",200,200],["Z"]]');
+    await page.locator('#layerClipApply').click();
+    await page.waitForFunction(() => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      return scene.layers.find(layer => layer.id === state.layerId)?.clip_path?.length === 4;
+    });
+    await page.locator('#layerClipClear').click();
+    await page.waitForFunction(() => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      return !scene.layers.find(layer => layer.id === state.layerId)?.clip_path;
+    });
+    await page.locator('[data-tab="tool"]').click();
+
     // Exercise the integrated AI workspace's sharp glass styling and safe JSON gating.
     await page.locator('#aiLaunch').waitFor({ state: 'visible' });
     await page.locator('#aiLaunch').click();
