@@ -28,6 +28,33 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#canvas').waitFor({ state: 'visible' });
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
 
+    // A double-click on an empty exposure cell should author a real blank drawing cel.
+    await page.locator('#addLayer').click();
+    const celTarget = await page.evaluate(() => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      const layer = scene.layers.find(item => item.id === state.layerId);
+      if (!layer) throw new Error('New timeline layer was not selected');
+      const scroll = document.querySelector('#dopeScroll');
+      const canvas = document.querySelector('#dope');
+      const rect = canvas.getBoundingClientRect();
+      const frame = Math.min(5, state.project.settings.duration_frames - 1);
+      const px = Math.max(10, (scroll.clientWidth - 12) / state.project.settings.duration_frames);
+      return {
+        x: rect.left + 6 + frame * px + px / 2 - scroll.scrollLeft,
+        y: rect.top + 18 + 10 - scroll.scrollTop,
+        layerId: layer.id,
+        frame,
+      };
+    });
+    await page.mouse.dblclick(celTarget.x, celTarget.y);
+    await page.waitForFunction(({ layerId, frame }) => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      const layer = scene.layers.find(item => item.id === layerId);
+      return state.frame === frame && layer?.exposures?.some(exposure => exposure.start === frame
+        && exposure.length === 1 && !!state.project.drawings[exposure.drawing]);
+    }, celTarget);
     // Exercise the editable clipping-path controls and verify undoable project data.
     await page.locator('[data-tab="object"]').click();
     await page.locator('#layerClipPath').fill('[["M",0,0],["L",200,0],["L",200,200],["Z"]]');
