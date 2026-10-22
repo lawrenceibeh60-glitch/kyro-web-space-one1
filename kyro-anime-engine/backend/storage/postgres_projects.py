@@ -151,3 +151,11 @@ def delete(project_id):
         )
         conn.commit()
         return cursor.rowcount > 0
+
+
+def check_connection():
+    """Verify connectivity and initialize the schema/migration if needed."""
+    with _connect() as conn:
+        _ensure_schema(conn)
+        conn.execute("SELECT 1").fetchone()
+    return True
