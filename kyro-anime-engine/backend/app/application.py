@@ -23,6 +23,7 @@ def create_app():
         exports,
         health,
         layers,
+        mcp_connector,
         projects,
         rendering,
         rigs,
@@ -33,6 +34,7 @@ def create_app():
     )
 
     app.register_blueprint(health.bp, url_prefix="/api")
+    app.register_blueprint(mcp_connector.bp)
     app.register_blueprint(ai_studio.bp, url_prefix="/api")
     app.register_blueprint(ai_providers.bp, url_prefix="/api")
     app.register_blueprint(projects.bp, url_prefix="/api/projects")

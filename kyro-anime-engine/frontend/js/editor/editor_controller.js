@@ -575,7 +575,64 @@ async function boot() {
   window.addEventListener('beforeunload', e => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
   syncOpts(); renderSwatches(); renderLayers(); layout.apply(layout.current());
+  startMcpLiveSync();
   window.kae = { state, execute, undo, redo }; // debug handle
+}
+
+
+// Pull validated MCP edits into the running editor when the local document is clean.
+// Polling is read-only: writes still go through authenticated MCP tools.
+let mcpLiveSyncStarted = false;
+function startMcpLiveSync() {
+  if (mcpLiveSyncStarted) return;
+  mcpLiveSyncStarted = true;
+  let lastRemoteModified = state.project?.modified || null;
+  let polling = false;
+  let warnedAboutConflict = false;
+
+  const pollRemoteProject = async () => {
+    if (polling || !state.projectId || !state.project) return;
+    polling = true;
+    try {
+      const remote = await Projects.get(state.projectId);
+      const revision = remote?.modified || null;
+      if (!revision) return;
+      if (!lastRemoteModified) {
+        lastRemoteModified = revision;
+        return;
+      }
+      if (revision === lastRemoteModified) return;
+      if (state.dirty) {
+        if (!warnedAboutConflict) {
+          toast('KAE has newer AI edits saved on the server. Resolve or save your local changes before syncing.');
+          warnedAboutConflict = true;
+        }
+        return;
+      }
+
+      const scenes = Array.isArray(remote.scenes) ? remote.scenes : [];
+      const sceneId = scenes.some(scene => scene.id === state.sceneId)
+        ? state.sceneId : (scenes[0]?.id || null);
+      const scene = scenes.find(item => item.id === sceneId);
+      const layers = Array.isArray(scene?.layers) ? scene.layers : [];
+      const layerId = layers.some(layer => layer.id === state.layerId)
+        ? state.layerId : (layers[0]?.id || null);
+      const maxFrame = Math.max(0, Number(remote.settings?.duration_frames || 1) - 1);
+      const frame = Math.min(Math.max(0, Number(state.frame) || 0), maxFrame);
+
+      setState({ project: remote, sceneId, layerId, frame, dirty: false });
+      lastRemoteModified = revision;
+      warnedAboutConflict = false;
+      bus.emit('project:changed', { label: 'AI connector updated project' });
+      toast('AI connector changes synced to the canvas');
+    } catch (error) {
+      console.warn('KAE live AI sync:', error?.message || error);
+    } finally {
+      polling = false;
+    }
+  };
+
+  window.setInterval(pollRemoteProject, 1500);
 }
 
 boot();
