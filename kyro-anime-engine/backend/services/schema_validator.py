@@ -12,6 +12,7 @@ _SCHEMA_NAMES = (
     "effects.schema.json",
     "path.schema.json",
     "project.schema.json",
+    "node_graph.schema.json",
     "rig.schema.json",
     "scene.schema.json",
     "style.schema.json",
