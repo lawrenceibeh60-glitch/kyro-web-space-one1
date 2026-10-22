@@ -928,6 +928,23 @@ def _check_scenes(scenes, drawings, errs):
                     errs.append(f"{lw}.color: hex color #RRGGBB required")
 
 
+def _check_preview_range(project, errs):
+    preview = project.get("preview_range")
+    if preview is None:
+        return
+    if not isinstance(preview, dict):
+        errs.append("preview_range: must be an object")
+        return
+    start, end = preview.get("start"), preview.get("end")
+    total = project.get("settings", {}).get("duration_frames", 1) if isinstance(project.get("settings"), dict) else 1
+    if not _int(start) or not 0 <= start < total:
+        errs.append("preview_range.start: must be within the project timeline")
+    if not _int(end) or not 0 <= end < total:
+        errs.append("preview_range.end: must be within the project timeline")
+    if _int(start) and _int(end) and start > end:
+        errs.append("preview_range: start must be less than or equal to end")
+
+
 def _check_markers(project, errs):
     markers = project.get("markers", [])
     if not isinstance(markers, list):
@@ -977,6 +994,7 @@ def validate_project(p):
     if not isinstance(p.get("name"), str) or not p["name"].strip():
         errs.append("name: non-empty string required")
     _check_settings(p.get("settings"), errs)
+    _check_preview_range(p, errs)
     _check_markers(p, errs)
     _check_drawings(p.get("drawings"), errs)
     characters = p.get("characters", [])
