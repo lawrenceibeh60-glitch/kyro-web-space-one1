@@ -49,7 +49,6 @@ def _bucket():
 def put(key, data, content_type):
     _client().put_object(
         Bucket=_bucket(), Key=key, Body=data, ContentType=content_type,
-        ServerSideEncryption="AES256",
     )
 
 
