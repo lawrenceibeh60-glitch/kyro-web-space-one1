@@ -26,7 +26,7 @@ def authenticate(authorization):
 
 
 def _now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def _project(pid):
@@ -96,7 +96,13 @@ def _scene_context(pid, args):
     if not args.get("include_strokes", False):
         # Drawing payloads are returned through the drawing catalog, not duplicated in every exposure.
         pass
-    return {"project_id":project.get("id"),"project_name":project.get("name"),"modified":project.get("modified"),"settings":project.get("settings",{}),"scene":{**{k:deepcopy(v) for k,v in scene.items() if k!="layers"},"layers":layers},"drawing_catalog":[{"id":key,"name":value.get("name",key),"stroke_count":len(value.get("strokes",[]))} for key,value in project.get("drawings",{}).items()]}
+    catalog = []
+    for key, value in project.get("drawings", {}).items():
+        entry = {"id": key, "name": value.get("name", key), "stroke_count": len(value.get("strokes", []))}
+        if args.get("include_strokes", False):
+            entry["strokes"] = deepcopy(value.get("strokes", []))
+        catalog.append(entry)
+    return {"project_id":project.get("id"),"project_name":project.get("name"),"modified":project.get("modified"),"settings":project.get("settings",{}),"scene":{**{k:deepcopy(v) for k,v in scene.items() if k!="layers"},"layers":layers},"drawing_catalog":catalog}
 
 
 def call_tool(name, args):
