@@ -771,7 +771,14 @@ def plan_story_vector_animation():
         )},
         {"role": "user", "content": prompt},
     ]
-    raw, used_model = provider_completion(profile, messages, temperature=0.1, timeout=180)
+    try:
+        raw, used_model = provider_completion(profile, messages, temperature=0.1, timeout=180)
+    except ApiError as exc:
+        # Retry transient upstream errors once at deterministic temperature.
+        message = str(exc).lower()
+        if exc.status != 502 or not any(code in message for code in ('http 502', 'http 503', 'http 504', 'timeout', 'timed out')):
+            raise
+        raw, used_model = provider_completion(profile, messages, temperature=0, timeout=180)
     try:
         plan = _parse_model_json(raw)
         if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
