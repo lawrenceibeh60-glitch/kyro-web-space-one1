@@ -10,7 +10,7 @@ import { buildTurnChoreography, countTurnPairs } from '../animation/turn_choreog
 import { withRotationLimit } from '../animation/rig_constraints.js';
 import { withTwoBoneIK } from '../animation/rig_ik.js';
 import { getLayerTransform as evaluateLayerTransform } from '../rendering/renderer.js';
-import { pathCoordinateCount } from '../animation/rig_deformer.js';
+import { pathCoordinateCount, clearRigDeformationCache } from '../animation/rig_deformer.js';
 import { toast } from './notifications.js';
 
 const $ = id => document.getElementById(id);
@@ -241,6 +241,7 @@ export function initStudioPanel({ onCharacterImported }) {
       });
     }
     if (changed) {
+      clearRigDeformationCache();
       weightPaint.changed = true;
       weightPaint.touched += changed;
       updateSkinStatus(`Painting ${weightPaint.boneName}: ${weightPaint.touched} point/control-point touches. Release to commit.`);
