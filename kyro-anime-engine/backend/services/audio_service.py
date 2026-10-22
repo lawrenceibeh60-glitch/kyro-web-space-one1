@@ -26,8 +26,8 @@ def _audio_dir(pid):
 
 
 def _object_key(pid, clip):
-    return f"kae/projects/{safe_id(pid)}/audio/{clip.get('filename', '')}"
-
+    _stored_path(pid, clip)  # validate filename before using it as an object key
+    return f"kae/projects/{safe_id(pid)}/audio/{clip['filename']}"
 
 def _stored_path(pid, clip):
     filename = clip.get("filename", "")
