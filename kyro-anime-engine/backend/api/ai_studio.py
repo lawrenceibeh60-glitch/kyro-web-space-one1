@@ -775,7 +775,7 @@ def plan_story_vector_animation():
         {"role": "user", "content": visual_brief_prompt},
     ]
     try:
-        brief_raw, used_model = provider_completion(profile, planning_messages, temperature=0.25, timeout=180)
+        brief_raw, used_model = provider_completion(profile, planning_messages, temperature=0.25, timeout=180, max_tokens=100000)
         visual_brief = _parse_model_json(brief_raw)
         if not isinstance(visual_brief, dict):
             raise ValueError("Visual design brief must be a JSON object.")
@@ -832,11 +832,32 @@ def plan_story_vector_animation():
         {"role": "system", "content": capability_context + "\nYou are KAE's native vector-cel renderer. Produce paths only for KAE's existing command schema. Never invent external tools, schemas, or endpoints."},
         {"role": "user", "content": drawing_prompt},
     ]
-    raw, used_model = provider_completion(profile, drawing_messages, temperature=0.15, timeout=240)
-    plan = _parse_model_json(raw)
-    if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != frame_count:
-        raise ApiError(502, "The drawing model returned an incomplete vector plan. KAE expected " + str(frame_count) + " frames after visual planning.")
-    frames = _validated_vector_frames(plan["frames"], width, height, coordinates_normalized=True)
+    visual_reference = data.get("visual_reference")
+    if isinstance(visual_reference, str) and len(visual_reference) <= 18_000_000 and visual_reference.startswith(("data:image/", "https://")):
+        if profile.get("provider") != "anthropic" or visual_reference.startswith("data:image/"):
+            drawing_messages[-1]["content"] = [
+                {"type": "text", "text": drawing_prompt + "\n\nUse the attached concept image as a visual reference for silhouette, palette, face, costume, props and lighting. Translate it into editable native paths; do not claim to copy pixels."},
+                {"type": "image_url", "image_url": {"url": visual_reference}},
+            ]
+    raw, used_model = provider_completion(profile, drawing_messages, temperature=0.15, timeout=240, max_tokens=100000)
+    try:
+        plan = _parse_model_json(raw)
+        if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != frame_count:
+            raise ValueError("Expected exactly " + str(frame_count) + " frames.")
+        frames = _validated_vector_frames(plan["frames"], width, height, coordinates_normalized=True)
+    except (ApiError, ValueError) as first_error:
+        repair_messages = drawing_messages + [
+            {"role": "assistant", "content": raw[:180000]},
+            {"role": "user", "content": "SELF-REPAIR PASS 1/1. Your previous output failed KAE JSON/path validation: " + str(first_error) +
+             "\nRewrite the COMPLETE JSON object from scratch. Return only valid JSON with summary and exactly " + str(frame_count) +
+             " frames. Every frame needs 12-48 detailed strokes; each stroke must use valid hex colors, width 0.5-40, fill null or hex, " +
+             "and commands beginning with M followed by valid L/Q/C/Z commands. Coordinates must be numbers 0-1000. Do not explain the repair."},
+        ]
+        raw, used_model = provider_completion(profile, repair_messages, temperature=0, timeout=240, max_tokens=100000)
+        plan = _parse_model_json(raw)
+        if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != frame_count:
+            raise ApiError(502, "Self-repair did not return a complete " + str(frame_count) + "-frame JSON plan. Please continue with a shorter scene or clarify the design.")
+        frames = _validated_vector_frames(plan["frames"], width, height, coordinates_normalized=True)
     return jsonify(
         title=str(scene_title)[:180],
         summary=str(plan.get("summary") or "Visual plan converted into editable native vector animation")[:2000],
