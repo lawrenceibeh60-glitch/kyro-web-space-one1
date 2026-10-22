@@ -103,7 +103,7 @@ export function initStudioPanel({ onCharacterImported }) {
         row.append(makeControl('Count', 1, 200, effect.count ?? 36,
           value => updateEffect(effect.id, { count: value })));
       }
-      if (effect.type !== 'camera_shake') {
+      if (!['camera_shake', 'glow'].includes(effect.type)) {
         row.append(makeControl('Speed', 0, 20, effect.speed ?? 1,
           value => updateEffect(effect.id, { speed: value }), 0.1));
       }
