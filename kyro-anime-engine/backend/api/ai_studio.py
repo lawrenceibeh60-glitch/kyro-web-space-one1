@@ -761,7 +761,7 @@ def plan_story_vector_animation():
         "foreground, midground and background; camera framing; light direction; shadow shapes; palette; "
         "depth ordering; and how the design stays consistent across motion. Identify the visual focal point "
         "and avoid tiny details that would disappear at the target canvas size. Return ONLY JSON with keys "
-        "composition, character_design, pose_sequence (array of 4 to 6 short entries), palette (array of hex colors), "
+        "composition, character_design, pose_sequence (array of exactly 4 short entries), palette (array of hex colors), "
         "environment_design, lighting, continuity_rules, and quality_check. Do not output hidden reasoning, "
         "markdown, image URLs, or claims that a raster image exists. Make the brief concrete and drawable using "
         "KAE's native paths and fills.\n\n"
@@ -783,8 +783,8 @@ def plan_story_vector_animation():
             if not isinstance(visual_brief.get(field), str) or not visual_brief[field].strip():
                 raise ValueError("Visual design brief omitted " + field + ".")
         poses = visual_brief.get("pose_sequence")
-        if not isinstance(poses, list) or not 4 <= len(poses) <= 6:
-            raise ValueError("Visual design brief must include 4 to 6 pose beats.")
+        if not isinstance(poses, list) or len(poses) != 4:
+            raise ValueError("Visual design brief must include exactly 4 pose beats.")
         palette = visual_brief.get("palette", [])
         if not isinstance(palette, list):
             palette = []
@@ -803,7 +803,7 @@ def plan_story_vector_animation():
             raise
         raise ApiError(502, "The visual planning stage returned an incomplete art-direction brief: " + str(exc)) from exc
 
-    frame_count = len(visual_brief["pose_sequence"])
+    frame_count = 4
     drawing_prompt = (
         "Now produce the native KAE drawing JSON using the approved visual brief below. This is stage 2: "
         "write the actual drawable paths, not another plan. Return ONLY valid JSON with keys summary and frames. "
