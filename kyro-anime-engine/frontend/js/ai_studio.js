@@ -139,6 +139,7 @@ export function initAIStudio() {
   let authoredScript = null;
   let storyAuthorState = null;
   let scriptComplete = false;
+  let projectApplied = false;
   let authoringBusy = false;
   const status = el('div', { class: 'ai-status' }, 'Loading KAE engine capabilities…');
 
@@ -210,8 +211,8 @@ export function initAIStudio() {
         parsed.scenes.length > 0 && parsed.scenes.every(scene => scene && Array.isArray(scene.frames) &&
           scene.frames.length >= 4 && scene.frames.every(frame => Array.isArray(frame.strokes) && frame.strokes.length > 0));
       authoredScript = valid ? parsed : null;
-      moveToProject.disabled = !valid || authoringBusy || !currentProject?.id;
-      moveToProject.hidden = !valid || authoringBusy || !currentProject?.id;
+      moveToProject.disabled = !valid || authoringBusy || !currentProject?.id || projectApplied;
+      moveToProject.hidden = !valid || authoringBusy || !currentProject?.id || projectApplied;
       if (valid && !authoringBusy) jsonStatus.textContent = 'JSON parses successfully · ' + parsed.scenes.length + ' scene(s) · ready to move into the project.';
       return Boolean(valid);
     } catch (_) {
@@ -1020,6 +1021,7 @@ export function initAIStudio() {
       }
       currentProject = await request('GET', '/api/projects/' + encodeURIComponent(currentProject.id));
       jsonStatus.textContent = 'MOVED TO PROJECT · ' + script.scenes.length + ' scene(s) were applied to the KAE timeline.';
+      projectApplied = true;
       moveToProject.hidden = true;
       addMessage('assistant', 'MOVED TO PROJECT · ' + script.title + '\nThe editor acknowledged all ' + script.scenes.length + ' scene(s). The JSON remains available in the JSON Script tab.');
       root.hidden = true;
