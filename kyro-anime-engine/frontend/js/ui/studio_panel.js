@@ -131,6 +131,35 @@ export function initStudioPanel({ onCharacterImported }) {
         row.append(makeControl('Depth range', 5, 100, Math.round((effect.range ?? 0.25) * 100),
           value => updateEffect(effect.id, { range: value / 100 })));
       }
+      const sceneLayers = (state.project.scenes.find(item => item.id === sceneId)?.layers || []);
+      const flattenLayers = (items, depth = 0) => items.flatMap(item => [
+        { id: item.id, name: `${'— '.repeat(depth)}${item.name || item.id}` },
+        ...flattenLayers(item.children || [], depth + 1),
+      ]);
+      const layerOptions = flattenLayers(sceneLayers);
+      const appendLayerSelect = (label, field, excludedId = '') => {
+        const wrap = document.createElement('label'); wrap.className = 'studio-control';
+        const title = document.createElement('span'); title.textContent = label;
+        const select = document.createElement('select'); select.setAttribute('aria-label', label);
+        for (const item of layerOptions.filter(item => item.id !== excludedId)) {
+          const option = document.createElement('option'); option.value = item.id; option.textContent = item.name;
+          select.append(option);
+        }
+        select.value = effect[field] || layerOptions.find(item => item.id !== excludedId)?.id || '';
+        select.onchange = () => updateEffect(effect.id, { [field]: select.value });
+        wrap.append(title, select); row.append(wrap);
+      };
+      if (effect.type === 'layer_mask') {
+        appendLayerSelect('Target layer', 'target_layer_id', effect.mask_layer_id || '');
+        appendLayerSelect('Mask source layer', 'mask_layer_id', effect.target_layer_id || '');
+      }
+      if (effect.type === 'facial_animation') {
+        appendLayerSelect('Character face layer', 'target_layer_id');
+        row.append(makeControl('Blink interval (frames)', 8, 240, effect.blink_interval ?? 48,
+          value => updateEffect(effect.id, { blink_interval: value })));
+        row.append(makeControl('Mouth cycle (frames)', 4, 120, effect.mouth_cycle ?? 18,
+          value => updateEffect(effect.id, { mouth_cycle: value })));
+      }
       if (effect.type !== 'camera_shake') {
         const color = document.createElement('input'); color.type = 'color'; color.value = effect.color || '#ffffff';
         color.setAttribute('aria-label', 'Effect color');
@@ -154,6 +183,7 @@ export function initStudioPanel({ onCharacterImported }) {
       id, scene_id: state.sceneId, type, enabled: true,
       start_frame: 0, end_frame: state.project.settings.duration_frames - 1,
       intensity: 0.5, color: '#ffffff', count: 36, speed: 1, focus_depth: 0.5, range: 0.25,
+      blink_interval: 48, mouth_cycle: 18,
     };
     changeProjectArray('effects', [...(state.project.effects || []), effect], 'Add effect');
   }
