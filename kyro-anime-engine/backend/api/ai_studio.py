@@ -691,10 +691,19 @@ def expand_story_outline():
         "IMPORTED STORY JSON:\n" + story_text
     )
     raw, used_model = provider_completion(profile, [
-        {"role": "system", "content": "You are KAE's story editor and animation director. Return compact valid JSON only."},
+        {"role": "system", "content": build_system_context(project) + "\nYou are KAE's story editor and animation director. Use only the tagged native tools and schema fields in the capability inventory. Return valid JSON only; never invent external drawing tools."},
         {"role": "user", "content": prompt},
-    ], temperature=0.2, timeout=180)
-    outline = _parse_model_json(raw)
+    ], temperature=0.2, timeout=180, max_tokens=100000)
+    try:
+        outline = _parse_model_json(raw)
+    except ApiError as first_error:
+        raw, used_model = provider_completion(profile, [
+            {"role": "system", "content": build_system_context(project)},
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": raw[:160000]},
+            {"role": "user", "content": "SELF-REPAIR PASS 1/1. Return the COMPLETE corrected story outline as valid JSON only. Previous parse error: " + str(first_error) + ". Keep 1-12 scenes and all required fields."},
+        ], temperature=0, timeout=180, max_tokens=100000)
+        outline = _parse_model_json(raw)
     if not isinstance(outline, dict) or not isinstance(outline.get("scenes"), list) or not 1 <= len(outline["scenes"]) <= 12:
         raise ApiError(502, "The story director must return between 1 and 12 scenes.")
     required = ("title", "logline", "style_bible")
