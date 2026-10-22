@@ -419,8 +419,8 @@ export function initAIStudio() {
             : ['qwen/qwen3.6-27b', 'qwen/qwen3.8-27b'], savedImage.model);
         }
       } catch (_) {}
-    } else resetProviderForSelection();
-  } catch (_) { resetProviderForSelection(); }
+    } else { providerSelect.value = 'xkiro'; resetProviderForSelection(); }
+  } catch (_) { providerSelect.value = 'xkiro'; resetProviderForSelection(); }
 
   function setBusy(value) {
     send.disabled = value;
@@ -802,7 +802,8 @@ export function initAIStudio() {
         native_engine: 'KAE',
         native_vector_format: 'kae-native-vector-cels',
         created_at: new Date().toISOString(),
-        correction_passes: state.correctionPasses || 0,
+        self_repair: 'one automatic JSON/path correction pass per generated scene',
+        scenes_written: state.scenes.length,
       },
     };
   }
