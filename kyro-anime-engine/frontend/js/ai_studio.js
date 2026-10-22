@@ -132,7 +132,7 @@ export function initAIStudio() {
   const jsonToolbar = el('div', { class: 'ai-json-toolbar' });
   const jsonStatus = el('div', { class: 'ai-json-status' }, 'Drop a story into the chat. KAE will plan the visuals, write native animation JSON, validate it and repair malformed output.');
   const jsonEditor = el('textarea', { class: 'ai-json-editor', spellcheck: 'false', 'aria-label': 'Generated KAE animation JSON', placeholder: 'Your story animation JSON will appear here as it is authored…' });
-  const moveToProject = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Move to Project');
+  const moveToProject = el('button', { type: 'button', class: 'primary', disabled: '', hidden: '' }, 'Move to Project');
   const validateJson = el('button', { type: 'button' }, 'Validate JSON');
   jsonToolbar.append(validateJson, moveToProject);
   jsonPane.append(jsonStatus, jsonEditor, jsonToolbar);
@@ -210,11 +210,13 @@ export function initAIStudio() {
           scene.frames.length >= 4 && scene.frames.every(frame => Array.isArray(frame.strokes) && frame.strokes.length > 0));
       authoredScript = valid ? parsed : null;
       moveToProject.disabled = !valid || authoringBusy || !currentProject?.id;
+      moveToProject.hidden = !valid || authoringBusy || !currentProject?.id;
       if (valid && !authoringBusy) jsonStatus.textContent = 'JSON parses successfully · ' + parsed.scenes.length + ' scene(s) · ready to move into the project.';
       return Boolean(valid);
     } catch (_) {
       authoredScript = null;
       moveToProject.disabled = true;
+      moveToProject.hidden = true;
       return false;
     }
   }
@@ -437,6 +439,18 @@ export function initAIStudio() {
     const previousHistory = history.slice(-12);
     history.push({ role: 'user', content: message });
     if (latestVideoAnalysis) latestCreativeDirection = message;
+
+    if (storyAuthorState) {
+      await runStoryAuthoring(storyAuthorState, message);
+      return;
+    }
+    if (storyLikeMessage(message)) {
+      window.kaeAIAppliedSceneCount = 0;
+      const state = { story: message, continuation: '', outline: null, scenes: [], nextScene: 0, stage: 'outline', correctionPasses: 0 };
+      await runStoryAuthoring(state);
+      return;
+    }
+
     setBusy(true);
     status.textContent = 'Consulting KAE engine context and capabilities…';
     try {
