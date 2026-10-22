@@ -279,6 +279,11 @@ def build_character_document(character_id, name, options, canvas_width, canvas_h
     sx = sy = scale
     hair, eyes, skin, outfit = colors["hair_color"], colors["eye_color"], colors["skin_color"], colors["outfit_color"]
     outline = "#302b37"
+    def lighten(value, amount):
+        channels = [int(value[index:index + 2], 16) for index in (1, 3, 5)]
+        return "#" + "".join(f"{round(channel + (255 - channel) * amount):02x}" for channel in channels)
+    hair_highlight = lighten(hair, 0.42)
+    outfit_highlight = lighten(outfit, 0.5)
 
     def pt(x, y):
         return [round(cx + x * sx, 2), round(cy + y * sy, 2), 1]
@@ -291,6 +296,8 @@ def build_character_document(character_id, name, options, canvas_width, canvas_h
                             (35, -172), (111, -132), (150, -64), (147, 20),
                             (116, 2), (94, -56), (57, -87), (10, -103),
                             (-42, -91), (-91, -56), (-114, 5)], outline, hair, 7),
+        _shape("hair-sheen-left", [pt(-104, -98), pt(-78, -132), pt(-44, -149)], hair_highlight, None, 3 * sx),
+        _shape("hair-sheen-right", [pt(44, -148), pt(81, -127), pt(106, -94)], hair_highlight, None, 3 * sx),
     ]
     hair_front = [
         poly("fringe", [(-135, -86), (-81, -125), (-48, -115), (-14, -63),
@@ -298,6 +305,7 @@ def build_character_document(character_id, name, options, canvas_width, canvas_h
                         (137, -72), (116, -14), (84, -43), (61, -3),
                         (31, -46), (0, -5), (-28, -49), (-63, -10),
                         (-88, -51), (-121, -28)], outline, hair, 6),
+        _shape("fringe-highlight", [pt(-90, -94), pt(-63, -107), pt(-42, -91)], hair_highlight, None, 2.5 * sx),
     ]
     parts = [
         {"id": "hair_back", "name": "Hair Back", "strokes": hair_back, "depth": 0.9},
@@ -309,6 +317,8 @@ def build_character_document(character_id, name, options, canvas_width, canvas_h
         ]},
         {"id": "left_foot", "name": "Left Foot", "strokes": [
             poly("left-shoe", [(-92, 619), (-20, 619), (-12, 652), (-111, 652)], outline, "#493d4b", 5),
+            poly("left-shoe-sole", [(-105, 646), (-18, 646)], "#d4c2c4", None, 3),
+            poly("left-shoe-lace", [(-66, 628), (-52, 636)], "#f5e8dd", None, 2),
         ]},
         {"id": "right_thigh", "name": "Right Thigh", "strokes": [
             poly("right-thigh", [(8, 354), (72, 354), (82, 455), (12, 455)], outline, outfit, 7),
@@ -318,12 +328,15 @@ def build_character_document(character_id, name, options, canvas_width, canvas_h
         ]},
         {"id": "right_foot", "name": "Right Foot", "strokes": [
             poly("right-shoe", [(20, 619), (92, 619), (111, 652), (12, 652)], outline, "#493d4b", 5),
+            poly("right-shoe-sole", [(18, 646), (105, 646)], "#d4c2c4", None, 3),
+            poly("right-shoe-lace", [(52, 636), (66, 628)], "#f5e8dd", None, 2),
         ]},
         {"id": "arm_left", "name": "Left Upper Arm", "strokes": [
             poly("left-upper-arm", [(-88, 192), (-126, 209), (-151, 266), (-124, 278), (-103, 247), (-83, 247)], outline, outfit, 7),
         ]},
         {"id": "forearm_left", "name": "Left Forearm", "strokes": [
             poly("left-forearm", [(-151, 266), (-124, 278), (-145, 344), (-174, 326)], outline, outfit, 7),
+            _shape("left-cuff-seam", [pt(-168, 318), pt(-143, 333)], outfit_highlight, None, 3 * sx),
         ]},
         {"id": "hand_left", "name": "Left Hand", "strokes": [
             poly("left-hand", [(-174, 326), (-145, 344), (-134, 375), (-151, 385), (-171, 365), (-184, 344)], outline, skin, 5),
@@ -333,6 +346,7 @@ def build_character_document(character_id, name, options, canvas_width, canvas_h
         ]},
         {"id": "forearm_right", "name": "Right Forearm", "strokes": [
             poly("right-forearm", [(151, 266), (124, 278), (145, 344), (174, 326)], outline, outfit, 7),
+            _shape("right-cuff-seam", [pt(168, 318), pt(143, 333)], outfit_highlight, None, 3 * sx),
         ]},
         {"id": "hand_right", "name": "Right Hand", "strokes": [
             poly("right-hand", [(174, 326), (145, 344), (134, 375), (151, 385), (171, 365), (184, 344)], outline, skin, 5),
@@ -343,6 +357,12 @@ def build_character_document(character_id, name, options, canvas_width, canvas_h
         {"id": "body", "name": "Outfit", "strokes": [
             poly("torso", [(-36, 164), (-102, 193), (-139, 310), (-106, 377), (106, 377), (139, 310), (102, 193), (36, 164)], outline, outfit, 8),
             poly("collar", [(-38, 169), (0, 204), (38, 169), (20, 237), (-20, 237)], outline, "#f5e8dd", 4),
+            poly("jacket-panel-left", [(-76, 224), (-58, 236), (-72, 319), (-90, 340)], outfit_highlight, None, 2.5),
+            poly("jacket-panel-right", [(76, 224), (58, 236), (72, 319), (90, 340)], outfit_highlight, None, 2.5),
+            poly("jacket-center-seam", [(0, 238), (0, 350)], outline, None, 2.5),
+            _shape("jacket-button-top", [pt(-7, 256), pt(-4, 256), pt(-4, 260), pt(-7, 260)], "#f5e8dd", "#f5e8dd", 1),
+            _shape("jacket-button-mid", [pt(-7, 288), pt(-4, 288), pt(-4, 292), pt(-7, 292)], "#f5e8dd", "#f5e8dd", 1),
+            _shape("jacket-button-low", [pt(-7, 320), pt(-4, 320), pt(-4, 324), pt(-7, 324)], "#f5e8dd", "#f5e8dd", 1),
         ]},
         {"id": "head", "name": "Face", "strokes": head},
         {"id": "hair_front", "name": "Hair Fringe", "strokes": hair_front},
