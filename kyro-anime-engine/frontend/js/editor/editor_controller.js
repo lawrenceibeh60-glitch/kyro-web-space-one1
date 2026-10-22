@@ -548,6 +548,7 @@ async function boot() {
             }
           }
         }
+        viewport?.requestRender();
         totalDrawnStrokes += completeStrokes.length;
         overlay.textContent = 'KYRO DRAWING · ' + (task.storyTitle || 'Story') +
           '\\nScene ' + (task.sceneNumber || 1) + '/' + (task.totalScenes || 1) + ': ' + (task.title || 'Untitled') +
