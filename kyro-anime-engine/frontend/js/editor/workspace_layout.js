@@ -9,6 +9,7 @@ export const EDITORS = {
   properties: { label: 'Properties', icon: 'sliders' },
   timeline: { label: 'Timeline', icon: 'timeline' },
   graph: { label: 'Graph Editor', icon: 'timeline' },
+  geometry: { label: 'Geometry Nodes', icon: 'nodes' },
   history: { label: 'History', icon: 'history' },
   assets: { label: 'Asset Browser', icon: 'asset' },
   studio: { label: 'Studio Tools', icon: 'sliders' },
