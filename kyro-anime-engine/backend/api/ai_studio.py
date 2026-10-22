@@ -855,7 +855,15 @@ def plan_story_vector_animation():
                 {"type": "text", "text": drawing_prompt + "\n\nUse the attached concept image as a visual reference for silhouette, palette, face, costume, props and lighting. Translate it into editable native paths; do not claim to copy pixels."},
                 {"type": "image_url", "image_url": {"url": visual_reference}},
             ]
-    raw, used_model = provider_completion(profile, drawing_messages, temperature=0.15, timeout=240, max_tokens=100000)
+    try:
+        raw, used_model = provider_completion(profile, drawing_messages, temperature=0.15, timeout=240, max_tokens=100000)
+    except ApiError:
+        # A model/provider may reject image_url content even if it accepts text.
+        # Retry text-only so optional image collaboration cannot block the drawing.
+        if not isinstance(drawing_messages[-1].get("content"), list):
+            raise
+        drawing_messages[-1]["content"] = drawing_prompt
+        raw, used_model = provider_completion(profile, drawing_messages, temperature=0.15, timeout=240, max_tokens=100000)
     try:
         plan = _parse_model_json(raw)
         if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != frame_count:
