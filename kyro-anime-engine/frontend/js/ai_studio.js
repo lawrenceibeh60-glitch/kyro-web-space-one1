@@ -138,6 +138,7 @@ export function initAIStudio() {
   jsonPane.append(jsonStatus, jsonEditor, jsonToolbar);
   let authoredScript = null;
   let storyAuthorState = null;
+  let scriptComplete = false;
   let authoringBusy = false;
   const status = el('div', { class: 'ai-status' }, 'Loading KAE engine capabilities…');
 
@@ -205,7 +206,7 @@ export function initAIStudio() {
   function refreshMoveButton() {
     try {
       const parsed = JSON.parse(jsonEditor.value);
-      const valid = parsed && parsed.format === 'kae-story-animation' && Array.isArray(parsed.scenes) &&
+      const valid = scriptComplete && parsed && parsed.format === 'kae-story-animation' && Array.isArray(parsed.scenes) &&
         parsed.scenes.length > 0 && parsed.scenes.every(scene => scene && Array.isArray(scene.frames) &&
           scene.frames.length >= 4 && scene.frames.every(frame => Array.isArray(frame.strokes) && frame.strokes.length > 0));
       authoredScript = valid ? parsed : null;
@@ -446,6 +447,8 @@ export function initAIStudio() {
     }
     if (storyLikeMessage(message)) {
       window.kaeAIAppliedSceneCount = 0;
+      scriptComplete = false;
+      authoredScript = null;
       const state = { story: message, continuation: '', outline: null, scenes: [], nextScene: 0, stage: 'outline', correctionPasses: 0 };
       await runStoryAuthoring(state);
       return;
@@ -950,6 +953,7 @@ export function initAIStudio() {
       const completeScript = currentAuthoredScript(state);
       await streamScriptToEditor(completeScript);
       state.stage = 'complete';
+      scriptComplete = true;
       storyAuthorState = null;
       jsonEditor.disabled = false;
       jsonStatus.textContent = 'COMPLETE · every scene has native frames and valid JSON. Review it, then choose Move to Project.';
