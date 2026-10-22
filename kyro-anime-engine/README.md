@@ -16,7 +16,7 @@ Open http://127.0.0.1:5000. Choose one of the editable animation demos or create
 4. Drawing - brush (smoothing, pressure), stroke eraser, per-layer frames
 5. Animation - playback, keyframes with easing, move/rotate/scale tools, dope sheet, auto-key
 6. Export - PNG sequence (zip), GIF, sprite sheet + JSON atlas, and browser-recorded WebM; frames use the same renderer as the editor. Pillow is only needed for GIF and sprite sheets. All UI icons are inline SVG (`frontend/js/ui/icons.js`).
-7. Blender-style UI - workspaces (Draw / Animate / Edit), switchable areas (Outliner, Properties, Timeline, Graph Editor, History, Asset Browser), editable drawing exposures, onion skin, Edit mode for stroke points, undo history, preferences + keymap, auto-save option
+7. Blender-style UI - workspaces (Draw / Animate / Edit), switchable areas (Outliner, Properties, Timeline, Graph Editor, History, Asset Browser), editable drawing exposures, onion skin, Edit mode for stroke points, undo history, preferences + keymap, auto-save option; named frame markers with ruler flags and marker navigation; inclusive preview-range playback with start/end controls
 8. Drawing tools - line, rectangle, ellipse, vector fill, canvas eyedropper, HSV color wheel, project palette, and Grease Pencil presets
 9. Drawing assets - search project drawings, save the current frame as an asset, import/export drawing JSON, and place independent copies on the timeline
 10. Camera - per-scene pan and zoom, keyframed at the current frame; select Camera (`K`) to drag-pan and wheel-zoom around the pointer. Framing is applied consistently in the viewport and image/video exports
