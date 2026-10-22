@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="css/editor/asset_browser.css">
 <link rel="stylesheet" href="css/animation/timeline.css">
 <link rel="stylesheet" href="css/animation/dope_sheet.css">
-<link rel="stylesheet" href="css/animation/graph_editor.css">
+<link rel="stylesheet" href="css/animation/graph_editor.css">\n<link rel="stylesheet" href="css/animation/geometry_nodes.css">
 <link rel="stylesheet" href="css/rendering/export_dialog.css">
 <link rel="stylesheet" href="css/layout/responsive.css">
 <link rel="stylesheet" href="css/themes/production_workspace.css">
@@ -410,6 +410,12 @@
     <div class="dope-scroll" style="height:calc(100% - 52px); margin:8px 8px 8px; border:1px solid var(--line); background:var(--panel);">
       <canvas id="graphCanvas" style="display:block; width:100%; height:100%;"></canvas>
     </div>
+  </section>
+
+  <section class="panel" id="p-geometry">
+    <div class="panel-h"><span class="dim">Geometry Nodes · procedural 2D graph</span><div class="panel-actions"><button id="geoNewGraph">New Graph</button><button id="geoAddNode" class="primary">+ Node</button></div></div>
+    <div class="geo-toolbar"><label>Graph <select id="geoGraphSelect"></select></label><span class="geo-help">Connect output sockets to inputs. Drag node headers to arrange.</span></div>
+    <div class="geo-workspace"><div class="geo-canvas-wrap"><div id="geoCanvas" class="geo-canvas"></div></div><aside class="geo-inspector"><div class="grp-title">Node Inspector</div><div id="geoInspector" class="geo-inspector-body"><p class="hint">Select a node to inspect parameters.</p></div><div class="grp-title">Live Geometry Preview</div><div id="geoPreview" class="geo-preview"></div><p id="geoStatus" class="geo-status">Ready · saved in project</p></aside></div>
   </section>
 
   <section class="panel" id="p-timeline">
