@@ -63,6 +63,21 @@ class StudioFeatureTests(unittest.TestCase):
         self.assertEqual(validate_project(project), [])
         self.assertEqual(save.call_count, 2)
 
+    def test_glow_and_impact_flash_effects_validate_as_native_scene_effects(self):
+        project = deepcopy(self.project)
+        project["effects"] = [
+            {"id": "fx_glow", "scene_id": "scene_1", "type": "glow",
+             "enabled": True, "start_frame": 0, "end_frame": 12,
+             "intensity": 0.65, "color": "#ffffff", "speed": 1},
+            {"id": "fx_impact", "scene_id": "scene_1", "type": "impact_flash",
+             "enabled": True, "start_frame": 4, "end_frame": 10,
+             "intensity": 0.8, "color": "#ffcc66", "speed": 1.5},
+        ]
+        self.assertEqual(validate_project(project), [])
+
+        project["effects"][0]["type"] = "unknown_effect"
+        self.assertTrue(any("unsupported effect" in error for error in validate_project(project)))
+
     def test_rig_validates_character_part_links_and_rejects_cycles(self):
         project = deepcopy(self.project)
         with patch.object(character_service.repo, "load", return_value=project), \

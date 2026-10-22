@@ -341,7 +341,7 @@ def _check_studio_data(project, errs):
             if not isinstance(scene_id, str) or scene_id not in scene_ids:
                 errs.append(f"{where}.scene_id: scene not found")
             effect_type = effect.get("type")
-            if not isinstance(effect_type, str) or effect_type not in {"lightning", "particles", "speed_lines", "camera_shake"}:
+            if not isinstance(effect_type, str) or effect_type not in {"lightning", "particles", "speed_lines", "camera_shake", "glow", "impact_flash"}:
                 errs.append(f"{where}.type: unsupported effect")
             if "enabled" in effect and not isinstance(effect["enabled"], bool):
                 errs.append(f"{where}.enabled: boolean required")
