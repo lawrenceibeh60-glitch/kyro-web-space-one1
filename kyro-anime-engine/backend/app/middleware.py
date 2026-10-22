@@ -20,7 +20,8 @@ def install(app):
     def _hosted_access_gate():
         # Keep Render's health probe reachable. When configured, protect every
         # editor/API route with HTTP Basic Auth; the password is only an env var.
-        if request.path in ("/health", "/api/health"):
+        if request.path in ("/health", "/api/health", "/mcp"):
+            # /mcp has its own bearer-token authentication in mcp_connector.py.
             return None
         expected = os.environ.get("KAE_ACCESS_PASSWORD", "")
         if not expected:
