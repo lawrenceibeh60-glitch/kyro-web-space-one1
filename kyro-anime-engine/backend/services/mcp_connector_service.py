@@ -50,6 +50,12 @@ def _save(pid, project):
     return project
 
 
+def _touch(pid):
+    """Advance the project revision after scene_service mutations."""
+    project = _project(pid)
+    return _save(pid, project)
+
+
 def _scene(project, scene_id=None):
     scenes = project.get("scenes", [])
     if scene_id is None:
@@ -159,7 +165,8 @@ def call_tool(name, args):
             raise ApiError(422, f"Exposure ends at frame {start + length}, beyond project duration {duration}; extend the project duration first")
         layer = {"id":layer_id,"name":str(args.get("name","AI Drawing Layer"))[:120],"type":"drawing","visible":True,"locked":False,"opacity":1,"depth":1,"blend":"normal","exposures":[{"start":start,"length":length,"drawing":drawing_id}],"tracks":{}}
         created = scene_service.add_layer(pid, scene["id"], layer)
-        return {"ok":True,"project_id":pid,"scene_id":scene["id"],"layer":created,"modified":repo.load(pid).get("modified")}
+        saved = _touch(pid)
+        return {"ok":True,"project_id":pid,"scene_id":scene["id"],"layer":created,"modified":saved.get("modified")}
     if name == "kae_update_layer":
         pid, scene_id, layer_id = args.get("project_id"), args.get("scene_id"), args.get("layer_id")
         changes = {key:args[key] for key in ("name","visible","locked","opacity","transform") if key in args}
@@ -170,13 +177,15 @@ def call_tool(name, args):
         if "opacity" in changes and (isinstance(changes["opacity"],bool) or not isinstance(changes["opacity"],(int,float)) or not 0<=changes["opacity"]<=1):
             raise ApiError(400, "opacity must be between 0 and 1")
         updated = scene_service.update_layer(pid, scene_id, layer_id, changes)
-        return {"ok":True,"project_id":pid,"scene_id":scene_id,"layer":updated,"modified":repo.load(pid).get("modified")}
+        saved = _touch(pid)
+        return {"ok":True,"project_id":pid,"scene_id":scene_id,"layer":updated,"modified":saved.get("modified")}
     if name == "kae_delete_layer":
         if args.get("confirm") is not True:
             raise ApiError(400, "Layer deletion requires confirm=true")
         pid, scene_id, layer_id = args.get("project_id"), args.get("scene_id"), args.get("layer_id")
         scene_service.delete_layer(pid, scene_id, layer_id)
-        return {"ok":True,"project_id":pid,"scene_id":scene_id,"deleted_layer_id":layer_id,"modified":repo.load(pid).get("modified")}
+        saved = _touch(pid)
+        return {"ok":True,"project_id":pid,"scene_id":scene_id,"deleted_layer_id":layer_id,"modified":saved.get("modified")}
     raise ApiError(404, f"Unknown KAE tool '{name}'")
 
 
