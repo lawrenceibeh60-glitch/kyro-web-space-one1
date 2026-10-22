@@ -78,11 +78,35 @@ def import_project():
 
 @bp.get("/<pid>")
 def get_project(pid):
-    return jsonify(svc.get_project(pid))
+    project = svc.get_project(pid)
+    response = jsonify(project)
+    # The modified timestamp acts as a lightweight revision token for clients.
+    if project.get("modified"):
+        response.set_etag(project["modified"])
+    return response
+
 
 @bp.put("/<pid>")
 def save_project(pid):
-    return jsonify(svc.save_project(pid, _body()))
+    data = _body()
+    # Optional optimistic concurrency guard. Older clients remain compatible;
+    # newer clients can send _expected_modified to avoid silently overwriting a
+    # newer save from another tab or device.
+    expected = data.pop("_expected_modified", None)
+    if expected is not None:
+        current = svc.get_project(pid)
+        actual = current.get("modified")
+        if expected != actual:
+            raise ApiError(
+                409,
+                "Project changed since it was loaded. Reload the latest version before saving.",
+                {"expected_modified": expected, "current_modified": actual},
+            )
+    project = svc.save_project(pid, data)
+    response = jsonify(project)
+    if project.get("modified"):
+        response.set_etag(project["modified"])
+    return response
 
 
 @bp.delete("/<pid>")

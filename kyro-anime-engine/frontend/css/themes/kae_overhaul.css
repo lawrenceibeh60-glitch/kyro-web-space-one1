@@ -1,0 +1,130 @@
+/* KYRO Animation Engine — full studio shell overhaul.
+   Keeps the existing editor DOM and event hooks; this is a structural visual layer,
+   not a replacement for the application's drawing/animation logic. */
+:root {
+  color-scheme: dark;
+  --kae-bg: #101216;
+  --kae-panel: #181b21;
+  --kae-panel-2: #20242c;
+  --kae-panel-3: #272c35;
+  --kae-line: #353b46;
+  --kae-line-soft: #292e37;
+  --kae-text: #e7eaf0;
+  --kae-dim: #929baa;
+  --kae-gold: #e6b84c;
+  --kae-gold-hot: #ffd778;
+  --kae-blue: #6ba9ff;
+  --kae-danger: #ff7777;
+  --kae-radius: 4px;
+}
+html, body { background: var(--kae-bg); color: var(--kae-text); }
+body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .005em; }
+button, .btn, input, select, textarea { border-radius: var(--kae-radius) !important; }
+button, .btn { min-height: 29px; border-color: var(--kae-line); background: linear-gradient(180deg,#292e37,#22262e); transition: border-color .12s ease, background .12s ease, color .12s ease; }
+button:hover, .btn:hover { border-color: #6b7484; background: #303641; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--kae-gold); outline-offset: 1px; }
+button.primary { background: var(--kae-gold); border-color: var(--kae-gold); color: #151515; font-weight: 750; }
+button.primary:hover { background: var(--kae-gold-hot); border-color: var(--kae-gold-hot); }
+input, select, textarea { background: #12151a !important; border-color: var(--kae-line) !important; color: var(--kae-text) !important; }
+.topbar { height: var(--bar); gap: 6px; padding: 0 10px; background: #171a20; border-bottom: 1px solid #3a404b; box-shadow: 0 4px 16px #0002; z-index: 4; }
+.topbar .name { font-size: 12px; letter-spacing: .015em; }
+.topbar .wtabs { align-self: stretch; display: flex; align-items: stretch; gap: 3px; margin-left: 12px; }
+.topbar .wtabs button { position: relative; height: auto; min-width: 70px; background: transparent; border-color: transparent; border-radius: 0 !important; color: var(--kae-dim); gap: 7px; }
+.topbar .wtabs button:hover { color: var(--kae-text); background: #ffffff08; }
+.topbar .wtabs button.active, .topbar .wtabs button.on, .topbar .wtabs button[aria-pressed="true"] { color: var(--kae-gold-hot); }
+.topbar .wtabs button.active::after, .topbar .wtabs button.on::after, .topbar .wtabs button[aria-pressed="true"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; background: var(--kae-gold); }
+#save { min-width: 36px; }
+.main { min-height: 0; gap: 0; }
+.shelf { padding: 7px 5px; background: #171a20; border-right: 1px solid var(--kae-line); gap: 5px; }
+.shelf .tool { width: 36px; height: 34px; min-width: 36px; border-color: transparent; background: transparent; color: #aab2c0; }
+.shelf .tool:hover { border-color: #4a5260; background: #292e37; color: white; }
+.shelf .tool.active, .shelf .tool.on, .shelf .tool[aria-pressed="true"] { color: var(--kae-gold-hot); border-color: #80662e; background: #4a3a1b; box-shadow: inset 2px 0 var(--kae-gold); }
+.shelf-sep { width: 24px; margin: 4px auto; border-top: 1px solid var(--kae-line); }
+.vp { min-width: 0; min-height: 0; background: #111318; }
+.vp-head { min-height: 38px; padding: 4px 8px; background: #1b1e25; border-bottom: 1px solid var(--kae-line); gap: 5px; }
+.vp-head button { min-height: 27px; }
+.vp-toggle.on, .vp-toggle[aria-pressed="true"] { color: var(--kae-gold-hot); border-color: #6d5728; background: #342b1a; }
+.vp-readout { color: #aeb6c4; font-size: 11px; gap: 10px; }
+.viewport { margin: 0; background-color: #0d0f13; background-image: radial-gradient(#333944 0.7px, transparent 0.7px); background-size: 18px 18px; }
+#canvas { filter: none; }
+.right { min-width: 0; background: var(--kae-panel); border-left: 1px solid var(--kae-line); }
+.right .slot { min-height: 0; border-bottom: 1px solid var(--kae-line); }
+.panel { min-width: 0; background: var(--kae-panel); border: 0; border-bottom: 1px solid var(--kae-line); }
+.panel-h, .grp-title, .palette-head { background: #20242c; color: #d3d8e1; border-color: var(--kae-line); letter-spacing: .055em; text-transform: uppercase; font-size: 10px; font-weight: 750; }
+.panel-h { min-height: 34px; padding: 4px 8px; }
+.panel-b { padding: 9px; }
+.panel-actions { gap: 4px; }
+.layers { padding: 4px; }
+.layers li { margin: 2px 0; border: 1px solid transparent; border-radius: 3px; }
+.layers li:hover { background: #ffffff08; }
+.layers li.selected, .layers li.active { background: #45371e; border-color: #80662e; color: #ffdf8d; }
+.ptabs { gap: 3px; padding: 5px; background: #14171c; border-bottom: 1px solid var(--kae-line); }
+.ptab { flex: 1; min-width: 0; background: transparent; border-color: transparent; color: var(--kae-dim); }
+.ptab.on, .ptab[aria-selected="true"] { color: var(--kae-gold-hot); background: #3a301d; border-color: #6b562c; }
+.fld { color: #b8bfca; gap: 7px; }
+.fld input, .fld select { min-width: 0; }
+.swatches button, .swatch { border: 1px solid #ffffff24 !important; box-shadow: 0 1px 2px #0007; }
+.studio-panel { border: 1px solid var(--kae-line); margin-top: 10px; }
+.studio-tabs { background: #14171c; border-bottom: 1px solid var(--kae-line); }
+.studio-tabs button { flex: 1; border-color: transparent; background: transparent; }
+.studio-tabs button.on { color: var(--kae-gold-hot); box-shadow: inset 0 -2px var(--kae-gold); }
+#slotC { min-height: 0; background: #171a20; border-top: 1px solid #444b57; box-shadow: 0 -4px 16px #0002; }
+#slotC .panel { background: #171a20; }
+.timeline, .timeline-wrap, .timeline-panel { background: #181b21; }
+.timeline-head, .timeline-toolbar, .timeline-ruler { background: #20242c; border-color: var(--kae-line); }
+.timeline button { border-radius: 3px !important; }
+.timeline .selected, .timeline [aria-selected="true"] { outline-color: var(--kae-gold); }
+input[type=range] { accent-color: var(--kae-gold); }
+.toasts { bottom: 24px; z-index: 100; }
+.toast { background: #242a33; border-color: #505967; box-shadow: 0 8px 30px #0008; }
+.toast.ok { border-color: #5cae8b; } .toast.err { border-color: var(--kae-danger); }
+.home-page { background: #101216; }
+.home { max-width: 1240px; padding: 0 clamp(16px,3vw,40px) 52px; }
+.home-top { border-color: var(--kae-line); }
+.home-mark { border-radius: 4px; background: var(--kae-gold); color: #151515; }
+.home-version, .eyebrow, .feature-index { color: #a2adbd; }
+.home-copy h1 { color: #f0f2f6; letter-spacing: -.04em; }
+.home-copy h1 em, .home-copy h1 strong { color: var(--kae-gold-hot); }
+.home-intro { color: #aab2bf; }
+.home-create input { background: #171a20 !important; border-color: var(--kae-line); }
+.projlist { gap: 8px; }
+.projlist li, .project-card { background: #191d24; border: 1px solid var(--kae-line); border-radius: 4px; }
+.projlist li:hover, .project-card:hover { border-color: #88703a; background: #222731; }
+a { color: var(--kae-blue); }
+.dim, .hint, .projects-note { color: var(--kae-dim); }
+@media (max-width: 900px) {
+  .topbar .wtabs { margin-left: 2px; }
+  .topbar .wtabs button { min-width: 0; padding: 0 7px; }
+  .topbar .wtabs button span { display: none; }
+  .main { grid-template-columns: 42px minmax(0,1fr) minmax(220px, 30vw); }
+  .shelf .tool { width: 32px; min-width: 32px; }
+}
+@media (max-width: 700px) {
+  .topbar { padding: 0 4px; gap: 3px; }
+  .topbar .name { max-width: 26vw; }
+  .topbar .wtabs { gap: 0; }
+  .topbar .wtabs button { padding: 0 5px; }
+  .main { grid-template-columns: 38px minmax(0,1fr); grid-template-rows: minmax(0,1fr) 31vh; }
+  .shelf { padding: 5px 3px; overflow-y: auto; }
+  .shelf .tool { width: 30px; min-width: 30px; height: 31px; }
+  .right { grid-column: 1 / -1; display: flex; flex-direction: row !important; overflow: auto; }
+  .right .slot { flex: 1 0 50%; min-width: 0; border-bottom: 0; }
+  #slotC { overflow-x: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Timeline is the primary animation workspace; keep its dense controls readable. */
+#p-timeline { background: #171a20; }
+#p-timeline .tl-head, #p-timeline .timeline-markers { background: #20242c; border-color: var(--kae-line); }
+#p-timeline .tl-head button { background: #292e37; border-color: #414957; }
+#p-timeline .tl-head #play { background: var(--kae-gold); color: #151515; border-color: var(--kae-gold-hot); }
+#p-timeline .tl-head #autokey.on { background: #5a2b2b; border-color: #a34b4b; color: #fff; }
+#p-timeline .dope, #p-timeline .dope-scroll { background: #14171c; }
+#p-timeline .dope-names, #p-timeline #dopeContent { background-color: #1d2128; }
+#p-timeline .dope-row, #p-timeline .dope-name { border-color: #303641; }
+#p-timeline .dope-name.selected { background: #45371e; color: #ffdf8d; }
+#p-timeline .frame-marker { background: #242a33; color: #dfe5ee; }
+#p-timeline .frame-marker.selected { background: #45371e; color: #ffdf8d; }
+#p-timeline .key, #p-timeline .keyframe { color: var(--kae-gold-hot); }
