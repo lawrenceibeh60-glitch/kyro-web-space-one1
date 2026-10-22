@@ -1,6 +1,12 @@
 import os
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
+
+import config
+from backend.services import project_service
+from backend.storage import project_repository as repo
 
 from backend.app.application import create_app
 from backend.services import mcp_connector_service as mcp
@@ -34,6 +40,34 @@ class MCPConnectorTests(unittest.TestCase):
         with patch.dict(os.environ, {"KAE_MCP_API_KEY": "right-secret"}):
             self.assertEqual(mcp.authenticate("Bearer wrong-secret"), (False, "Invalid or missing bearer token"))
             self.assertEqual(mcp.authenticate("Bearer right-secret"), (True, ""))
+
+
+    def test_drawing_can_be_added_and_placed_on_timeline(self):
+        with TemporaryDirectory() as folder, patch.object(config, "PROJECTS_DIR", Path(folder)):
+            project = project_service.create_project("MCP connector test")
+            pid = project["id"]
+            stroke = {
+                "id": "mcp_stroke_1",
+                "tool": "brush",
+                "color": "#111111",
+                "width": 3,
+                "points": [[10, 10, 1], [30, 30, 1]],
+            }
+            created = mcp.call_tool("kae_add_drawing", {
+                "project_id": pid, "drawing_id": "mcp_drawing_1",
+                "name": "MCP test stroke", "strokes": [stroke],
+            })
+            self.assertTrue(created["ok"])
+            placed = mcp.call_tool("kae_create_drawing_layer", {
+                "project_id": pid, "scene_id": "scene_1",
+                "layer_id": "mcp_layer_1", "name": "AI artwork",
+                "drawing_id": "mcp_drawing_1", "start_frame": 0, "length": 24,
+            })
+            self.assertTrue(placed["ok"])
+            saved = repo.load(pid)
+            self.assertEqual(len(saved["drawings"]["mcp_drawing_1"]["strokes"]), 1)
+            self.assertEqual(saved["scenes"][0]["layers"][-1]["id"], "mcp_layer_1")
+            self.assertEqual(saved["scenes"][0]["layers"][-1]["exposures"][0]["drawing"], "mcp_drawing_1")
 
     def test_http_endpoint_requires_auth(self):
         with patch.dict(os.environ, {"KAE_MCP_API_KEY": "right-secret", "KAE_ACCESS_PASSWORD": ""}):
