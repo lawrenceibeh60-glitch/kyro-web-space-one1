@@ -103,8 +103,9 @@ export function initStudioPanel({ onCharacterImported }) {
         row.append(makeControl('Count', 1, 200, effect.count ?? 36,
           value => updateEffect(effect.id, { count: value })));
       }
-      if (!['camera_shake', 'glow'].includes(effect.type)) {
-        row.append(makeControl('Speed', 0, 20, effect.speed ?? 1,
+      if (!['camera_shake', 'glow', 'depth_of_field'].includes(effect.type)) {
+        const controlLabel = effect.type === 'soft_shadow' ? 'Blur radius' : 'Speed';
+        row.append(makeControl(controlLabel, 0, 20, effect.speed ?? 1,
           value => updateEffect(effect.id, { speed: value }), 0.1));
       }
       const timing = document.createElement('div'); timing.className = 'xrow n';
@@ -124,6 +125,12 @@ export function initStudioPanel({ onCharacterImported }) {
       });
       timing.append(start, end);
       row.append(timing);
+      if (effect.type === 'depth_of_field') {
+        row.append(makeControl('Focus depth', 0, 100, Math.round((effect.focus_depth ?? 0.5) * 100),
+          value => updateEffect(effect.id, { focus_depth: value / 100 })));
+        row.append(makeControl('Depth range', 5, 100, Math.round((effect.range ?? 0.25) * 100),
+          value => updateEffect(effect.id, { range: value / 100 })));
+      }
       if (effect.type !== 'camera_shake') {
         const color = document.createElement('input'); color.type = 'color'; color.value = effect.color || '#ffffff';
         color.setAttribute('aria-label', 'Effect color');
@@ -146,7 +153,7 @@ export function initStudioPanel({ onCharacterImported }) {
     const effect = {
       id, scene_id: state.sceneId, type, enabled: true,
       start_frame: 0, end_frame: state.project.settings.duration_frames - 1,
-      intensity: 0.5, color: '#ffffff', count: 36, speed: 1,
+      intensity: 0.5, color: '#ffffff', count: 36, speed: 1, focus_depth: 0.5, range: 0.25,
     };
     changeProjectArray('effects', [...(state.project.effects || []), effect], 'Add effect');
   }
