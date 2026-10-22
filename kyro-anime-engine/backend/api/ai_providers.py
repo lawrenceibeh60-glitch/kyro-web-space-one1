@@ -117,6 +117,10 @@ def completion(profile, messages, temperature=0.2, timeout=90, max_tokens=4096):
         max_tokens = min(100000, max(256, int(max_tokens)))
     except (TypeError, ValueError):
         max_tokens = 4096
+    # 100,000 is KAE's hard ceiling, not a request to exceed model limits.
+    # The configured Devstral Medium profile is capped at 16k output tokens.
+    if profile.get("provider") == "xkiro" and "devstral" in model.lower():
+        max_tokens = min(max_tokens, 16000)
     if not model:
         raise ApiError(400, "Choose a model before sending an AI request.")
     if profile["provider"] == "anthropic":
