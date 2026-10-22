@@ -45,30 +45,9 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     });
     await page.locator('[data-tab="tool"]').click();
 
-    // Exercise the integrated AI workspace's sharp glass styling and safe JSON gating.
-    await page.locator('#aiLaunch').waitFor({ state: 'visible' });
-    await page.locator('#aiLaunch').click();
-    await page.locator('#aiStudio').waitFor({ state: 'visible' });
-    const glassStyle = await page.locator('#aiStudio').evaluate(node => {
-      const panel = getComputedStyle(node);
-      const button = getComputedStyle(node.querySelector('.ai-head button'));
-      return {
-        panelRadius: panel.borderRadius,
-        panelBlur: panel.backdropFilter || panel.webkitBackdropFilter,
-        panelBackground: panel.backgroundColor,
-        buttonRadius: button.borderRadius,
-      };
-    });
-    assert.equal(glassStyle.panelRadius, '0px', 'AI workspace panel should use sharp edges');
-    assert.equal(glassStyle.buttonRadius, '0px', 'AI workspace buttons should use sharp edges');
-    assert.match(glassStyle.panelBlur, /blur\(/, 'AI workspace should use a glass blur');
-    await page.getByRole('button', { name: 'JSON Script' }).click();
-    await page.locator('.ai-json-workspace').waitFor({ state: 'visible' });
-    assert.equal(await page.getByRole('button', { name: 'Move to Project' }).isHidden(), true,
-      'Move to Project must remain hidden until a complete validated story exists');
-    await page.getByRole('button', { name: 'Visual Lab' }).click();
-    await page.locator('#aiStudio button[aria-label="Close AI workspace"]').click();
-    await page.locator('#aiStudio').waitFor({ state: 'hidden' });
+    // The AI workspace has been removed from the production editor UI.
+    assert.equal(await page.locator('#aiLaunch').count(), 0, 'AI workspace launch control must not appear');
+    assert.equal(await page.locator('#aiStudio').count(), 0, 'AI workspace overlay must not be mounted');
 
     await page.locator('[data-ws="studio"]').click();
     await page.locator('[data-studio-tab="character"]').click();
@@ -222,7 +201,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
 });
 
 
-test('Android-sized browser keeps editor tools and AI workspace within reachable scroll areas', async () => {
+test('Android-sized browser keeps editor tools and timeline reachable without an AI workspace overlay', async () => {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -241,8 +220,8 @@ test('Android-sized browser keeps editor tools and AI workspace within reachable
     await page.locator('#create').click();
     await page.waitForURL(/editor\.html\?project=/);
     await page.locator('#canvas').waitFor({ state: 'visible' });
-    await page.locator('#aiLaunch').click();
-    await page.locator('#aiStudio').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#aiLaunch').count(), 0, 'mobile editor must not show an AI workspace launcher');
+    assert.equal(await page.locator('#aiStudio').count(), 0, 'mobile editor must not mount an AI workspace overlay');
 
     const layout = await page.evaluate(() => {
       const rect = selector => {
@@ -263,24 +242,11 @@ test('Android-sized browser keeps editor tools and AI workspace within reachable
         canvas: rect('#canvas'),
         shelf: rect('.shelf'),
         timeline: rect('#slotC'),
-        ai: rect('#aiStudio'),
-        aiSide: rect('.ai-side'),
-        aiPreview: rect('.ai-preview'),
-        aiProvider: rect('.ai-provider-panel'),
-        aiThread: rect('.ai-thread'),
-        aiVisualBody: rect('.ai-preview-body'),
       };
     });
     assert.ok(layout.canvas.width > 0 && layout.canvas.height > 0, 'mobile canvas should remain visible');
     assert.ok(layout.timeline.height >= 150, 'timeline should retain a usable mobile height');
-    assert.ok(layout.ai.width <= layout.viewport.width, 'AI workspace must fit the phone width');
-    assert.ok(layout.ai.bottom <= layout.viewport.height + 1, 'AI workspace must fit the dynamic viewport');
-    assert.equal(layout.aiSide.overflowY, 'auto', 'AI conversation/settings column must be scrollable');
-    assert.equal(layout.aiVisualBody.overflowY, 'auto', 'AI visual tools must be independently scrollable');
-    await page.getByRole('button', { name: 'JSON Script' }).click();
-    await page.locator('.ai-json-workspace').waitFor({ state: 'visible' });
-    assert.equal(await page.getByRole('button', { name: 'Move to Project' }).isHidden(), true,
-      'mobile layout must preserve JSON validation/import gating');
+    assert.ok(layout.timeline.width > 0, 'mobile timeline should remain visible and reachable');
     assert.deepEqual(pageErrors, [], `mobile browser runtime errors: ${pageErrors.join('; ')}`);
   } finally {
     await context.close();
