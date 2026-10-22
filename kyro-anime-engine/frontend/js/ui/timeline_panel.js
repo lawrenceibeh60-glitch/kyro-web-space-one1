@@ -165,6 +165,21 @@ export function initTimelinePanel() {
       }
     }
 
+    // Preview range boundaries (inclusive), matching Blender's timeline preview range.
+    const preview = state.project.preview_range;
+    if (preview && Number.isInteger(preview.start) && Number.isInteger(preview.end)
+        && preview.start >= 0 && preview.end >= preview.start && preview.end < n) {
+      const left = PAD + preview.start * px;
+      const right = PAD + (preview.end + 1) * px;
+      ctx.fillStyle = 'rgba(54,197,216,.12)';
+      ctx.fillRect(Math.max(left, scrollLeft), 0, Math.max(0, Math.min(right, scrollLeft + viewWidth) - Math.max(left, scrollLeft)), RULER);
+      ctx.strokeStyle = '#36c5d8';
+      ctx.lineWidth = 2;
+      for (const x of [frameX(preview.start), frameX(preview.end)]) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+    }
+
     // playhead
     const hx = frameX(state.frame);
     ctx.fillStyle = 'rgba(74,144,226,.25)'; ctx.fillRect(PAD + state.frame * px, RULER, px, h - RULER);
@@ -415,6 +430,43 @@ export function initTimelinePanel() {
     requestDraw();
   }
 
+  function renderPreviewRange() {
+    const range = state.project?.preview_range;
+    const valid = range && Number.isInteger(range.start) && Number.isInteger(range.end)
+      && range.start >= 0 && range.end >= range.start && range.end < total();
+    $('previewClear').disabled = !valid || (range.start === 0 && range.end === total() - 1);
+    $('previewRangeLabel').textContent = valid
+      ? `F${range.start + 1}–F${range.end + 1}`
+      : 'Full timeline';
+  }
+
+  function setPreviewStart() {
+    const frame = clamp(state.frame, 0, total() - 1);
+    const old = state.project.preview_range;
+    const end = old && Number.isInteger(old.end) ? Math.max(frame, old.end) : total() - 1;
+    execute(setValue(['preview_range'], { start: frame, end }, 'Set preview range start'));
+    renderPreviewRange();
+    requestDraw();
+  }
+
+  function setPreviewEnd() {
+    const frame = clamp(state.frame, 0, total() - 1);
+    const old = state.project.preview_range;
+    const start = old && Number.isInteger(old.start) ? Math.min(frame, old.start) : 0;
+    execute(setValue(['preview_range'], { start, end: frame }, 'Set preview range end'));
+    renderPreviewRange();
+    requestDraw();
+  }
+
+  function clearPreviewRange() {
+    execute(setValue(['preview_range'], { start: 0, end: total() - 1 }, 'Clear preview range'));
+    renderPreviewRange();
+    requestDraw();
+  }
+
+  $('previewStart').onclick = setPreviewStart;
+  $('previewEnd').onclick = setPreviewEnd;
+  $('previewClear').onclick = clearPreviewRange;
   $('addMarker').onclick = addMarker;
   $('renameMarker').onclick = renameSelectedMarker;
   $('deleteMarker').onclick = deleteSelectedMarker;
@@ -433,11 +485,12 @@ export function initTimelinePanel() {
     if ('project' in p) {
       if (!markers().some(marker => marker.id === selectedMarkerId)) selectedMarkerId = null;
       renderMarkers();
+      renderPreviewRange();
     }
   });
-  bus.on('project:changed', () => { selectedExposure = null; renderNames(); renderMarkers(); requestDraw(); });
+  bus.on('project:changed', () => { selectedExposure = null; renderNames(); renderMarkers(); renderPreviewRange(); requestDraw(); });
   bus.on('selection', () => { renderNames(); requestDraw(); });
   bus.on('playback', requestDraw);
-  renderNames(); renderMarkers(); requestDraw();
+  renderNames(); renderMarkers(); renderPreviewRange(); requestDraw();
   return { requestDraw, renderNames };
 }
