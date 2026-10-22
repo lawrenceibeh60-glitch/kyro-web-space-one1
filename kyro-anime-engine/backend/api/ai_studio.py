@@ -764,14 +764,14 @@ def plan_story_vector_animation():
         "composition, character_design, pose_sequence (array of 4 to 6 short entries), palette (array of hex colors), "
         "environment_design, lighting, continuity_rules, and quality_check. Do not output hidden reasoning, "
         "markdown, image URLs, or claims that a raster image exists. Make the brief concrete and drawable using "
-        "KAE's native paths and fills.\\n\\n"
+        "KAE's native paths and fills.\n\n"
         "CANVAS: " + str(width) + " x " + str(height) + " pixels; aspect ratio " +
-        str(round(width / height, 4)) + ".\\n"
-        "SCENE TITLE: " + str(scene_title)[:180] + "\\n"
-        "STORY / SCENE DIRECTION:\\n" + direction.strip()
+        str(round(width / height, 4)) + ".\n"
+        "SCENE TITLE: " + str(scene_title)[:180] + "\n"
+        "STORY / SCENE DIRECTION:\n" + direction.strip()
     )
     planning_messages = [
-        {"role": "system", "content": capability_context + "\\nYou are the visual design stage of a two-stage KAE drawing pipeline. Use only real native KAE drawing capabilities."},
+        {"role": "system", "content": capability_context + "\nYou are the visual design stage of a two-stage KAE drawing pipeline. Use only real native KAE drawing capabilities."},
         {"role": "user", "content": visual_brief_prompt},
     ]
     try:
@@ -817,19 +817,19 @@ def plan_story_vector_animation():
         "cubic/quadratic Bézier curves, layered highlights/shadows and a controlled palette. Keep the main subject "
         "large enough to read clearly in the canvas. Use meaningful spatial composition, not random disconnected "
         "shapes. Maintain exact identity, costume, proportions and palette between frames; vary pose and camera/action "
-        "according to each pose beat. Use no text, captions, logos or watermarks.\\n"
+        "according to each pose beat. Use no text, captions, logos or watermarks.\n"
         "Each stroke object: {color:'#RRGGBB',width:number,closed:boolean,fill:null|string,commands:array}. "
         "Width is 0.5..40 in normalized canvas units. Each commands array starts with ['M',x,y] and uses "
         "['L',x,y], ['Q',cx,cy,x,y], ['C',c1x,c1y,c2x,c2y,x,y], or ['Z']; up to 120 commands per stroke. "
         "Coordinates are numbers 0..1000. Fill is null or a hex color. Use separate paths for details instead of "
-        "overloading one path. Avoid over-simplifying and avoid duplicating the same path many times. No extra keys.\\n\\n"
-        "CANVAS: " + str(width) + " x " + str(height) + "\\n"
-        "SCENE: " + str(scene_title)[:180] + "\\n"
-        "STORY DIRECTION:\\n" + direction.strip() + "\\n\\n"
-        "APPROVED VISUAL DESIGN BRIEF:\\n" + json.dumps(visual_brief, ensure_ascii=False, separators=(",", ":"))
+        "overloading one path. Avoid over-simplifying and avoid duplicating the same path many times. No extra keys.\n\n"
+        "CANVAS: " + str(width) + " x " + str(height) + "\n"
+        "SCENE: " + str(scene_title)[:180] + "\n"
+        "STORY DIRECTION:\n" + direction.strip() + "\n\n"
+        "APPROVED VISUAL DESIGN BRIEF:\n" + json.dumps(visual_brief, ensure_ascii=False, separators=(",", ":"))
     )
     drawing_messages = [
-        {"role": "system", "content": capability_context + "\\nYou are KAE's native vector-cel renderer. Produce paths only for KAE's existing command schema. Never invent external tools, schemas, or endpoints."},
+        {"role": "system", "content": capability_context + "\nYou are KAE's native vector-cel renderer. Produce paths only for KAE's existing command schema. Never invent external tools, schemas, or endpoints."},
         {"role": "user", "content": drawing_prompt},
     ]
     raw, used_model = provider_completion(profile, drawing_messages, temperature=0.15, timeout=240)
