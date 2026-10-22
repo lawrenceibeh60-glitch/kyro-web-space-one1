@@ -111,8 +111,12 @@ def provider_request(profile, path, method="GET", payload=None, timeout=30):
         raise ApiError(502, f"Could not reach {profile['label']} ({type(exc).__name__}). Check the base URL and network.") from exc
 
 
-def completion(profile, messages, temperature=0.2, timeout=90):
+def completion(profile, messages, temperature=0.2, timeout=90, max_tokens=4096):
     model = profile["model"]
+    try:
+        max_tokens = min(100000, max(256, int(max_tokens)))
+    except (TypeError, ValueError):
+        max_tokens = 4096
     if not model:
         raise ApiError(400, "Choose a model before sending an AI request.")
     if profile["provider"] == "anthropic":
@@ -138,7 +142,7 @@ def completion(profile, messages, temperature=0.2, timeout=90):
                             raise ApiError(400, "Claude image analysis requires base64 JPEG, PNG, GIF, or WebP frames.")
                 content = blocks
             conversation.append({"role": item["role"], "content": content})
-        payload = {"model": model, "max_tokens": 4096, "system": system, "messages": conversation}
+        payload = {"model": model, "max_tokens": max_tokens, "system": system, "messages": conversation}
         if temperature is not None:
             payload["temperature"] = temperature
         result = provider_request(profile, "/messages", "POST", payload, timeout)
@@ -146,7 +150,7 @@ def completion(profile, messages, temperature=0.2, timeout=90):
         if not reply.strip():
             raise ApiError(502, "Claude returned no text response.")
         return reply.strip(), result.get("model", model)
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model, "messages": messages, "max_tokens": max_tokens}
     if temperature is not None:
         payload["temperature"] = temperature
     try:
