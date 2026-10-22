@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { renderFrame } from '../js/rendering/renderer.js';
 
-const fixture = JSON.parse(await readFile(new URL('./fixtures/rigged_arm_idle.kae', import.meta.url), 'utf8'));
+const fixture = JSON.parse(await readFile(new URL('../../examples/rigged-arm-idle.kae', import.meta.url), 'utf8'));
 
 function makeContext() {
   const rotations = [];
