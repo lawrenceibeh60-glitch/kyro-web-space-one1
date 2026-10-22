@@ -41,5 +41,5 @@ KAE exposes native project editing tools through a provider-neutral Model Contex
 - Every MCP request requires the configured bearer secret.
 - Layer deletion requires explicit confirmation.
 - Every write validates the complete native project before saving.
-- This initial connector is stateless and does not yet report the browser's active selection/frame. The editor may need to reload to display server-side edits; live editor synchronization is a separate step.
+- The connector is stateless on the MCP transport. The editor polls its project revision every 1.5 seconds and loads saved AI edits when there are no unsaved local edits. If the local document is dirty, KAE warns rather than silently overwriting the user's changes.
 - Generic MCP support does not guarantee every AI provider permits custom server registration. The connector is provider-neutral; client-side availability depends on each provider and account.
