@@ -778,7 +778,17 @@ def plan_story_vector_animation():
         message = str(exc).lower()
         if exc.status != 502 or not any(code in message for code in ('http 502', 'http 503', 'http 504', 'timeout', 'timed out')):
             raise
-        raw, used_model = provider_completion(profile, messages, temperature=0, timeout=180)
+        compact_messages = [
+            {"role": "system", "content": "Return only compact valid JSON for KAE's vector-cel renderer."},
+            {"role": "user", "content": (
+                "Return JSON {summary,frames:[{timestamp_seconds,strokes:[{color,width,closed,fill,commands}]}]}. "
+                "Exactly 4 frames, 4 strokes per frame, 5 commands max per stroke. Coordinates 0..1000. "
+                "Commands: ['M',x,y], ['L',x,y], ['Q',cx,cy,x,y], ['Z']. Use simple recognizable filled "
+                "anime silhouettes and vary the pose across frames. No markdown. Canvas " + str(width) + "x" +
+                str(height) + ". Scene: " + str(scene_title)[:120] + ". Direction: " + direction.strip()
+            )},
+        ]
+        raw, used_model = provider_completion(profile, compact_messages, temperature=0, timeout=180)
     try:
         plan = _parse_model_json(raw)
         if not isinstance(plan, dict) or not isinstance(plan.get("frames"), list) or len(plan["frames"]) != 4:
