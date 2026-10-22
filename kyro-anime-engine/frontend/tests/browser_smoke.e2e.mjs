@@ -62,6 +62,20 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       const layer = scene.layers.find(item => item.id === layerId);
       return !layer?.exposures?.some(exposure => frame >= exposure.start && frame < exposure.start + exposure.length);
     }, celTarget);
+    await page.locator('#undo').click();
+    await page.waitForFunction(({ layerId, frame }) => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      const layer = scene.layers.find(item => item.id === layerId);
+      return layer?.exposures?.some(exposure => frame >= exposure.start && frame < exposure.start + exposure.length);
+    }, celTarget);
+    await page.locator('#redo').click();
+    await page.waitForFunction(({ layerId, frame }) => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      const layer = scene.layers.find(item => item.id === layerId);
+      return !layer?.exposures?.some(exposure => frame >= exposure.start && frame < exposure.start + exposure.length);
+    }, celTarget);
     // Exercise the editable clipping-path controls and verify undoable project data.
     await page.locator('[data-tab="object"]').click();
     await page.locator('#layerClipPath').fill('[["M",0,0],["L",200,0],["L",200,200],["Z"]]');
