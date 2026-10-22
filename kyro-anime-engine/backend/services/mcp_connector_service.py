@@ -205,7 +205,15 @@ def handle_rpc(message):
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
         return _rpc(message.get("id") if isinstance(message,dict) else None, error={"code":-32600,"message":"Invalid Request"})
     method, request_id = message["method"], message.get("id")
-    params = message.get("params") or {}
+    params = message.get("params", {})
+    if params is None:
+        params = {}
+    if not isinstance(params, dict):
+        # JSON-RPC params must be an object or array. KAE tools use named
+        # arguments, so only object parameters are supported here.
+        if "id" not in message:
+            return None
+        return _rpc(request_id, error={"code":-32602,"message":"Invalid params: params must be an object"})
     if "id" not in message:
         if method.startswith("notifications/"):
             return None
