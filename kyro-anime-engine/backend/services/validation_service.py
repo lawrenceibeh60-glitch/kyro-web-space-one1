@@ -928,6 +928,39 @@ def _check_scenes(scenes, drawings, errs):
                     errs.append(f"{lw}.color: hex color #RRGGBB required")
 
 
+def _check_markers(project, errs):
+    markers = project.get("markers", [])
+    if not isinstance(markers, list):
+        errs.append("markers: must be a list")
+        return
+    total = project.get("settings", {}).get("duration_frames", 1) if isinstance(project.get("settings"), dict) else 1
+    seen_ids = set()
+    seen_positions = set()
+    for index, marker in enumerate(markers):
+        where = f"markers[{index}]"
+        if not isinstance(marker, dict):
+            errs.append(f"{where}: must be an object")
+            continue
+        marker_id = marker.get("id")
+        if not isinstance(marker_id, str) or not ID_RE.fullmatch(marker_id) or marker_id in seen_ids:
+            errs.append(f"{where}.id: must be a unique valid ID")
+        else:
+            seen_ids.add(marker_id)
+        frame = marker.get("frame")
+        if not _int(frame) or frame < 0 or frame >= total:
+            errs.append(f"{where}.frame: must be within the project timeline (0..{max(0, total - 1)})")
+        name = marker.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name) > 120:
+            errs.append(f"{where}.name: non-empty string up to 120 characters required")
+        if isinstance(frame, int) and not isinstance(frame, bool) and (frame, str(name).casefold()) in seen_positions:
+            errs.append(f"{where}: duplicate marker name on the same frame")
+        elif isinstance(frame, int) and not isinstance(frame, bool):
+            seen_positions.add((frame, str(name).casefold()))
+        color = marker.get("color")
+        if color is not None and (not isinstance(color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", color)):
+            errs.append(f"{where}.color: hex color #RRGGBB required")
+
+
 def validate_project(p):
     errs = []
     if not isinstance(p, dict):
@@ -944,6 +977,7 @@ def validate_project(p):
     if not isinstance(p.get("name"), str) or not p["name"].strip():
         errs.append("name: non-empty string required")
     _check_settings(p.get("settings"), errs)
+    _check_markers(p, errs)
     _check_drawings(p.get("drawings"), errs)
     characters = p.get("characters", [])
     if not isinstance(characters, list):
