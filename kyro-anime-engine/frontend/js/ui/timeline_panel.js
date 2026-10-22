@@ -302,6 +302,27 @@ export function initTimelinePanel() {
     requestDraw();
   });
 
+  // Harmony-style exposure workflow: double-click an empty layer/frame cell to create a new drawing.
+  // Single-click remains a non-destructive scrub/select action.
+  canvas.addEventListener('dblclick', e => {
+    if (!state.project) return;
+    const p = local(e);
+    if (p.y < RULER) return;
+    const rowIndex = Math.floor((p.y - RULER) / ROW);
+    const layer = rows()[rowIndex];
+    if (!layer) return;
+    const frame = frameAt(p.x);
+    if (findExposure(layer, frame)) return;
+    if (layer.locked || layer.visible === false) {
+      toast(layer.locked ? 'Unlock this layer to create a drawing' : 'Show this layer to create a drawing', 'err');
+      return;
+    }
+    selectLayer(layer.id);
+    setFrame(frame);
+    newDrawing(false);
+    toast(`Created drawing at frame ${frame + 1}`);
+  });
+
   canvas.addEventListener('pointermove', e => {
     const p = local(e);
     if (!mode) {
