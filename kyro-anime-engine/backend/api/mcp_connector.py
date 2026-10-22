@@ -27,7 +27,8 @@ def mcp_endpoint():
     if response_data is None:
         return "", 202
     response = make_response(jsonify(response_data))
-    response.headers["MCP-Protocol-Version"] = request.headers.get("MCP-Protocol-Version", "2025-11-25")
+    negotiated = response_data.get("result", {}).get("protocolVersion") if isinstance(response_data, dict) and isinstance(response_data.get("result"), dict) else None
+    response.headers["MCP-Protocol-Version"] = negotiated or request.headers.get("MCP-Protocol-Version", "2025-11-25")
     return response
 
 
