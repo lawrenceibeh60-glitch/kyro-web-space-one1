@@ -330,7 +330,7 @@ def _check_studio_data(project, errs):
             for key in effect.keys() - {
                 "id", "scene_id", "type", "enabled", "start_frame", "end_frame",
                 "intensity", "count", "speed", "color", "focus_depth", "range",
-                "target_layer_id", "mask_layer_id", "blink_interval", "mouth_cycle",
+                "target_layer_id", "mask_layer_id", "blink_interval", "mouth_cycle", "mouth_keys",
             }:
                 errs.append(f"{where}.{key}: unknown property")
             effect_id = effect.get("id")
@@ -401,6 +401,27 @@ def _check_studio_data(project, errs):
                         errs.append(f"{where}.blink_interval: integer 8..240 required")
                     if not _int(mouth_cycle) or not 4 <= mouth_cycle <= 120:
                         errs.append(f"{where}.mouth_cycle: integer 4..120 required")
+                    mouth_keys = effect.get("mouth_keys", [])
+                    if not isinstance(mouth_keys, list):
+                        errs.append(f"{where}.mouth_keys: list required")
+                    else:
+                        last_frame = -1
+                        for key_index, key in enumerate(mouth_keys):
+                            key_where = f"{where}.mouth_keys[{key_index}]"
+                            if not isinstance(key, dict):
+                                errs.append(f"{key_where}: object required")
+                                continue
+                            if key.keys() - {"frame", "shape"}:
+                                errs.append(f"{key_where}: unknown property")
+                            key_frame = key.get("frame")
+                            if not _int(key_frame) or not 0 <= key_frame < duration:
+                                errs.append(f"{key_where}.frame: integer within project timeline required")
+                            elif key_frame <= last_frame:
+                                errs.append(f"{key_where}.frame: keys must be strictly increasing")
+                            else:
+                                last_frame = key_frame
+                            if key.get("shape") not in {"neutral", "smile", "open"}:
+                                errs.append(f"{key_where}.shape: neutral, smile, or open required")
 
     characters = {
         item.get("id"): item for item in project.get("characters", [])
