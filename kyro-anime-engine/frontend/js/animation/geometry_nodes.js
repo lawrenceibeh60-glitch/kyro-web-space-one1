@@ -7,6 +7,8 @@ const TYPES = {
  rectangle:{label:'Rectangle',inputs:[],outputs:['Geometry'],defaults:{width:96,height:64}},
  transform:{label:'Transform 2D',inputs:['Geometry'],outputs:['Geometry'],defaults:{x:0,y:0,rotation:0,scale:1}},
  join:{label:'Join Geometry',inputs:['Geometry A','Geometry B'],outputs:['Geometry'],defaults:{}},
+ array:{label:'Array',inputs:['Geometry'],outputs:['Geometry'],defaults:{count:3,offset_x:100,offset_y:0}},
+ mirror:{label:'Mirror',inputs:['Geometry'],outputs:['Geometry'],defaults:{axis:0}},
  output:{label:'Group Output',inputs:['Geometry'],outputs:[],defaults:{}}
 };
 const makeId=p=>p+'_'+Math.random().toString(36).slice(2,9);
@@ -39,6 +41,8 @@ function evaluate(g,n,stack=new Set()){if(stack.has(n.id))return[];const seen=ne
  if(n.type==='circle'){const r=Math.max(1,Math.min(400,+p.radius||48)),count=Math.max(8,Math.min(256,Math.round(+p.segments||32)));return[{points:Array.from({length:count},(_,i)=>[Math.cos(i*Math.PI*2/count)*r,Math.sin(i*Math.PI*2/count)*r])}];}
  if(n.type==='rectangle'){const w=Math.max(1,Math.min(800,+p.width||96))/2,h=Math.max(1,Math.min(800,+p.height||64))/2;return[{points:[[-w,-h],[w,-h],[w,h],[-w,h]]}];}
  if(n.type==='join')return input(0).concat(input(1));
+ if(n.type==='array'){const source=input(0),count=Math.max(1,Math.min(64,Math.round(+p.count||3))),dx=+p.offset_x||0,dy=+p.offset_y||0;return Array.from({length:count},(_,i)=>source.map(sh=>({...sh,points:sh.points.map(([x,y])=>[x+i*dx,y+i*dy])}))).flat();}
+ if(n.type==='mirror'){return input(0).map(sh=>({...sh,points:sh.points.map(([x,y])=>+(p.axis||0)===0?[-x,y]:[x,-y])}));}
  if(n.type==='transform'){const a=(+p.rotation||0)*Math.PI/180,s=Math.max(.01,Math.min(100,+p.scale||1)),c=Math.cos(a),sn=Math.sin(a);return input(0).map(sh=>({...sh,points:sh.points.map(([x,y])=>[x*s*c-y*s*sn+(+p.x||0),x*s*sn+y*s*c+(+p.y||0)])}));}
  if(n.type==='output')return input(0);return[];}
 function renderPreview(g){const host=$('geoPreview');host.replaceChildren();const out=g.nodes.find(n=>n.type==='output'),shapes=out?evaluate(g,out):[],ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','-160 -100 320 200');const axis=document.createElementNS(ns,'path');axis.setAttribute('d','M-160 0H160 M0 -100V100');axis.setAttribute('stroke','#3d4653');axis.setAttribute('stroke-width','.7');svg.append(axis);shapes.forEach(sh=>{const p=document.createElementNS(ns,'polygon');p.setAttribute('points',sh.points.map(q=>q.join(',')).join(' '));p.setAttribute('fill','#e6b84c22');p.setAttribute('stroke','#e6b84c');p.setAttribute('stroke-width','2');svg.append(p);});host.append(svg);$('geoStatus').textContent=g.nodes.length+' nodes · '+g.links.length+' links · '+shapes.length+' generated shape(s) · '+(state.dirty?'modified':'loaded');}
