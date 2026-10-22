@@ -10,6 +10,6 @@ export const Projects = {
   demoTemplate: async template => request('POST', `/api/projects/templates/${encodeURIComponent(template)}`),
   import: payload => request('POST', '/api/projects/import', payload),
   get: id => request('GET', `/api/projects/${encodeURIComponent(id)}`),
-  save: (id, doc) => request('PUT', `/api/projects/${encodeURIComponent(id)}`, doc),
+  save: (id, doc, expectedModified) => request('PUT', `/api/projects/${encodeURIComponent(id)}`, expectedModified ? { ...doc, _expected_modified: expectedModified } : doc),
   remove: id => request('DELETE', `/api/projects/${encodeURIComponent(id)}`),
 };
