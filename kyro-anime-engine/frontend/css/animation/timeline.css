@@ -36,3 +36,6 @@
   .timeline-markers { flex-wrap:wrap; align-items:flex-start; }
   .marker-list { flex:1 1 100%; max-width:100%; }
 }
+
+.marker-divider { flex:0 0 1px; align-self:stretch; margin:3px 2px; background:var(--line); }
+.preview-range-label { flex:0 0 auto; color:#8ce5ef; font:10px ui-monospace,monospace; white-space:nowrap; }
