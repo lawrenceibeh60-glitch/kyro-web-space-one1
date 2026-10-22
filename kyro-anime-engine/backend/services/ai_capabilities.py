@@ -82,6 +82,18 @@ def get_capabilities():
     ]
     for tool in routes:
         tool["tags"] = _tags_for(tool.get("name", "") + " " + tool.get("purpose", "") + " " + tool.get("path", ""))
+    editor_actions = [
+        {"name": "timeline.marker.create", "surface": "timeline", "purpose": "Add a named marker at a frame; optional color; use existing timeline marker controls.", "tags": ["timeline", "marker", "navigation"]},
+        {"name": "timeline.marker.rename", "surface": "timeline", "purpose": "Rename a selected marker while preserving its frame.", "tags": ["timeline", "marker", "metadata"]},
+        {"name": "timeline.marker.delete", "surface": "timeline", "purpose": "Delete a selected marker through the editor undo flow.", "tags": ["timeline", "marker", "delete"]},
+        {"name": "timeline.preview_range.set", "surface": "timeline", "purpose": "Set inclusive preview start/end frames for playback and looping.", "tags": ["timeline", "playback", "range"]},
+        {"name": "timeline.playback", "surface": "timeline", "purpose": "Play, pause, loop and scrub the current animation using native editor controls.", "tags": ["timeline", "animation", "playback"]},
+        {"name": "drawing.vector_cels.apply", "surface": "canvas", "purpose": "Apply validated editable vector cels through kae:ai-draw-frames; creates a new drawing layer and preserves existing art.", "tags": ["drawing", "vector", "canvas", "animation", "apply"]},
+        {"name": "animation.transform.plan", "surface": "timeline", "purpose": "Plan transform keyframes for existing layers using the AI animation plan endpoint, then request explicit apply.", "tags": ["animation", "timeline", "keyframe", "transform"]},
+        {"name": "character.rig.inspect", "surface": "character", "purpose": "Inspect supported character and rig schema before proposing rig changes.", "tags": ["character", "rigging", "schema"]},
+        {"name": "reference.image.generate", "surface": "ai_studio", "purpose": "Generate an optional concept image with the configured xKiro image model; pass it to the text model as a visual reference when supported.", "tags": ["ai", "image", "reference", "character", "design"]},
+        {"name": "story.json.validate", "surface": "ai_studio", "purpose": "Validate complete JSON structure and native vector frame shape before exposing Move to Project.", "tags": ["ai", "validation", "json", "drawing"]},
+    ]
     return {
         "engine": "Kyro Animation Engine (KAE)",
         "format": {"name": "kae", "versions": [1, 2]},
@@ -101,6 +113,7 @@ def get_capabilities():
             "Prefer a plan and request confirmation before broad destructive edits.",
         ],
         "tools": routes,
+        "editor_actions": editor_actions,
         "schemas": _schema_inventory(),
     }
 
