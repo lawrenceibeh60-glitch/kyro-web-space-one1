@@ -2,6 +2,6 @@
 :root {
   --bg: #101722; --panel: #182231; --header: #1c2939; --field: #26364a; --field-h: #31475f; --line: #34465b;
   --text: #e8f2ff; --dim: #8fa6bd; --accent: #43d9ff; --orange: #ffd166; --workspace: #172334;
-  --slotC-h: clamp(104px, 22vh, 140px); --radius: 5px; --bar: 38px; --shelf: 42px; --right: clamp(150px, 28vw, 250px);
+  --slotC-h: clamp(132px, 24vh, 170px); --radius: 5px; --bar: 38px; --shelf: 42px; --right: clamp(150px, 28vw, 250px);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
