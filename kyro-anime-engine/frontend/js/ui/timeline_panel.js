@@ -19,8 +19,11 @@ export function initTimelinePanel() {
   const names = $('dopeNames'), ctx = canvas.getContext('2d');
   let px = 10, W = 0, H = 0, dpr = 1, canvasDpr = 0, queued = false;
   let mode = null, drag = null, exposureDrag = null, zoom = 1;
+  let selectedMarkerId = null;
 
   const rows = () => [...(getScene()?.layers || [])].reverse();
+  const markers = () => Array.isArray(state.project?.markers) ? state.project.markers : [];
+  const selectedMarker = () => markers().find(marker => marker.id === selectedMarkerId) || null;
   const total = () => state.project.settings.duration_frames;
   const frameX = f => PAD + f * px + px / 2;
   const frameAt = x => frameFromTimelineX(x, PAD, px, total());
@@ -141,6 +144,25 @@ export function initTimelinePanel() {
       const x = frameX(f);
       if (px >= 6) { ctx.fillRect(x, RULER - 4, 1, 4); }
       if (f % step === 0) ctx.fillText(String(f + 1), x, 7);
+    }
+
+    // Blender-style named frame markers: colored flags on the ruler and guide lines.
+    for (const marker of markers()) {
+      const frame = Number(marker.frame);
+      if (!Number.isInteger(frame) || frame < firstFrame || frame >= lastFrame || frame >= n) continue;
+      const mx = frameX(frame);
+      const color = /^#[0-9a-f]{6}$/i.test(marker.color || '') ? marker.color : '#36c5d8';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = marker.id === selectedMarkerId ? 2 : 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(mx, RULER); ctx.lineTo(mx, h); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.moveTo(mx - 4, 0); ctx.lineTo(mx + 5, 0); ctx.lineTo(mx, 8); ctx.closePath(); ctx.fill();
+      if (px >= 8) {
+        ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillText(String(marker.name || 'Marker').slice(0, 18), mx + 5, 8, 110);
+      }
     }
 
     // playhead
@@ -315,6 +337,87 @@ export function initTimelinePanel() {
     renderNames();
     requestDraw();
   });
+  function renderMarkers() {
+    const list = $('markerList');
+    if (!list) return;
+    list.innerHTML = '';
+    const sorted = [...markers()].sort((a, b) => a.frame - b.frame || a.name.localeCompare(b.name));
+    if (!sorted.length) {
+      const empty = document.createElement('span');
+      empty.className = 'marker-empty';
+      empty.textContent = 'No markers yet';
+      list.append(empty);
+    }
+    for (const marker of sorted) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'frame-marker' + (marker.id === selectedMarkerId ? ' selected' : '');
+      button.title = `Go to frame ${marker.frame + 1}; right-click to rename`;
+      button.textContent = `F${marker.frame + 1} · ${marker.name}`;
+      button.style.setProperty('--marker-color', /^#[0-9a-f]{6}$/i.test(marker.color || '') ? marker.color : '#36c5d8');
+      button.onclick = () => {
+        selectedMarkerId = marker.id;
+        setFrame(marker.frame);
+        renderMarkers();
+        requestDraw();
+      };
+      button.oncontextmenu = event => {
+        event.preventDefault();
+        selectedMarkerId = marker.id;
+        renameSelectedMarker();
+      };
+      list.append(button);
+    }
+    const chosen = !!selectedMarker();
+    $('renameMarker').disabled = !chosen;
+    $('deleteMarker').disabled = !chosen;
+  }
+
+  function addMarker() {
+    const name = window.prompt('Marker name (e.g. Impact, Camera Cut, Final Pose):', `Marker ${markers().length + 1}`);
+    if (name === null) return;
+    const clean = name.trim().slice(0, 120);
+    if (!clean) { toast('Enter a marker name', 'err'); return; }
+    const frame = clamp(Math.round(state.frame), 0, total() - 1);
+    const duplicate = markers().find(m => m.frame === frame && m.name.toLowerCase() === clean.toLowerCase());
+    if (duplicate) {
+      selectedMarkerId = duplicate.id;
+      renderMarkers();
+      toast('A marker with that name already exists on this frame');
+      return;
+    }
+    const marker = { id: `marker_${Date.now().toString(36)}`, frame, name: clean, color: '#36c5d8' };
+    execute(setValue(['markers'], [...markers(), marker], 'Add frame marker'));
+    selectedMarkerId = marker.id;
+    renderMarkers();
+    requestDraw();
+  }
+
+  function renameSelectedMarker() {
+    const marker = selectedMarker();
+    if (!marker) { toast('Select a marker first', 'err'); return; }
+    const name = window.prompt('Rename frame marker:', marker.name);
+    if (name === null) return;
+    const clean = name.trim().slice(0, 120);
+    if (!clean) { toast('Marker name cannot be empty', 'err'); return; }
+    const updated = markers().map(item => item.id === marker.id ? { ...item, name: clean } : item);
+    execute(setValue(['markers'], updated, 'Rename frame marker'));
+    renderMarkers();
+    requestDraw();
+  }
+
+  function deleteSelectedMarker() {
+    const marker = selectedMarker();
+    if (!marker) { toast('Select a marker first', 'err'); return; }
+    execute(setValue(['markers'], markers().filter(item => item.id !== marker.id), 'Delete frame marker'));
+    selectedMarkerId = null;
+    renderMarkers();
+    requestDraw();
+  }
+
+  $('addMarker').onclick = addMarker;
+  $('renameMarker').onclick = renameSelectedMarker;
+  $('deleteMarker').onclick = deleteSelectedMarker;
   $('newDrawing').onclick = () => newDrawing(false);
   $('duplicateDrawing').onclick = () => newDrawing(true);
   $('holdDrawing').onclick = holdDrawing;
@@ -325,10 +428,16 @@ export function initTimelinePanel() {
   };
   new ResizeObserver(() => { renderNames(); requestDraw(); }).observe(scroll);
 
-  bus.on('state', p => { if ('frame' in p || 'project' in p || 'sceneId' in p || 'layerId' in p) requestDraw(); });
-  bus.on('project:changed', () => { selectedExposure = null; renderNames(); requestDraw(); });
+  bus.on('state', p => {
+    if ('frame' in p || 'project' in p || 'sceneId' in p || 'layerId' in p) requestDraw();
+    if ('project' in p) {
+      if (!markers().some(marker => marker.id === selectedMarkerId)) selectedMarkerId = null;
+      renderMarkers();
+    }
+  });
+  bus.on('project:changed', () => { selectedExposure = null; renderNames(); renderMarkers(); requestDraw(); });
   bus.on('selection', () => { renderNames(); requestDraw(); });
   bus.on('playback', requestDraw);
-  renderNames(); requestDraw();
+  renderNames(); renderMarkers(); requestDraw();
   return { requestDraw, renderNames };
 }
