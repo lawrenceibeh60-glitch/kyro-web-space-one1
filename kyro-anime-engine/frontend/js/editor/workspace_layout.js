@@ -16,10 +16,10 @@ export const EDITORS = {
 };
 
 export const WORKSPACES = {
-  draw: { label: 'Draw', tool: 'brush', tab: 'tool', bottom: 'clamp(104px, 22vh, 140px)', slots: { A: 'outliner', B: 'properties', C: 'timeline' } },
-  animate: { label: 'Animate', tool: 'move', tab: 'object', bottom: 'clamp(150px, 36vh, 260px)', slots: { A: 'outliner', B: 'properties', C: 'timeline' } },
+  draw: { label: 'Draw', tool: 'brush', tab: 'tool', bottom: 'clamp(180px, 28vh, 280px)', slots: { A: 'outliner', B: 'properties', C: 'timeline' } },
+  animate: { label: 'Animate', tool: 'move', tab: 'object', bottom: 'clamp(210px, 34vh, 320px)', slots: { A: 'outliner', B: 'properties', C: 'timeline' } },
   edit: { label: 'Edit', tool: 'edit', tab: 'tool', bottom: 'clamp(104px, 22vh, 140px)', slots: { A: 'history', B: 'properties', C: 'timeline' } },
-  studio: { label: 'Studio', tool: 'move', tab: 'object', bottom: 'clamp(148px, 28vh, 230px)', slots: { A: 'outliner', B: 'studio', C: 'timeline' } },
+  studio: { label: 'Studio', tool: 'move', tab: 'object', bottom: 'clamp(190px, 30vh, 300px)', slots: { A: 'outliner', B: 'studio', C: 'timeline' } },
   nodes: { label: 'Nodes', tool: 'move', tab: 'object', bottom: 'clamp(148px, 28vh, 230px)', slots: { A: 'geometry', B: 'outliner', C: 'timeline' } },
 };
 
