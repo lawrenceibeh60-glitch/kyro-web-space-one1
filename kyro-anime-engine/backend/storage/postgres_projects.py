@@ -11,7 +11,7 @@ from pathlib import Path
 import config
 
 _lock = threading.RLock()
-_ready = False
+_ready_url = None
 
 
 def configured():
@@ -40,11 +40,15 @@ def _connect():
 
 
 def _ensure_schema(conn):
-    global _ready
-    if _ready:
+    # The service may reconnect to a different DATABASE_URL during tests,
+    # previews, or runtime reconfiguration. Cache schema readiness per URL,
+    # never as one process-wide boolean.
+    global _ready_url
+    database_url = _url()
+    if _ready_url == database_url:
         return
     with _lock:
-        if _ready:
+        if _ready_url == database_url:
             return
         conn.execute("""
             CREATE TABLE IF NOT EXISTS kae_projects (
@@ -96,7 +100,7 @@ def _ensure_schema(conn):
                 ("filesystem-projects-v1",),
             )
             conn.commit()
-        _ready = True
+        _ready_url = database_url
 
 
 def exists(project_id):
