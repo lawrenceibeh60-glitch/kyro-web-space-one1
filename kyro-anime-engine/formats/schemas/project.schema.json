@@ -137,11 +137,20 @@
     "preview_range": {
       "type": "object",
       "description": "Optional inclusive frame range used by timeline playback preview.",
-      "required": ["start", "end"],
+      "required": [
+        "start",
+        "end"
+      ],
       "additionalProperties": false,
       "properties": {
-        "start": { "type": "integer", "minimum": 0 },
-        "end": { "type": "integer", "minimum": 0 }
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "markers": {
@@ -149,13 +158,30 @@
       "description": "Named frame markers for animation beats and shot navigation.",
       "items": {
         "type": "object",
-        "required": ["id", "frame", "name"],
+        "required": [
+          "id",
+          "frame",
+          "name"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-          "frame": { "type": "integer", "minimum": 0 },
-          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
-          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "frame": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "color": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
         }
       }
     },
@@ -224,6 +250,13 @@
       "minItems": 1,
       "items": {
         "$ref": "scene.schema.json"
+      }
+    },
+    "node_graphs": {
+      "type": "array",
+      "description": "Saved procedural geometry node graphs.",
+      "items": {
+        "$ref": "node_graph.schema.json"
       }
     }
   }
