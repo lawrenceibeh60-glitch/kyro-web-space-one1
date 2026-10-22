@@ -329,7 +329,7 @@ def _check_studio_data(project, errs):
                 continue
             for key in effect.keys() - {
                 "id", "scene_id", "type", "enabled", "start_frame", "end_frame",
-                "intensity", "count", "speed", "color",
+                "intensity", "count", "speed", "color", "focus_depth", "range",
             }:
                 errs.append(f"{where}.{key}: unknown property")
             effect_id = effect.get("id")
@@ -341,7 +341,7 @@ def _check_studio_data(project, errs):
             if not isinstance(scene_id, str) or scene_id not in scene_ids:
                 errs.append(f"{where}.scene_id: scene not found")
             effect_type = effect.get("type")
-            if not isinstance(effect_type, str) or effect_type not in {"lightning", "particles", "speed_lines", "camera_shake", "glow", "impact_flash"}:
+            if not isinstance(effect_type, str) or effect_type not in {"lightning", "particles", "speed_lines", "camera_shake", "glow", "impact_flash", "soft_shadow", "depth_of_field"}:
                 errs.append(f"{where}.type: unsupported effect")
             if "enabled" in effect and not isinstance(effect["enabled"], bool):
                 errs.append(f"{where}.enabled: boolean required")
@@ -365,6 +365,13 @@ def _check_studio_data(project, errs):
             color = effect.get("color", "#ffffff")
             if not isinstance(color, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", color):
                 errs.append(f"{where}.color: hex color #RRGGBB required")
+            if effect_type == "depth_of_field":
+                focus_depth = effect.get("focus_depth", 0.5)
+                depth_range = effect.get("range", 0.25)
+                if not _num(focus_depth) or not 0 <= focus_depth <= 1:
+                    errs.append(f"{where}.focus_depth: number 0..1 required")
+                if not _num(depth_range) or not 0 < depth_range <= 1:
+                    errs.append(f"{where}.range: number >0..1 required")
 
     characters = {
         item.get("id"): item for item in project.get("characters", [])

@@ -78,6 +78,18 @@ class StudioFeatureTests(unittest.TestCase):
         project["effects"][0]["type"] = "unknown_effect"
         self.assertTrue(any("unsupported effect" in error for error in validate_project(project)))
 
+    def test_soft_shadow_and_depth_of_field_effects_validate(self):
+        project = deepcopy(self.project)
+        project["effects"] = [
+            {"id": "fx_shadow", "scene_id": "scene_1", "type": "soft_shadow",
+             "intensity": 0.6, "speed": 8, "color": "#111827"},
+            {"id": "fx_dof", "scene_id": "scene_1", "type": "depth_of_field",
+             "intensity": 0.75, "focus_depth": 0.45, "range": 0.3},
+        ]
+        self.assertEqual(validate_project(project), [])
+        project["effects"][1]["range"] = 0
+        self.assertTrue(any("range: number >0..1 required" in error for error in validate_project(project)))
+
     def test_rig_validates_character_part_links_and_rejects_cycles(self):
         project = deepcopy(self.project)
         with patch.object(character_service.repo, "load", return_value=project), \
