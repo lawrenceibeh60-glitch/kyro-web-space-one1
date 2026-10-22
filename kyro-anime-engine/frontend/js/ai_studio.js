@@ -732,6 +732,13 @@ export function initAIStudio() {
       const result = await request('POST', '/api/ai/story/vector-plan', {
         direction, scene_title: scene.title, project: projectSummary(), ...providerPayload,
       });
+      const visualBrief = result.visual_brief || {};
+      addMessage('assistant', 'VISUAL PREPLAN · ' + scene.title + '\n' +
+        (visualBrief.composition || 'Composition planned') + '\n\nCHARACTER DESIGN\n' +
+        (visualBrief.character_design || 'Character design planned') + '\n\nENVIRONMENT & LIGHT\n' +
+        (visualBrief.environment_design || '') + '\n' + (visualBrief.lighting || '') +
+        '\n\nCONTINUITY\n' + (visualBrief.continuity_rules || 'Continuity preserved') +
+        '\n\nNow rendering the approved design as native KAE vector JSON.');
       storyStatus.textContent = 'Scene ' + (index + 1) + '/' + total + ' · drawing ' +
         result.frames.reduce((sum, frame) => sum + frame.strokes.length, 0) + ' native vector strokes on the main canvas…';
       await new Promise((resolve, reject) => {
