@@ -937,6 +937,8 @@ def _check_preview_range(project, errs):
         return
     start, end = preview.get("start"), preview.get("end")
     total = project.get("settings", {}).get("duration_frames", 1) if isinstance(project.get("settings"), dict) else 1
+    if not _int(total) or total < 1:
+        total = 1
     if not _int(start) or not 0 <= start < total:
         errs.append("preview_range.start: must be within the project timeline")
     if not _int(end) or not 0 <= end < total:
@@ -951,6 +953,8 @@ def _check_markers(project, errs):
         errs.append("markers: must be a list")
         return
     total = project.get("settings", {}).get("duration_frames", 1) if isinstance(project.get("settings"), dict) else 1
+    if not _int(total) or total < 1:
+        total = 1
     seen_ids = set()
     seen_positions = set()
     for index, marker in enumerate(markers):
