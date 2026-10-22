@@ -373,6 +373,10 @@ export function initTimelinePanel() {
       button.onclick = () => {
         selectedMarkerId = marker.id;
         setFrame(marker.frame);
+        const markerX = frameX(marker.frame);
+        if (markerX < scroll.scrollLeft || markerX > scroll.scrollLeft + scroll.clientWidth - 24) {
+          scroll.scrollLeft = Math.max(0, markerX - scroll.clientWidth / 2);
+        }
         renderMarkers();
         requestDraw();
       };
