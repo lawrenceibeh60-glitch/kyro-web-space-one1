@@ -134,6 +134,21 @@
         "$ref": "rig.schema.json"
       }
     },
+    "markers": {
+      "type": "array",
+      "description": "Named frame markers for animation beats and shot navigation.",
+      "items": {
+        "type": "object",
+        "required": ["id", "frame", "name"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+          "frame": { "type": "integer", "minimum": 0 },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+        }
+      }
+    },
     "audio": {
       "type": "array",
       "items": {
