@@ -24,7 +24,7 @@ class MCPConnectorTests(unittest.TestCase):
     def test_tools_are_advertised_with_schemas(self):
         result = mcp.handle_rpc({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
         names = {item["name"] for item in result["result"]["tools"]}
-        self.assertTrue({"kae_list_projects", "kae_get_project", "kae_get_scene_context", "kae_add_drawing", "kae_append_strokes", "kae_create_drawing_layer", "kae_update_layer", "kae_delete_layer"} <= names)
+        self.assertTrue({"kae_list_projects", "kae_create_project", "kae_get_project", "kae_get_scene_context", "kae_add_drawing", "kae_append_strokes", "kae_create_drawing_layer", "kae_update_layer", "kae_delete_layer"} <= names)
         self.assertTrue(all(item["inputSchema"]["type"] == "object" for item in result["result"]["tools"]))
 
     def test_unknown_method_returns_json_rpc_error(self):
@@ -54,6 +54,23 @@ class MCPConnectorTests(unittest.TestCase):
             self.assertEqual(mcp.authenticate("Bearer wrong-secret"), (False, "Invalid or missing bearer token"))
             self.assertEqual(mcp.authenticate("Bearer right-secret"), (True, ""))
 
+
+    def test_mcp_can_create_a_native_project(self):
+        with TemporaryDirectory() as folder, patch.object(config, "PROJECTS_DIR", Path(folder)):
+            result = mcp.call_tool("kae_create_project", {
+                "name": "MCP-created project",
+                "settings": {"width": 1920, "height": 1080, "fps": 24, "duration_frames": 48},
+            })
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["name"], "MCP-created project")
+            saved = repo.load(result["project_id"])
+            self.assertEqual(saved["settings"]["width"], 1920)
+            self.assertEqual(saved["settings"]["height"], 1080)
+            self.assertEqual(saved["scenes"][0]["id"], "scene_1")
+
+    def test_create_project_rejects_invalid_settings_object(self):
+        with self.assertRaisesRegex(Exception, "settings must be an object"):
+            mcp.call_tool("kae_create_project", {"name": "Bad project", "settings": []})
 
     def test_drawing_can_be_added_and_placed_on_timeline(self):
         with TemporaryDirectory() as folder, patch.object(config, "PROJECTS_DIR", Path(folder)):
