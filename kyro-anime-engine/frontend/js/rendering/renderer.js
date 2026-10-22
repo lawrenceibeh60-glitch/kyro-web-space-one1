@@ -416,6 +416,29 @@ export function drawStroke(ctx, s) {
   ctx.restore();
 }
 
+function drawMaskLayerTree(ctx, layer, project, frame, camera, width, height, root = true) {
+  if (!layer || layer.visible === false) return;
+  ctx.save();
+  if (root) applyCameraDepthTransform(ctx, width, height, camera, frame, layer.depth ?? 1);
+  const transform = getLayerTransform(layer, frame);
+  ctx.globalAlpha *= evaluateOpacity(layer, frame);
+  ctx.translate(transform.x || 0, transform.y || 0);
+  ctx.rotate((transform.rotation || 0) * Math.PI / 180);
+  ctx.scale(transform.scale_x ?? 1, transform.scale_y ?? 1);
+  ctx.translate(-(transform.anchor_x || 0), -(transform.anchor_y || 0));
+  if (layer.clip_path) applyVectorClip(ctx, layer.clip_path);
+  if (layer.type === 'group' || layer.type === 'character_instance') {
+    for (const child of layer.children || []) {
+      drawMaskLayerTree(ctx, child, project, frame, camera, width, height, false);
+    }
+  } else {
+    const exposure = findExposure(layer, frame);
+    const strokes = exposure ? (project.drawings?.[exposure.drawing]?.strokes || []) : [];
+    for (const stroke of strokes) drawStroke(ctx, stroke);
+  }
+  ctx.restore();
+}
+
 // preview (optional): { layerId, drawingId, stroke, hidden:Set<strokeId>, cursor:{x,y,r} }
 // opts: { transparent } skips the background fill (PNG / sprite / GIF with alpha)
 export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
@@ -502,21 +525,12 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
       const maskEffect = maskEffects.find(effect => effect.target_layer_id === layer.id);
       if (maskEffect && maskCtx) {
         const maskLayer = (scene?.layers || []).find(item => item.id === maskEffect.mask_layer_id);
-        const maskExposure = maskLayer && findExposure(maskLayer, frame);
-        const maskStrokes = maskExposure ? (project.drawings[maskExposure.drawing]?.strokes || []) : [];
         maskCtx.setTransform(1, 0, 0, 1, 0, 0);
         maskCtx.clearRect(0, 0, width, height);
         if (maskLayer && maskLayer.visible !== false) {
-          const mt = getLayerTransform(maskLayer, frame);
           maskCtx.save();
           maskCtx.beginPath(); maskCtx.rect(0, 0, width, height); maskCtx.clip();
-          applyCameraDepthTransform(maskCtx, width, height, camera, frame, maskLayer.depth ?? 1);
-          maskCtx.translate(mt.x || 0, mt.y || 0);
-          maskCtx.rotate((mt.rotation || 0) * Math.PI / 180);
-          maskCtx.scale(mt.scale_x ?? 1, mt.scale_y ?? 1);
-          maskCtx.translate(-(mt.anchor_x || 0), -(mt.anchor_y || 0));
-          maskCtx.globalAlpha = maskLayer.opacity ?? 1;
-          for (const stroke of maskStrokes) drawStroke(maskCtx, stroke);
+          drawMaskLayerTree(maskCtx, maskLayer, project, frame, camera, width, height, true);
           maskCtx.restore();
         }
         layerCtx.save();
