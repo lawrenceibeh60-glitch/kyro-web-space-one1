@@ -686,7 +686,8 @@ def expand_story_outline():
         "major plot twists that contradict the source. Split action into drawable scenes with clear beginnings and "
         "endings. Every visual_description must describe what is visibly on the canvas, including foreground, "
         "background, lighting, character pose, costume, and props. Keep character appearance consistent between scenes. "
-        "Limit the outline to 12 scenes so each can be drawn as native vector cels. No markdown.\n\n"
+        "Limit the outline to 12 scenes so each can be drawn as native vector cels. No markdown. " 
+        "Also include needs_clarification (boolean) and clarification_question (string). Ask a question only if a missing story or design detail would materially change the result and cannot be safely inferred; otherwise make a coherent creative choice and set needs_clarification=false. Preserve the user's story.\n\n"
         "PROJECT CANVAS: " + json.dumps(project.get("settings", {}), ensure_ascii=False)[:1000] + "\n"
         "IMPORTED STORY JSON:\n" + story_text
     )
@@ -704,7 +705,13 @@ def expand_story_outline():
             {"role": "user", "content": "SELF-REPAIR PASS 1/1. Return the COMPLETE corrected story outline as valid JSON only. Previous parse error: " + str(first_error) + ". Keep 1-12 scenes and all required fields."},
         ], temperature=0, timeout=180, max_tokens=100000)
         outline = _parse_model_json(raw)
-    if not isinstance(outline, dict) or not isinstance(outline.get("scenes"), list) or not 1 <= len(outline["scenes"]) <= 12:
+    if not isinstance(outline, dict):
+        raise ApiError(502, "The story director must return a JSON object.")
+    if outline.get("needs_clarification") is True:
+        question = outline.get("clarification_question")
+        if isinstance(question, str) and question.strip():
+            return jsonify(status="needs_input", question=question.strip()[:1800], model=used_model)
+    if not isinstance(outline.get("scenes"), list) or not 1 <= len(outline["scenes"]) <= 12:
         raise ApiError(502, "The story director must return between 1 and 12 scenes.")
     required = ("title", "logline", "style_bible")
     for field in required:
