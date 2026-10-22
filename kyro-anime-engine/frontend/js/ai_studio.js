@@ -738,6 +738,269 @@ export function initAIStudio() {
     }};
   }
 
+  function storyLikeMessage(message) {
+    const text = String(message || '').trim();
+    if (text.split(/\s+/).length >= 18) return true;
+    return /(?:write|create|make|draw|design|animate|animation|anime|character|story|scene|episode|fight scene|battle scene|visual sequence)\b/i.test(text);
+  }
+
+  async function streamScriptToEditor(script) {
+    const serialized = JSON.stringify(script, null, 2);
+    jsonEditor.value = '';
+    jsonEditor.disabled = true;
+    setOutputTab('json');
+    const chunkSize = 220;
+    for (let offset = 0; offset < serialized.length; offset += chunkSize) {
+      jsonEditor.value = serialized.slice(0, offset + chunkSize);
+      jsonEditor.scrollTop = jsonEditor.scrollHeight;
+      await delay(8);
+    }
+    jsonEditor.disabled = false;
+    jsonEditor.value = serialized;
+    refreshMoveButton();
+  }
+
+  function currentAuthoredScript(state) {
+    return {
+      format: 'kae-story-animation',
+      version: 1,
+      title: state.outline?.title || 'KAE Story Animation',
+      summary: state.outline?.logline || '',
+      style_bible: state.outline?.style_bible || '',
+      characters: state.outline?.characters || [],
+      image_reference: state.visualReference ? { available: true, model: state.imageModel || 'xKiro image model' } : { available: false },
+      scenes: state.scenes.map(item => ({
+        scene_number: item.scene.scene_number,
+        title: item.scene.title,
+        location: item.scene.location,
+        mood: item.scene.mood,
+        characters: item.scene.characters || [],
+        action: item.scene.action,
+        visual_description: item.scene.visual_description,
+        continuity_notes: item.scene.continuity_notes,
+        visual_brief: item.visual_brief,
+        frames: item.frames,
+      })),
+      metadata: {
+        native_engine: 'KAE',
+        native_vector_format: 'kae-native-vector-cels',
+        created_at: new Date().toISOString(),
+        correction_passes: state.correctionPasses || 0,
+      },
+    };
+  }
+
+  async function runStoryAuthoring(state, answer = '') {
+    if (answer.trim()) {
+      if (state.stage === 'clarify_outline') {
+        state.story += '\n\nUSER CLARIFICATION:\n' + answer.trim();
+        state.outline = null;
+        state.stage = 'outline';
+      } else {
+        state.continuation = [state.continuation, answer.trim()].filter(Boolean).join('\n');
+      }
+    }
+    storyAuthorState = state;
+    authoringBusy = true;
+    moveToProject.hidden = true;
+    moveToProject.disabled = true;
+    jsonEditor.disabled = true;
+    setBusy(true);
+    setOutputTab('json');
+    jsonStatus.textContent = 'KAE visual director is analysing the story and the tagged native tool inventory…';
+    try {
+      const providerPayload = activeProviderPayload();
+      if (!currentProject?.id) throw new Error('Open a KAE project before authoring a script to move into it.');
+      if (!state.outline) {
+        state.stage = 'outline';
+        addMessage('assistant', 'VISUAL DIRECTOR · reading the story, filling reasonable gaps, and checking whether any essential design decision needs your input.');
+        const outlineResult = await request('POST', '/api/ai/story/outline', {
+          story: state.story, project: projectSummary(), ...providerPayload,
+        });
+        if (outlineResult.status === 'needs_input') {
+          state.stage = 'clarify_outline';
+          jsonStatus.textContent = 'Waiting for your answer · the JSON is intentionally not marked complete.';
+          jsonEditor.disabled = false;
+          addMessage('assistant', 'ONE DETAIL NEEDED BEFORE I LOCK THE DESIGN:\n' + outlineResult.question + '\n\nReply here and I will continue from this stage.');
+          return;
+        }
+        state.outline = outlineResult;
+        state.stage = 'drawing';
+        state.nextScene = state.nextScene || 0;
+        state.scenes = state.scenes || [];
+        addMessage('assistant', 'STORY STRUCTURE READY · ' + state.outline.title + '\n' +
+          state.outline.scenes.length + ' scenes · ' + state.outline.style_bible +
+          '\nI will now create the visual reference and write the native JSON scene by scene.');
+        jsonStatus.textContent = 'Story planned · ' + state.outline.scenes.length + ' scenes. Preparing a separate image-model concept reference…';
+
+        // Optional image-model collaboration. If it is unavailable, text authoring continues;
+        // the image reference never replaces the native KAE JSON or drawing tools.
+        if (!state.imageAttempted) {
+          state.imageAttempted = true;
+          const imageConfig = imageProfile();
+          if (imageConfig.provider === 'xkiro' && imageConfig.api_key && imageConfig.model) {
+            try {
+              const firstScene = state.outline.scenes[0] || {};
+              const conceptPrompt = [
+                'Create a high-detail anime production concept image for KYRO Animation Engine.',
+                'STORY: ' + state.outline.title + ' — ' + state.outline.logline,
+                'STYLE BIBLE: ' + state.outline.style_bible,
+                'CHARACTERS: ' + (state.outline.characters || []).join('\n'),
+                'FIRST SCENE: ' + firstScene.title + ' — ' + firstScene.visual_description,
+                'Prioritize deliberate character design, readable silhouette, expressive face and eyes, layered hair, designed clothing, clear pose, props, cinematic composition, lighting, shadows, and a controlled palette. One coherent image, no captions or watermark.'
+              ].join('\n');
+              jsonStatus.textContent = 'Image model is preparing a concept reference for the text model…';
+              sessionStorage.setItem('kae-ai-image-config', JSON.stringify(imageConfig));
+              let concept = await request('POST', '/api/ai/images', { prompt: conceptPrompt, image_config: imageConfig });
+              const deadline = Date.now() + 5 * 60 * 1000;
+              while (concept.status !== 'succeeded' && concept.job_id && Date.now() < deadline) {
+                jsonStatus.textContent = 'Image model is rendering the visual reference…';
+                await delay(2500);
+                concept = await request('POST', '/api/ai/images/' + encodeURIComponent(concept.job_id), { image_config: imageConfig });
+              }
+              if (concept.status !== 'succeeded') throw new Error('The image model did not finish its reference job.');
+              const data = concept.image || {};
+              state.visualReference = data.b64_json ? 'data:image/png;base64,' + data.b64_json : data.url || null;
+              state.imageModel = imageConfig.model;
+              if (state.visualReference) {
+                imageUrl = state.visualReference;
+                image.src = imageUrl;
+                image.hidden = false;
+                showRef.disabled = false;
+                download.href = imageUrl;
+                download.hidden = false;
+                jsonStatus.textContent = 'Concept image ready · text model will use it as a visual reference for native vector JSON.';
+              }
+            } catch (imageError) {
+              state.visualReference = null;
+              addMessage('assistant', 'IMAGE MODEL NOTE · concept generation did not complete (' + imageError.message + '). Continuing with the text model and KAE tools; no drawing progress was lost.');
+            }
+          } else {
+            jsonStatus.textContent = 'No image-model key selected · continuing with the text model. Configure xKiro under Image Generation Model to enable visual-reference collaboration.';
+          }
+        }
+      }
+
+      const scenes = state.outline.scenes || [];
+      state.scenes = state.scenes || [];
+      state.nextScene = Number.isInteger(state.nextScene) ? state.nextScene : state.scenes.length;
+      for (let index = state.nextScene; index < scenes.length; index++) {
+        const scene = scenes[index];
+        state.stage = 'drawing';
+        jsonStatus.textContent = 'Scene ' + (index + 1) + '/' + scenes.length + ' · visual planning, native tool selection and JSON authoring…';
+        const direction = [
+          'WHOLE STORY: ' + state.outline.title + ' — ' + state.outline.logline,
+          'GLOBAL STYLE BIBLE: ' + state.outline.style_bible,
+          'CHARACTER BIBLE: ' + (state.outline.characters || []).join('\n'),
+          'SCENE ' + scene.scene_number + ': ' + scene.title,
+          'LOCATION: ' + scene.location,
+          'MOOD: ' + scene.mood,
+          'CHARACTERS: ' + (scene.characters || []).join(', '),
+          'ACTION: ' + scene.action,
+          'VISUAL DESCRIPTION: ' + scene.visual_description,
+          'CONTINUITY: ' + scene.continuity_notes,
+          state.continuation ? 'USER FOLLOW-UP / DESIGN CORRECTIONS:\n' + state.continuation : '',
+          'Fill in missing visual details coherently rather than leaving empty space. Use the real tagged KAE tools and schema inventory. Draw an anime production-quality scene with designed silhouettes, face, eyes, hair, clothing, hands, props, foreground, background, lighting, shadows and controlled palette. Avoid icon-like circles, stick figures and disconnected shapes.'
+        ].filter(Boolean).join('\n');
+        try {
+          const result = await request('POST', '/api/ai/story/vector-plan', {
+            direction, scene_title: scene.title, project: projectSummary(),
+            visual_reference: state.visualReference || undefined,
+            ...providerPayload,
+          });
+          const visualBrief = result.visual_brief || {};
+          state.scenes.push({ scene, visual_brief: visualBrief, frames: result.frames, model: result.model });
+          state.nextScene = index + 1;
+          state.correctionPasses = (state.correctionPasses || 0) + 1;
+          addMessage('assistant', 'VISUAL DESIGN LOCKED · ' + scene.title + '\n' +
+            (visualBrief.composition || '') + '\n\nCHARACTER DESIGN\n' +
+            (visualBrief.character_design || '') + '\n\nENVIRONMENT & LIGHT\n' +
+            (visualBrief.environment_design || '') + '\n' + (visualBrief.lighting || '') +
+            '\n\nCONTINUITY\n' + (visualBrief.continuity_rules || 'Preserved across the scene') +
+            '\n\nWriting and validating the native drawing JSON now.');
+          await streamScriptToEditor(currentAuthoredScript(state));
+          jsonStatus.textContent = 'Scene ' + (index + 1) + '/' + scenes.length + ' written · ' +
+            result.frames.reduce((sum, frame) => sum + frame.strokes.length, 0) +
+            ' native vector paths · ' + state.scenes.length + '/' + scenes.length + ' scenes complete.';
+        } catch (sceneError) {
+          state.stage = 'drawing';
+          state.nextScene = index;
+          jsonEditor.disabled = false;
+          jsonStatus.textContent = 'PAUSED · scene ' + (index + 1) + ' is not complete. Existing JSON is preserved; Move to Project stays unavailable until every scene is complete.';
+          addMessage('assistant', 'I paused before marking the script complete because scene "' + scene.title +
+            '" did not validate: ' + sceneError.message +
+            '\n\nReply with a clarification/correction, or tell me to continue and I will retry this exact scene. The JSON already written is preserved.');
+          return;
+        }
+      }
+      const completeScript = currentAuthoredScript(state);
+      await streamScriptToEditor(completeScript);
+      state.stage = 'complete';
+      storyAuthorState = null;
+      jsonEditor.disabled = false;
+      jsonStatus.textContent = 'COMPLETE · every scene has native frames and valid JSON. Review it, then choose Move to Project.';
+      addMessage('assistant', 'JSON SCRIPT COMPLETE · ' + completeScript.title + '\n' +
+        completeScript.scenes.length + ' scene(s) are ready. The Move to Project button is now available; nothing has been inserted into the project until you press it.');
+    } catch (error) {
+      jsonEditor.disabled = false;
+      jsonStatus.textContent = 'PAUSED · ' + error.message + '. Your story state and any completed scene JSON are preserved.';
+      addMessage('assistant', 'I paused without discarding your work: ' + error.message +
+        '\nReply with a clarification or say “continue” and I will resume from the saved stage.');
+      storyAuthorState = state;
+    } finally {
+      authoringBusy = false;
+      setBusy(false);
+      jsonEditor.disabled = false;
+      refreshMoveButton();
+      if (state.stage !== 'complete') moveToProject.hidden = true;
+    }
+  }
+
+  moveToProject.addEventListener('click', async () => {
+    if (authoringBusy || !refreshMoveButton() || !currentProject?.id) return;
+    const script = JSON.parse(jsonEditor.value);
+    if (!confirm('Move ' + script.scenes.length + ' complete scene(s) into the open KAE project? Existing project art will be preserved by the editor drawing workflow.')) return;
+    authoringBusy = true;
+    moveToProject.disabled = true;
+    jsonEditor.disabled = true;
+    jsonStatus.textContent = 'Moving validated native animation JSON into the project…';
+    setBusy(true);
+    try {
+      if (!Number.isInteger(window.kaeAIAppliedSceneCount)) window.kaeAIAppliedSceneCount = 0;
+      for (let index = window.kaeAIAppliedSceneCount; index < script.scenes.length; index++) {
+        const scene = script.scenes[index];
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error('Editor did not acknowledge scene ' + (index + 1) + ' in time.')), 10 * 60 * 1000);
+          window.dispatchEvent(new CustomEvent('kae:ai-draw-frames', { detail: {
+            title: scene.title || ('Scene ' + (index + 1)),
+            storyTitle: script.title,
+            sceneNumber: index + 1,
+            totalScenes: script.scenes.length,
+            frames: scene.frames,
+            resolve: value => { clearTimeout(timer); resolve(value); },
+            reject: error => { clearTimeout(timer); reject(error); },
+          }}));
+        });
+        window.kaeAIAppliedSceneCount = index + 1;
+        jsonStatus.textContent = 'Moved scene ' + (index + 1) + '/' + script.scenes.length + ' into the project…';
+      }
+      currentProject = await request('GET', '/api/projects/' + encodeURIComponent(currentProject.id));
+      jsonStatus.textContent = 'MOVED TO PROJECT · ' + script.scenes.length + ' scene(s) were applied to the KAE timeline.';
+      moveToProject.hidden = true;
+      addMessage('assistant', 'MOVED TO PROJECT · ' + script.title + '\nThe editor acknowledged all ' + script.scenes.length + ' scene(s). The JSON remains available in the JSON Script tab.');
+      root.hidden = true;
+    } catch (error) {
+      jsonStatus.textContent = 'Move paused: ' + error.message + ' Existing progress is retained; press Move to Project again to resume.';
+      moveToProject.hidden = false;
+      addMessage('assistant', 'Project import paused: ' + error.message + '. You can retry without re-authoring the script.');
+    } finally {
+      authoringBusy = false;
+      setBusy(false);
+      jsonEditor.disabled = false;
+      refreshMoveButton();
+    }
+  });
+
   async function drawStoryScenes(rawStory, sourceLabel) {
     const providerPayload = activeProviderPayload();
     if (!currentProject?.id) throw new Error('Open a KAE project before drawing a story.');
