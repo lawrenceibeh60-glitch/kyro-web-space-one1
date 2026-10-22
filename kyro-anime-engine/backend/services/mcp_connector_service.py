@@ -71,6 +71,7 @@ def _scene(project, scene_id=None):
 def list_tools():
     return [
         {"name":"kae_list_projects","title":"List KAE projects","description":"List available animation projects. Use this to find the project_id.","inputSchema":{"type":"object","properties":{},"additionalProperties":False},"annotations":{"readOnlyHint":True,"destructiveHint":False,"idempotentHint":True,"openWorldHint":False}},
+        {"name":"kae_create_project","title":"Create KAE project","description":"Create a new native KAE animation project. Use this when no project exists, or when the user explicitly requests a new project.","inputSchema":{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":120},"settings":{"type":"object","properties":{"width":{"type":"integer","minimum":1,"maximum":8192},"height":{"type":"integer","minimum":1,"maximum":8192},"fps":{"type":"integer","minimum":1,"maximum":120},"duration_frames":{"type":"integer","minimum":1,"maximum":10000},"background":{"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"}},"additionalProperties":False}},"required":["name"],"additionalProperties":False},"annotations":{"readOnlyHint":False,"destructiveHint":False,"idempotentHint":False,"openWorldHint":False}},
         {"name":"kae_get_project","title":"Inspect KAE project","description":"Read a native KAE project, including settings, scenes, drawings and animation. Set include_drawings=false for a compact overview.","inputSchema":{"type":"object","properties":{"project_id":{"type":"string","minLength":1},"include_drawings":{"type":"boolean","default":True}},"required":["project_id"],"additionalProperties":False},"annotations":{"readOnlyHint":True,"destructiveHint":False,"idempotentHint":True,"openWorldHint":False}},
         {"name":"kae_get_scene_context","title":"Inspect scene and layers","description":"Read scene layers, exposures, drawing IDs and stroke counts before editing. If scene_id is omitted, returns the first scene.","inputSchema":{"type":"object","properties":{"project_id":{"type":"string","minLength":1},"scene_id":{"type":"string"},"include_strokes":{"type":"boolean","default":False}},"required":["project_id"],"additionalProperties":False},"annotations":{"readOnlyHint":True,"destructiveHint":False,"idempotentHint":True,"openWorldHint":False}},
         {"name":"kae_add_drawing","title":"Add vector drawing","description":"Create native editable KAE artwork from validated stroke/path JSON in project canvas coordinates. Paths may use M/L/Q/C/Z commands.","inputSchema":{"type":"object","properties":{"project_id":{"type":"string","minLength":1},"drawing_id":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,64}$"},"name":{"type":"string","minLength":1,"maxLength":120},"strokes":{"type":"array","items":{"type":"object"}}},"required":["project_id","drawing_id","name","strokes"],"additionalProperties":False},"annotations":{"readOnlyHint":False,"destructiveHint":False,"idempotentHint":False,"openWorldHint":False}},
@@ -110,6 +111,15 @@ def call_tool(name, args):
         raise ApiError(400, "Tool arguments must be an object")
     if name == "kae_list_projects":
         return {"projects": project_service.list_projects()}
+    if name == "kae_create_project":
+        name_value = args.get("name")
+        if not isinstance(name_value, str) or not name_value.strip() or len(name_value.strip()) > 120:
+            raise ApiError(400, "name must be a non-empty string of at most 120 characters")
+        settings = args.get("settings", {})
+        if not isinstance(settings, dict):
+            raise ApiError(400, "settings must be an object")
+        project = project_service.create_project(name_value.strip(), settings)
+        return {"ok":True,"project_id":project["id"],"name":project["name"],"settings":project["settings"],"scene_ids":[scene["id"] for scene in project.get("scenes", [])],"modified":project.get("modified")}
     if name == "kae_get_project":
         project = _project(args.get("project_id"))
         if not args.get("include_drawings", True):
