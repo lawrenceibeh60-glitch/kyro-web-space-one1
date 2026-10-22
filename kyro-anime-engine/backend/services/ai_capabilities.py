@@ -52,6 +52,8 @@ def get_capabilities():
         {"name": "ai.video.reconstruction.plan", "method": "POST", "path": "/api/ai/video/reconstruction/plan", "purpose": "Propose bounded editable vector cels from sampled reference frames; does not mutate the project."},
         {"name": "ai.video.reconstruction.apply", "method": "POST", "path": "/api/ai/video/reconstruction/apply", "purpose": "Validate and add vector drawings on a new layer, preserving existing project art."},
         {"name": "ai.animation.plan", "method": "POST", "path": "/api/ai/animation/plan", "purpose": "Generate validated transform-keyframe operations for existing scene layers; does not mutate the project."},
+        {"name": "ai.story.outline", "method": "POST", "path": "/api/ai/story/outline", "purpose": "Expand a story into continuity-aware scenes."},
+        {"name": "ai.story.vector-plan", "method": "POST", "path": "/api/ai/story/vector-plan", "purpose": "Plan scene composition, then produce native vector-cel JSON."},
     ]
     return {
         "engine": "Kyro Animation Engine (KAE)",
