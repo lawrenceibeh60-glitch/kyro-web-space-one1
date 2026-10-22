@@ -27,11 +27,20 @@ function boneChain(rig, boneId) {
   return chain;
 }
 
-function transformPoint(point, chain, frame, pose, rig) {
+export function transformPoint(point, chain, frame, pose, rig) {
   let result = { x: point[0], y: point[1] };
+  const applied = [];
   for (const bone of chain) {
     if (!bone.pivot || !Number.isFinite(bone.pivot.x) || !Number.isFinite(bone.pivot.y)) continue;
-    result = rotateAround(result, bone.pivot, rotationOf(rig, bone, frame, pose));
+    const angle = rotationOf(rig, bone, frame, pose);
+    // Child joints travel with their parents. Transform the rest-pose pivot
+    // through every ancestor before rotating the point around this joint.
+    let worldPivot = { x: bone.pivot.x, y: bone.pivot.y };
+    for (const ancestor of applied) {
+      worldPivot = rotateAround(worldPivot, ancestor.pivot, ancestor.rotation);
+    }
+    result = rotateAround(result, worldPivot, angle);
+    applied.push({ pivot: worldPivot, rotation: angle });
   }
   return result;
 }
