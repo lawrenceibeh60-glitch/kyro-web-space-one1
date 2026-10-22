@@ -193,3 +193,70 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await browser.close();
   }
 });
+
+
+test('Android-sized browser keeps editor tools and AI workspace within reachable scroll areas', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    screen: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+  });
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  try {
+    await page.goto(baseURL, { waitUntil: 'networkidle' });
+    await page.locator('#newName').fill('KAE Android Layout');
+    await page.locator('#create').click();
+    await page.waitForURL(/editor\.html\?project=/);
+    await page.locator('#canvas').waitFor({ state: 'visible' });
+    await page.locator('#aiLaunch').click();
+    await page.locator('#aiStudio').waitFor({ state: 'visible' });
+
+    const layout = await page.evaluate(() => {
+      const rect = selector => {
+        const node = document.querySelector(selector);
+        if (!node) return null;
+        const box = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return {
+          x: box.x, y: box.y, right: box.right, bottom: box.bottom,
+          width: box.width, height: box.height,
+          overflowY: style.overflowY,
+        };
+      };
+      return {
+        viewport: { width: innerWidth, height: innerHeight },
+        bodyWidth: document.body.scrollWidth,
+        app: rect('.app'),
+        canvas: rect('#canvas'),
+        shelf: rect('.shelf'),
+        timeline: rect('#slotC'),
+        ai: rect('#aiStudio'),
+        aiSide: rect('.ai-side'),
+        aiPreview: rect('.ai-preview'),
+        aiProvider: rect('.ai-provider-panel'),
+        aiThread: rect('.ai-thread'),
+        aiVisualBody: rect('.ai-preview-body'),
+      };
+    });
+    assert.ok(layout.canvas.width > 0 && layout.canvas.height > 0, 'mobile canvas should remain visible');
+    assert.ok(layout.timeline.height >= 150, 'timeline should retain a usable mobile height');
+    assert.ok(layout.ai.width <= layout.viewport.width, 'AI workspace must fit the phone width');
+    assert.ok(layout.ai.bottom <= layout.viewport.height + 1, 'AI workspace must fit the dynamic viewport');
+    assert.equal(layout.aiSide.overflowY, 'auto', 'AI conversation/settings column must be scrollable');
+    assert.equal(layout.aiVisualBody.overflowY, 'auto', 'AI visual tools must be independently scrollable');
+    await page.getByRole('button', { name: 'JSON Script' }).click();
+    await page.locator('.ai-json-workspace').waitFor({ state: 'visible' });
+    assert.equal(await page.getByRole('button', { name: 'Move to Project' }).isHidden(), true,
+      'mobile layout must preserve JSON validation/import gating');
+    assert.deepEqual(pageErrors, [], `mobile browser runtime errors: ${pageErrors.join('; ')}`);
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+});
