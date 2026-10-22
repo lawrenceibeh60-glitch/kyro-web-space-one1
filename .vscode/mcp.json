@@ -1,0 +1,19 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "kae-mcp-api-key",
+      "description": "KAE MCP API key (the value configured in Render)",
+      "password": true
+    }
+  ],
+  "servers": {
+    "kae-animation-engine": {
+      "type": "http",
+      "url": "https://kyro-animation-engine.onrender.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:kae-mcp-api-key}"
+      }
+    }
+  }
+}
