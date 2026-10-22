@@ -434,3 +434,144 @@ button.primary, .studio-menu-shortcuts .studio-save { background: #e2b54b; borde
   #p-geometry .geo-workspace { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(110px,1fr) auto; }
   #p-geometry .geo-inspector { max-height: 140px; border-left: 0; border-top: 1px solid var(--kae-line); }
 }
+
+
+/* Blender-style workspace pass: fixed viewport geometry, proper bottom timeline,
+   neutral graphite panels, clear editor boundaries and no nested mobile grid. */
+:root {
+  --blender-bg: #202124;
+  --blender-panel: #2b2c2f;
+  --blender-header: #383a3e;
+  --blender-field: #1e1f22;
+  --blender-border: #17181a;
+  --blender-accent: #e58b36;
+}
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  background: var(--blender-bg);
+}
+.app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0,1fr);
+  grid-template-rows: 40px 30px minmax(0,1fr) clamp(175px,27dvh,285px);
+  gap: 0;
+  background: var(--blender-bg);
+}
+.app > .topbar { grid-row: 1; min-width: 0; min-height: 0; overflow: hidden; background: #252629; border-bottom: 1px solid #111; box-shadow: none; }
+.app > .studio-menubar { grid-row: 2; min-width: 0; min-height: 0; height: 30px; overflow: visible; background: #303135; border-bottom: 1px solid #151619; }
+.app > .main {
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 44px minmax(0,1fr) clamp(230px,24vw,330px);
+  grid-template-rows: minmax(0,1fr);
+  gap: 0;
+}
+.app > #slotC {
+  grid-row: 4;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  overflow: hidden;
+  border-top: 1px solid #111;
+  background: #252629;
+}
+.topbar, .studio-menubar, .vp-head, .area-h, .panel-h, .tl-head {
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+.topbar .wtabs { border-radius: 0 !important; background: #202124; }
+.topbar .wtabs button.on, .topbar .wtabs button.active { background: #414348; color: #fff; box-shadow: inset 0 -2px var(--blender-accent); }
+.studio-menubar { color: #d5d6d8; }
+.studio-menu-trigger { border-radius: 2px !important; color: #d5d6d8; }
+.studio-menu-trigger:hover, .studio-menu-trigger[aria-expanded="true"] { background: #45474b; border-color: #5a5c60; color: #fff; }
+.studio-dropdown { background: #343538; border-color: #151619; border-radius: 2px; box-shadow: 0 8px 22px #0009; }
+.studio-dropdown .studio-command:hover { background: #4a4c50; border-color: #606267; }
+.main, .right, .slot, .vp, .viewport, #slotC, #p-timeline { min-width: 0; min-height: 0; }
+.shelf { width: 44px; min-width: 0; padding: 5px 4px; gap: 3px; overflow-y: auto; background: #2a2b2e; border-right: 1px solid #17181a; }
+.shelf .tool { width: 34px; min-width: 34px; height: 32px; min-height: 32px; margin: 0; border: 1px solid transparent; border-radius: 2px !important; background: transparent; color: #c4c5c7; }
+.shelf .tool:hover { background: #424449; border-color: #55575b; }
+.shelf .tool.active { background: #51402d; border-color: var(--blender-accent); color: #fff; box-shadow: none; }
+.shelf-sep { background: #505155; margin: 3px 2px; }
+.vp { display: grid; grid-template-rows: 32px minmax(0,1fr); overflow: hidden; background: #343538; }
+.vp-head { min-width: 0; min-height: 0; height: 32px; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; padding: 3px 6px; gap: 4px; background: #3b3c40; border-bottom: 1px solid #17181a; }
+.vp-head > * { flex-shrink: 0; }
+.viewport { position: relative; min-height: 0; overflow: hidden; background-color: #343538; }
+#canvas { display: block; max-width: 100%; }
+.right { display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(100px, .8fr) minmax(120px,1fr); min-width: 0; min-height: 0; overflow: hidden; border-left: 1px solid #17181a; background: var(--blender-panel); }
+.right .slot { min-width: 0; min-height: 0; overflow: auto; border-bottom: 1px solid #17181a; }
+#slotC .area-h, .area-h { height: 27px; min-height: 27px; background: var(--blender-header); border-bottom: 1px solid #1b1c1e; }
+.panel, .slot > .panel, #p-timeline { background: var(--blender-panel); }
+.panel-h { background: var(--blender-header); border-bottom: 1px solid #1a1b1d; }
+.panel-b, .studio-body { min-height: 0; overflow: auto; }
+button, .btn { border-radius: 2px !important; }
+button.primary, .studio-menu-shortcuts .studio-save { background: var(--blender-accent); border-color: #f1a24f; color: #171717; }
+input, select, textarea { border-radius: 2px !important; background: var(--blender-field) !important; }
+#slotC .panel { height: calc(100% - 27px); min-height: 0; overflow: hidden; }
+#p-timeline { display: grid; grid-template-rows: auto auto minmax(0,1fr); min-height: 0; overflow: hidden; }
+#p-timeline .tl-head { flex-wrap: nowrap; min-height: 34px; overflow-x: auto; overflow-y: hidden; justify-content: flex-start; gap: 5px; background: #343538; }
+#p-timeline .tl-ctrls, #p-timeline .tl-drawing-actions { flex: 0 0 auto; flex-wrap: nowrap; }
+#p-timeline .timeline-markers { min-height: 28px; overflow: hidden; }
+#p-timeline .dope { display: grid; grid-template-columns: 180px minmax(0,1fr); min-height: 0; height: 100%; overflow: hidden; }
+#p-timeline .dope-names { min-width: 0; width: auto; overflow: auto; background: #303135; border-right: 1px solid #17181a; }
+#p-timeline .dope-scroll { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+#p-timeline .dope-name, #p-timeline .frame-marker { border-radius: 0 !important; }
+#p-timeline .dope-name.selected, #p-timeline .frame-marker.selected { background: #59452f; color: #fff; }
+#p-timeline .key, #p-timeline .keyframe { color: #f0a34d; }
+#p-geometry .geo-node { border-radius: 2px; }
+#p-geometry .geo-node.selected { border-color: var(--blender-accent); box-shadow: 0 0 0 1px var(--blender-accent); }
+
+/* Phones: one row for the editor, one fixed-height dock for the timeline.
+   The old responsive rule put the inspector on a second row inside .main,
+   making it overflow the viewport and push the timeline behind the system UI. */
+@media (max-width: 700px) {
+  html, body, .app { height: 100%; height: 100dvh; min-height: 0; overflow: hidden; }
+  .app { grid-template-rows: 36px auto minmax(0,1fr) clamp(145px,24dvh,205px); }
+  .app > .topbar { grid-row: 1; height: 36px; gap: 2px; padding: 0 3px; overflow-x: auto; }
+  .app > .studio-menubar { grid-row: 2; height: auto; min-height: 28px; max-height: 42px; overflow: visible; flex-wrap: wrap; align-content: center; gap: 1px; padding: 1px 3px; }
+  .studio-menu-group { gap: 0; }
+  .studio-menu-trigger { height: 24px; min-height: 24px; padding: 0 5px; font-size: 10px; }
+  .studio-menu-shortcuts { gap: 2px; }
+  .studio-menu-shortcuts button { height: 22px; min-height: 22px; padding: 0 5px; font-size: 9px; }
+  .app > .main { grid-row: 3; grid-template-columns: 34px minmax(0,1fr) minmax(118px,34vw); grid-template-rows: minmax(0,1fr); overflow: hidden; }
+  .shelf { width: 34px; padding: 4px 2px; }
+  .shelf .tool { width: 29px; min-width: 29px; height: 29px; min-height: 29px; }
+  .right { display: grid !important; grid-column: 3; grid-row: 1; grid-template-rows: minmax(70px,.8fr) minmax(80px,1fr); flex-direction: column !important; border-left: 1px solid #17181a !important; border-top: 0 !important; overflow: hidden; }
+  .right .slot { min-width: 0 !important; min-height: 0; flex: initial !important; overflow: auto; border-left: 0 !important; }
+  .vp { grid-column: 2; grid-row: 1; min-width: 0; }
+  .vp-head { height: auto; min-height: 30px; max-height: 48px; flex-wrap: wrap; overflow: auto; padding: 2px; gap: 2px; }
+  .vp-head > button { height: 24px; min-height: 24px; padding: 0 4px; }
+  .vp-camera-mode, #canvasFocus { display: none; }
+  .vp-readout { gap: 3px; font-size: 8px; }
+  .app > #slotC { grid-row: 4; height: auto; min-height: 0; max-height: none; overflow: hidden; }
+  #slotC .area-h { height: 24px; min-height: 24px; }
+  #slotC .panel { height: calc(100% - 24px); }
+  #p-timeline .tl-head { min-height: 30px; padding: 2px; gap: 3px; }
+  #p-timeline .tl-head button { height: 24px; min-height: 24px; padding: 0 4px; }
+  #p-timeline .timeline-markers { min-height: 24px; padding: 2px; }
+  #p-timeline .dope { grid-template-columns: 76px minmax(0,1fr); }
+  #p-timeline .dope-names { width: 76px; min-width: 76px; }
+  #p-timeline .dope-name { min-height: 23px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #p-geometry .geo-workspace { grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(90px,1fr) auto; }
+  #p-geometry .geo-inspector { max-height: 110px; overflow: auto; border-left: 0; border-top: 1px solid #17181a; }
+}
+@media (max-height: 520px) {
+  .app { grid-template-rows: 34px 27px minmax(0,1fr) clamp(120px,28dvh,165px); }
+  .app > .topbar { height: 34px; }
+  .app > .studio-menubar { height: 27px; min-height: 27px; }
+}
