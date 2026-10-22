@@ -8,6 +8,7 @@ from backend.app.exceptions import ApiError
 from backend.services.project_service import _now
 from backend.services.validation_service import validate_project
 from backend.storage import project_repository as repo
+from backend.storage import object_storage
 from backend.storage.file_manager import safe_id
 
 AUDIO_TYPES = {
@@ -22,6 +23,10 @@ AUDIO_TYPES = {
 
 def _audio_dir(pid):
     return config.PROJECTS_DIR / safe_id(pid) / "audio"
+
+
+def _object_key(pid, clip):
+    return f"kae/projects/{safe_id(pid)}/audio/{clip.get('filename', '')}"
 
 
 def _stored_path(pid, clip):
@@ -96,19 +101,26 @@ def upload_audio(pid, uploaded, metadata):
         raise ApiError(422, "Audio clip failed project validation", errors)
 
     directory = _audio_dir(pid)
-    directory.mkdir(parents=True, exist_ok=True)
     destination = directory / clip["filename"]
     temporary = directory / f".{clip_id}.upload"
     try:
-        temporary.write_bytes(data)
-        os.replace(temporary, destination)
-    except OSError as error:
+        if object_storage.configured():
+            object_storage.put(_object_key(pid, clip), data, clip["mime_type"])
+        else:
+            directory.mkdir(parents=True, exist_ok=True)
+            temporary.write_bytes(data)
+            os.replace(temporary, destination)
+    except Exception:
         temporary.unlink(missing_ok=True)
-        raise ApiError(500, f"Could not store audio file: {error}")
+        # Do not return provider credentials, bucket names, or signed request details.
+        raise ApiError(503, "Could not store audio data. Check the configured storage provider.")
     project["modified"] = _now()
     repo.save(pid, project)
     if previous and previous.get("filename") != clip["filename"]:
-        _stored_path(pid, previous).unlink(missing_ok=True)
+        if object_storage.configured():
+            object_storage.delete(_object_key(pid, previous))
+        else:
+            _stored_path(pid, previous).unlink(missing_ok=True)
     return {"clip": clip, "project": project}
 
 
@@ -116,6 +128,11 @@ def audio_file(pid, clip_id):
     clip = next((item for item in list_audio(pid) if item.get("id") == clip_id), None)
     if clip is None:
         raise ApiError(404, f"Audio clip '{clip_id}' not found")
+    if object_storage.configured():
+        try:
+            return object_storage.get(_object_key(pid, clip)), clip["mime_type"], clip["name"]
+        except Exception:
+            raise ApiError(404, f"Audio data for clip '{clip_id}' is missing")
     path = _stored_path(pid, clip)
     if not path.is_file():
         raise ApiError(404, f"Audio data for clip '{clip_id}' is missing")
@@ -128,8 +145,10 @@ def delete_audio(pid, clip_id):
     index = next((i for i, item in enumerate(clips) if item.get("id") == clip_id), -1)
     if index < 0:
         raise ApiError(404, f"Audio clip '{clip_id}' not found")
-    path = _stored_path(pid, clips[index])
     clip = clips.pop(index)
     project["modified"] = _now()
     repo.save(pid, project)
-    path.unlink(missing_ok=True)
+    if object_storage.configured():
+        object_storage.delete(_object_key(pid, clip))
+    else:
+        _stored_path(pid, clip).unlink(missing_ok=True)
