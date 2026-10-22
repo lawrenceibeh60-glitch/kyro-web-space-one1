@@ -76,3 +76,14 @@ From the home screen, choose **Watch cinematic demo** or open `demo.html`. The o
 The `engine/` tree contains additional planned modules that are not yet connected to the editor workflow.
 
 See [docs/architecture.md](docs/architecture.md) for an honest blueprint status and remaining implementation roadmap.
+
+
+## Anime production upgrade pass
+
+This pass adds a small but important quality and usability improvement without replacing the native vector workflow:
+
+- Generated characters include editable hair-sheen strokes, fringe highlights, jacket seams and buttons, sleeve-cuff seams, and shoe details. These remain ordinary strokes inside the existing stable character parts, so they can still be edited, rigged, and weighted.
+- The mobile layout now keeps the timeline's bottom-area height independent from desktop workspace presets. The workspace selector previously set `--slotC-h` on the root element, overriding the intended phone-sized timeline height; the editor now applies a mobile-specific local value, with portrait and landscape adjustments.
+- Regression assertions verify the generated detail strokes and continue validating the character document against the canonical schema.
+
+The current editor already contains the rigging, IK, weighted vector deformation, walk-cycle authoring, camera motion, scene effects, and export foundations listed above. These are not a promise of a full 3D renderer: KAE remains a 2D/2.5D production editor. True mesh deformation across arbitrary artwork, production-grade masks/depth-of-field/shadows, and pixel-perfect automatic video reconstruction still require separate validated implementation work.
