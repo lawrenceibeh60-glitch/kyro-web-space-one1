@@ -424,6 +424,13 @@
         <label class="zoom-control" title="Timeline zoom"><span>Zoom</span><input id="dopeZoom" type="range" min="1" max="12" value="1"><b id="dopeZoomValue">1×</b></label>
       </div>
     </div>
+    <div class="timeline-markers" id="timelineMarkers" aria-label="Animation frame markers">
+      <span class="marker-heading">MARKERS</span>
+      <button id="addMarker" type="button" title="Add a marker at the current frame">+ Marker</button>
+      <button id="renameMarker" type="button" title="Rename the selected marker" disabled>Rename</button>
+      <button id="deleteMarker" type="button" title="Delete the selected marker" disabled>Delete</button>
+      <div id="markerList" class="marker-list"><span class="marker-empty">No markers yet</span></div>
+    </div>
     <div class="dope">
       <div class="dope-names" id="dopeNames"></div>
       <div class="dope-scroll" id="dopeScroll"><div id="dopeContent"></div><canvas id="dope"></canvas></div>
