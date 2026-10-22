@@ -1,20 +1,13 @@
-# KAE rigged test animation
+# KAE rigged arm idle — engine smoke test
 
-This regression fixture exercises the native rig schema and keyframe interpolation with a three-bone test arm (`torso → upper_arm → forearm`). The arm moves between two poses over a 24-frame loop at the default 24 FPS.
+Open `examples/rigged-arm-idle.kae` in the KAE editor. It is a native KAE project: three drawing layers, a three-bone hierarchy, and keyed upper-arm/forearm rotations. The timeline is 24 FPS × 24 frames (one second). Scrub frames 0 → 6 → 12 → 23; the arm should swing out and return to its starting pose.
 
-## What it verifies
-
-- Rotation keyframes use the existing `animation.schema.json` shape and `evaluateTrack` interpolation.
-- Child pivots follow the evaluated rotation of their parent.
-- Looping, animation start offsets, and non-looping playback resolve frames deterministically.
-- Missing parents, duplicate IDs, invalid keyframes, and parent cycles fail fast instead of breaking playback.
-
-## Run the regression test
+## Automated verification
 
 From `kyro-anime-engine`, run:
 
 ```bash
-node --test frontend/tests/bone_evaluator.test.js
+node --test frontend/tests/rigged_arm_idle.test.js
 ```
 
-This validates the rig-evaluation core in isolation. It does **not** claim that the current editor viewport already draws skinned character artwork from this evaluator; viewport integration and a full `.kae` round-trip are separate acceptance checks before calling the animation workflow complete.
+The smoke test runs the fixture through KAE's actual `renderFrame` renderer, checks that keyframes produce different poses, confirms the final keyed pose returns to the start pose, and checks a JSON save/reopen round-trip. It uses a canvas-context stub, so this is a renderer regression test rather than a pixel-image comparison.
