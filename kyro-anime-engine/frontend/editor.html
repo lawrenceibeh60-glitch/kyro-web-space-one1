@@ -43,6 +43,23 @@
     <button id="save" class="primary" title="Save (Ctrl+S)"><i data-icon="save"></i></button>
   </header>
 
+  <nav class="studio-menubar" aria-label="Studio commands">
+    <div class="studio-menu-group">
+      <button class="studio-menu-trigger" data-menu="file" aria-expanded="false">File</button>
+      <button class="studio-menu-trigger" data-menu="edit" aria-expanded="false">Edit</button>
+      <button class="studio-menu-trigger" data-menu="view" aria-expanded="false">View</button>
+      <button class="studio-menu-trigger" data-menu="animation" aria-expanded="false">Animation</button>
+      <button class="studio-menu-trigger" data-menu="workspace" aria-expanded="false">Workspace</button>
+    </div>
+    <div class="studio-menu-context"><span class="context-dot"></span><span>ANIMATION WORKSPACE</span><span class="context-divider"></span><span id="studioFrameContext">FRAME 001</span></div>
+    <div class="studio-menu-shortcuts">
+      <button data-command="undo" title="Undo · Ctrl+Z">Undo</button>
+      <button data-command="redo" title="Redo · Ctrl+Shift+Z">Redo</button>
+      <button data-command="play" title="Play / pause · Space">Play</button>
+      <button data-command="save" class="studio-save" title="Save · Ctrl+S">Save Project</button>
+    </div>
+    <div class="studio-dropdown" id="studioDropdown" hidden role="menu"></div>
+  </nav>
   <div class="main">
     <nav class="shelf">
       <button class="tool" data-tool="pan" title="Hand (H)"><i data-icon="hand"></i></button>
@@ -501,5 +518,6 @@
 <input id="jsonImportFile" type="file" accept=".json,application/json" multiple hidden>
 <div id="toasts" class="toasts"></div>
 <script type="module" src="js/editor/editor_controller.js"></script>
+<script type="module" src="js/editor/studio_chrome.js"></script>
 </body>
 </html>
