@@ -15,6 +15,7 @@ import {
 } from './transform_tools.js';
 import { initTimelinePanel } from '../ui/timeline_panel.js';
 import { initGraphEditor } from '../animation/graph_editor.js';
+import { initGeometryNodes } from '../animation/geometry_nodes.js';
 import { initAudioPlayback } from '../animation/audio_playback.js';
 import { initEditTools, selectAll, deleteSelected, smoothSelected, hasSelection } from './edit_tools.js';
 import { initWorkspaceLayout } from './workspace_layout.js';
@@ -270,6 +271,7 @@ async function boot() {
   initEditTools();
   initTimelinePanel();
   initGraphEditor();
+  initGeometryNodes();
   initHistoryPanel();
   initAssetBrowser();
   initAudioPlayback();
