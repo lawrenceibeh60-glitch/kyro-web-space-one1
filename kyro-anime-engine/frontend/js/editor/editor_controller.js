@@ -271,7 +271,6 @@ async function boot() {
   initEditTools();
   initTimelinePanel();
   initGraphEditor();
-  initGeometryNodes();
   initHistoryPanel();
   initAssetBrowser();
   initAudioPlayback();
@@ -317,6 +316,7 @@ async function boot() {
   const scene = project.scenes[0];
   history.clear();
   setState({ project, projectId: id, sceneId: scene.id, layerId: scene.layers[scene.layers.length - 1]?.id ?? null, frame: 0, dirty: false });
+  initGeometryNodes();
   viewport.fit();
   const lastFrame = () => state.project.settings.duration_frames - 1;
 
