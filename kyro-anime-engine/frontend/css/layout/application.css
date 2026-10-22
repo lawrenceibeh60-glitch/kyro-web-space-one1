@@ -126,3 +126,12 @@ i[data-icon] { display: inline-flex; align-items: center; justify-content: cente
 .key .ic { width: 14px; height: 14px; }
 .dirty .ic { width: 10px; height: 10px; }
 .panel-h button .ic { width: 14px; height: 14px; }
+
+
+/* Keep the timeline dock clear of the Windows desktop taskbar and lift it into view. */
+@media (min-width: 701px) {
+  .app {
+    height: calc(100% - 36px);
+    min-height: 0;
+  }
+}
