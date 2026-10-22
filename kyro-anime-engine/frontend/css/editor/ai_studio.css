@@ -78,3 +78,68 @@
   .ai-provider-field:nth-child(n) { grid-column: 1; }
   .ai-provider-actions button { min-height: 34px; }
 }
+
+
+/* KAE visual refresh — selective iOS-like glass, not a full-screen blur wash. */
+.ai-studio {
+  background: linear-gradient(135deg, rgb(20 31 47 / 91%), rgb(12 19 31 / 88%));
+  border: 1px solid rgb(111 204 255 / 34%);
+  border-radius: 16px;
+  box-shadow: 0 28px 90px rgb(0 0 0 / 58%), 0 0 0 1px rgb(255 255 255 / 4%) inset, 0 0 42px rgb(67 217 255 / 9%);
+  backdrop-filter: blur(28px) saturate(145%);
+  -webkit-backdrop-filter: blur(28px) saturate(145%);
+  overflow: hidden;
+}
+.ai-side { background: rgb(13 21 34 / 40%); border-right-color: rgb(122 176 220 / 18%); }
+.ai-preview { background: linear-gradient(160deg, rgb(27 43 63 / 52%), rgb(12 20 32 / 42%)); }
+.ai-head {
+  background: linear-gradient(90deg, rgb(67 217 255 / 9%), rgb(255 209 102 / 5%), transparent);
+  border-bottom-color: rgb(123 183 224 / 22%);
+}
+.ai-head button, .ai-actions button, .ai-video-panel button {
+  border-color: rgb(121 176 220 / 30%);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 4%);
+  transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.ai-head button:hover, .ai-actions button:hover, .ai-video-panel button:hover {
+  border-color: rgb(67 217 255 / 75%);
+  background: rgb(67 217 255 / 10%);
+  box-shadow: 0 0 18px rgb(67 217 255 / 9%);
+}
+.ai-actions .primary, .ai-video-panel button.primary {
+  color: #07131d;
+  background: linear-gradient(115deg, #43d9ff, #8deaff 58%, #ffd166);
+  border-color: transparent;
+  box-shadow: 0 4px 18px rgb(67 217 255 / 18%);
+}
+.ai-provider-panel {
+  background: linear-gradient(145deg, rgb(29 45 65 / 78%), rgb(17 27 42 / 78%));
+  border-bottom-color: rgb(124 179 220 / 20%);
+}
+.ai-provider-control, .ai-compose textarea, .ai-prompt, .ai-video-panel, .ai-plan-summary {
+  background: rgb(7 13 23 / 66%);
+  border-color: rgb(118 163 205 / 26%);
+  border-radius: 9px;
+}
+.ai-provider-control:focus, .ai-compose textarea:focus, .ai-prompt:focus {
+  outline: 1px solid rgb(67 217 255 / 80%);
+  border-color: rgb(67 217 255 / 65%);
+  box-shadow: 0 0 0 3px rgb(67 217 255 / 8%);
+}
+.ai-msg { border-radius: 10px; border-color: rgb(118 163 205 / 22%); background: rgb(255 255 255 / 3%); }
+.ai-msg.user { border-left: 3px solid #ffd166; background: linear-gradient(90deg, rgb(255 209 102 / 8%), transparent 75%); }
+.ai-msg.assistant { border-left: 3px solid rgb(67 217 255 / 58%); background: linear-gradient(100deg, rgb(67 217 255 / 5%), rgb(255 255 255 / 2%)); }
+.ai-image-stage { border-radius: 12px; border-color: rgb(118 163 205 / 28%); background-color: rgb(8 14 24 / 75%); }
+.ai-vector-card { border-radius: 10px; border-color: rgb(118 163 205 / 26%); background: rgb(10 17 28 / 82%); }
+.ai-section-title { color: #71e5ff; text-shadow: 0 0 16px rgb(67 217 255 / 14%); }
+.ai-status { padding: 8px 10px; border: 1px solid rgb(118 163 205 / 20%); border-radius: 9px; background: rgb(255 255 255 / 3%); }
+.topbar { background: linear-gradient(90deg, #162233, #1c2b3e 62%, #172333); }
+.topbar .primary, .wtabs button.active, .wtabs button[aria-selected="true"] {
+  box-shadow: 0 0 16px rgb(67 217 255 / 18%);
+}
+.topbar #aiLaunch { border: 1px solid rgb(67 217 255 / 44%); border-radius: 9px; background: rgb(67 217 255 / 8%); }
+.topbar #aiLaunch:hover { background: rgb(67 217 255 / 16%); box-shadow: 0 0 20px rgb(67 217 255 / 12%); }
+@media (prefers-reduced-motion: reduce) {
+  .ai-head button, .ai-actions button, .ai-video-panel button { transition: none; }
+}
