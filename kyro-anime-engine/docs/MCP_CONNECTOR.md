@@ -20,6 +20,7 @@ KAE exposes native project editing tools through a provider-neutral Model Contex
 ## Tools
 
 - kae_list_projects: find available projects and IDs.
+- kae_create_project: create a native KAE project when the workspace is empty or the user requests a new project.
 - kae_get_project: inspect the canonical KAE project document.
 - kae_get_scene_context: inspect a scene, layer order, exposures and drawing catalog.
 - kae_add_drawing: add validated native vector artwork.
@@ -30,8 +31,8 @@ KAE exposes native project editing tools through a provider-neutral Model Contex
 
 ## Recommended AI workflow
 
-1. Call kae_list_projects and identify the user's intended project.
-2. Call kae_get_scene_context before editing.
+1. Call kae_list_projects and identify the user's intended project. If none exists and the user wants a new one, call kae_create_project.
+2. Call kae_get_project and kae_get_scene_context before editing.
 3. Read canvas dimensions from project settings and author strokes in those coordinates.
 4. Add artwork with kae_add_drawing, then expose it on the timeline with kae_create_drawing_layer.
 5. Re-read the scene to verify that changes were saved.
