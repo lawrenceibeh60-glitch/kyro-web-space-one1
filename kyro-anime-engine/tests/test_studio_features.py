@@ -108,6 +108,16 @@ class StudioFeatureTests(unittest.TestCase):
         self.assertEqual(validate_project(project), [])
         project["effects"][0]["mask_layer_id"] = first["id"]
         self.assertTrue(any("must differ from target layer" in error for error in validate_project(project)))
+        project["effects"][0]["mask_layer_id"] = "mask_group"
+        project["scenes"][0]["layers"].append({
+            "id": "mask_group", "type": "group", "name": "Nested mask group",
+            "children": [{
+                "id": "mask_child", "type": "drawing", "name": "Mask child",
+                "exposures": [{"start": 0, "length": project["settings"]["duration_frames"],
+                               "drawing": next(iter(project["drawings"]))}],
+            }],
+        })
+        self.assertEqual(validate_project(project), [])
         project["effects"][1]["mouth_keys"] = [
             {"frame": 0, "shape": "neutral"},
             {"frame": 8, "shape": "open"},
