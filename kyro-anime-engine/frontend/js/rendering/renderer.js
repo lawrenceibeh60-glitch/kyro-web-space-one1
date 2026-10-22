@@ -380,31 +380,51 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   ctx.save();
   ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
   if (!opts?.transparent) { ctx.fillStyle = background || '#ffffff'; ctx.fillRect(0, 0, width, height); }
+  const documentRef = ctx.canvas?.ownerDocument;
+  const layerEffects = effects.filter(effect => effect.type === 'soft_shadow' || effect.type === 'depth_of_field');
+  let layerCanvas = null, layerCtx = null, shadowCanvas = null, shadowCtx = null;
+  if (layerEffects.length && documentRef?.createElement) {
+    layerCanvas = documentRef.createElement('canvas');
+    shadowCanvas = documentRef.createElement('canvas');
+    layerCanvas.width = shadowCanvas.width = width;
+    layerCanvas.height = shadowCanvas.height = height;
+    layerCtx = layerCanvas.getContext('2d');
+    shadowCtx = shadowCanvas.getContext('2d');
+    if (!layerCtx || !shadowCtx) { layerCtx = null; shadowCtx = null; }
+  }
+  const shadowEffect = layerEffects.find(effect => effect.type === 'soft_shadow');
+  const depthEffect = layerEffects.find(effect => effect.type === 'depth_of_field');
   for (const layer of scene?.layers || []) {
     if (layer.visible === false) continue;
     const ex = findExposure(layer, frame);
     const strokes = (ex && project.drawings[ex.drawing]?.strokes) || [];
     const pv = preview && preview.layerId === layer.id ? preview : null;
     if (!strokes.length && !pv?.stroke) continue;
+    const targetCtx = layerCtx || ctx;
+    if (targetCtx === layerCtx) {
+      targetCtx.setTransform(1, 0, 0, 1, 0, 0);
+      targetCtx.clearRect(0, 0, width, height);
+    }
     const t = getLayerTransform(layer, frame);
-    ctx.save();
-    applyCameraDepthTransform(ctx, width, height, camera, frame, layer.depth ?? 1);
+    targetCtx.save();
+    targetCtx.beginPath(); targetCtx.rect(0, 0, width, height); targetCtx.clip();
+    applyCameraDepthTransform(targetCtx, width, height, camera, frame, layer.depth ?? 1);
     const rig = layer.character_id
       ? (project.rigs || []).find(item => item.character_id === layer.character_id)
       : null;
     const rigPose = rig ? evaluateRigAnimation(rig, frame, { layer, layerTransform: t }) : null;
-    ctx.globalAlpha = evaluateOpacity(layer, frame);
-    ctx.globalCompositeOperation = BLEND[layer.blend] || 'source-over';
-    ctx.translate((t.x || 0) + (rigPose?.rootOffset?.x || 0),
+    targetCtx.globalAlpha = evaluateOpacity(layer, frame);
+    targetCtx.globalCompositeOperation = targetCtx === layerCtx ? 'source-over' : (BLEND[layer.blend] || 'source-over');
+    targetCtx.translate((t.x || 0) + (rigPose?.rootOffset?.x || 0),
       (t.y || 0) + (rigPose?.rootOffset?.y || 0));
-    ctx.rotate((t.rotation || 0) * Math.PI / 180);
-    ctx.scale(t.scale_x ?? 1, t.scale_y ?? 1);
-    ctx.translate(-(t.anchor_x || 0), -(t.anchor_y || 0));
+    targetCtx.rotate((t.rotation || 0) * Math.PI / 180);
+    targetCtx.scale(t.scale_x ?? 1, t.scale_y ?? 1);
+    targetCtx.translate(-(t.anchor_x || 0), -(t.anchor_y || 0));
     const hide = pv && pv.drawingId === ex?.drawing ? pv.hidden : null;
     const yawPivotX = t.anchor_x || width / 2;
     const yawPivotY = t.anchor_y || height / 2;
     const drawRiggedStroke = sourceStroke => {
-      ctx.save();
+      targetCtx.save();
       const isWeighted = rig && (
         Array.isArray(sourceStroke.skin_weights) || Array.isArray(sourceStroke.command_skin_weights)
       );
@@ -412,13 +432,45 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
         ? deformStrokeForRig(sourceStroke, rig, frame, rigPose)
         : sourceStroke;
       stroke = projectStrokeForYaw(stroke, t.rotation_y, yawPivotX, yawPivotY);
-      if (!isWeighted) drawRigPose(ctx, project, layer, frame, rigPose);
-      drawStroke(ctx, stroke);
-      ctx.restore();
+      if (!isWeighted) drawRigPose(targetCtx, project, layer, frame, rigPose);
+      drawStroke(targetCtx, stroke);
+      targetCtx.restore();
     };
     for (const stroke of strokes) if (!hide?.has(stroke.id)) drawRiggedStroke(stroke);
     if (pv?.stroke) drawRiggedStroke(pv.stroke);
-    ctx.restore();
+    targetCtx.restore();
+
+    if (targetCtx === layerCtx) {
+      ctx.save();
+      if (shadowEffect && shadowCtx) {
+        shadowCtx.setTransform(1, 0, 0, 1, 0, 0);
+        shadowCtx.clearRect(0, 0, width, height);
+        shadowCtx.drawImage(layerCanvas, 0, 0);
+        shadowCtx.globalCompositeOperation = 'source-in';
+        shadowCtx.fillStyle = /^#[0-9a-f]{6}$/i.test(shadowEffect.color || '') ? shadowEffect.color : '#171d2a';
+        shadowCtx.fillRect(0, 0, width, height);
+        shadowCtx.globalCompositeOperation = 'source-over';
+        const blur = Math.max(1, Math.min(24, Number(shadowEffect.speed ?? 6)));
+        const offset = Math.round(2 + Number(shadowEffect.intensity ?? 0.5) * 5);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = Math.max(0, Math.min(1, Number(shadowEffect.intensity ?? 0.5)));
+        ctx.filter = `blur(${blur}px)`;
+        ctx.drawImage(shadowCanvas, offset, offset);
+        ctx.filter = 'none';
+      }
+      ctx.globalCompositeOperation = BLEND[layer.blend] || 'source-over';
+      ctx.globalAlpha = 1;
+      if (depthEffect) {
+        const focus = Math.max(0, Math.min(1, Number(depthEffect.focus_depth ?? 0.5)));
+        const range = Math.max(0.01, Math.min(1, Number(depthEffect.range ?? 0.25)));
+        const difference = Math.min(1, Math.abs((Number(layer.depth ?? 1) - focus) / range));
+        const blur = Math.max(0, Math.min(18, difference * Number(depthEffect.intensity ?? 0.5) * 18));
+        ctx.filter = blur > 0.25 ? `blur(${blur.toFixed(1)}px)` : 'none';
+      }
+      ctx.drawImage(layerCanvas, 0, 0);
+      ctx.filter = 'none';
+      ctx.restore();
+    }
   }
   if (scene?.lights?.length) {
     ctx.save();
