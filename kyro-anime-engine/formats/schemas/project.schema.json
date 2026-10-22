@@ -134,6 +134,16 @@
         "$ref": "rig.schema.json"
       }
     },
+    "preview_range": {
+      "type": "object",
+      "description": "Optional inclusive frame range used by timeline playback preview.",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "type": "integer", "minimum": 0 },
+        "end": { "type": "integer", "minimum": 0 }
+      }
+    },
     "markers": {
       "type": "array",
       "description": "Named frame markers for animation beats and shot navigation.",
