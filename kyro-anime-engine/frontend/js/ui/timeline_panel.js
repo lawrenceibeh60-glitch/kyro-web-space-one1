@@ -263,6 +263,17 @@ export function initTimelinePanel() {
     requestDraw();
   }
 
+  function clearDrawingExposure() {
+    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const exposure = layer && findExposure(layer, state.frame);
+    if (!layer || !exposure) { toast('There is no drawing exposure on this frame', 'err'); return; }
+    if (layer.locked) { toast('Unlock this layer to clear its exposure', 'err'); return; }
+    setExposures(layer, layer.exposures.filter(item => item !== exposure), 'Clear drawing exposure');
+    selectedExposure = null;
+    toast(`Cleared drawing exposure at frame ${state.frame + 1}`);
+    requestDraw();
+  }
+
   canvas.addEventListener('pointerdown', e => {
     if (!state.project) return;
     stop();
@@ -498,6 +509,7 @@ export function initTimelinePanel() {
   $('newDrawing').onclick = () => newDrawing(false);
   $('duplicateDrawing').onclick = () => newDrawing(true);
   $('holdDrawing').onclick = holdDrawing;
+  $('clearExposure').onclick = clearDrawingExposure;
   $('dopeZoom').oninput = e => {
     zoom = Number(e.target.value);
     $('dopeZoomValue').textContent = `${zoom}×`;
