@@ -69,7 +69,29 @@ export function pathCoordinateCount(commands) {
   }, 0);
 }
 
+const MAX_CACHED_FRAMES = 8;
+let deformationCache = new WeakMap();
+
+export function clearRigDeformationCache() {
+  deformationCache = new WeakMap();
+}
+
 export function deformStrokeForRig(stroke, rig, frame, pose = null) {
+  if (stroke && typeof stroke === 'object' && rig && typeof rig === 'object' && !pose) {
+    let byRig = deformationCache.get(stroke);
+    if (!byRig) { byRig = new WeakMap(); deformationCache.set(stroke, byRig); }
+    let byFrame = byRig.get(rig);
+    if (!byFrame) { byFrame = new Map(); byRig.set(rig, byFrame); }
+    if (byFrame.has(frame)) return byFrame.get(frame);
+    const result = deformStrokeUncached(stroke, rig, frame, pose);
+    byFrame.set(frame, result);
+    while (byFrame.size > MAX_CACHED_FRAMES) byFrame.delete(byFrame.keys().next().value);
+    return result;
+  }
+  return deformStrokeUncached(stroke, rig, frame, pose);
+}
+
+function deformStrokeUncached(stroke, rig, frame, pose = null) {
   const chains = new Map();
   let result = stroke;
   if (Array.isArray(stroke?.points) && Array.isArray(stroke?.skin_weights)
