@@ -123,7 +123,22 @@ export function initAIStudio() {
 
   const preview = el('div', { class: 'ai-preview' });
   const previewHead = el('header', { class: 'ai-head' }, 'REFERENCE & OUTPUT');
-  const body = el('div', { class: 'ai-preview-body' });
+  const previewTabs = el('nav', { class: 'ai-preview-tabs', 'aria-label': 'AI output tabs' });
+  const visualTab = el('button', { type: 'button', class: 'active', 'aria-selected': 'true' }, 'Visual Lab');
+  const jsonTab = el('button', { type: 'button', 'aria-selected': 'false' }, 'JSON Script');
+  previewTabs.append(visualTab, jsonTab);
+  const body = el('div', { class: 'ai-preview-body ai-visual-workspace' });
+  const jsonPane = el('section', { class: 'ai-json-workspace', hidden: '' });
+  const jsonToolbar = el('div', { class: 'ai-json-toolbar' });
+  const jsonStatus = el('div', { class: 'ai-json-status' }, 'Drop a story into the chat. KAE will plan the visuals, write native animation JSON, validate it and repair malformed output.');
+  const jsonEditor = el('textarea', { class: 'ai-json-editor', spellcheck: 'false', 'aria-label': 'Generated KAE animation JSON', placeholder: 'Your story animation JSON will appear here as it is authored…' });
+  const moveToProject = el('button', { type: 'button', class: 'primary', disabled: '' }, 'Move to Project');
+  const validateJson = el('button', { type: 'button' }, 'Validate JSON');
+  jsonToolbar.append(validateJson, moveToProject);
+  jsonPane.append(jsonStatus, jsonEditor, jsonToolbar);
+  let authoredScript = null;
+  let storyAuthorState = null;
+  let authoringBusy = false;
   const status = el('div', { class: 'ai-status' }, 'Loading KAE engine capabilities…');
 
   const videoPanel = el('section', { class: 'ai-video-panel' });
@@ -172,9 +187,42 @@ export function initAIStudio() {
   let animaticRecorder = null;
   const note = el('p', { class: 'ai-note' }, 'The AI receives the sampled frames and the KAE capability/schema inventory. It will analyze the motion and ask for your creative changes.');
   body.append(status, videoPanel, stage, prompt, previewActions, note);
-  preview.append(previewHead, body);
+  preview.append(previewHead, previewTabs, body, jsonPane);
   root.append(side, preview);
   document.body.append(root);
+
+  function setOutputTab(name) {
+    const showJson = name === 'json';
+    body.hidden = showJson;
+    jsonPane.hidden = !showJson;
+    visualTab.classList.toggle('active', !showJson);
+    jsonTab.classList.toggle('active', showJson);
+    visualTab.setAttribute('aria-selected', String(!showJson));
+    jsonTab.setAttribute('aria-selected', String(showJson));
+  }
+  visualTab.addEventListener('click', () => setOutputTab('visual'));
+  jsonTab.addEventListener('click', () => setOutputTab('json'));
+  function refreshMoveButton() {
+    try {
+      const parsed = JSON.parse(jsonEditor.value);
+      const valid = parsed && parsed.format === 'kae-story-animation' && Array.isArray(parsed.scenes) &&
+        parsed.scenes.length > 0 && parsed.scenes.every(scene => scene && Array.isArray(scene.frames) &&
+          scene.frames.length >= 4 && scene.frames.every(frame => Array.isArray(frame.strokes) && frame.strokes.length > 0));
+      authoredScript = valid ? parsed : null;
+      moveToProject.disabled = !valid || authoringBusy || !currentProject?.id;
+      if (valid && !authoringBusy) jsonStatus.textContent = 'JSON parses successfully · ' + parsed.scenes.length + ' scene(s) · ready to move into the project.';
+      return Boolean(valid);
+    } catch (_) {
+      authoredScript = null;
+      moveToProject.disabled = true;
+      return false;
+    }
+  }
+  jsonEditor.addEventListener('input', refreshMoveButton);
+  validateJson.addEventListener('click', () => {
+    const valid = refreshMoveButton();
+    if (!valid) jsonStatus.textContent = 'JSON is incomplete or invalid. Move to Project stays disabled until the full native script validates.';
+  });
 
   function addMessage(role, content) {
     const message = el('div', { class: 'ai-msg ' + role });
