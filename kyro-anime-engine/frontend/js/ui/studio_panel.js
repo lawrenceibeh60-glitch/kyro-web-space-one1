@@ -179,11 +179,26 @@ export function initStudioPanel({ onCharacterImported }) {
   function addEffect() {
     const id = nextId('fx', (state.project.effects || []).map(effect => effect.id));
     const type = $('effectType').value;
+    const scene = state.project.scenes.find(item => item.id === state.sceneId) || state.project.scenes[0];
+    const availableLayers = scene?.layers || [];
+    if (type === 'layer_mask' && availableLayers.length < 2) {
+      window.alert('Add at least two layers before creating a layer mask.');
+      return;
+    }
+    if (['layer_mask', 'facial_animation'].includes(type) && !availableLayers.length) {
+      window.alert('Add a drawing layer before creating this effect.');
+      return;
+    }
     const effect = {
-      id, scene_id: state.sceneId, type, enabled: true,
+      id, scene_id: scene?.id || state.sceneId, type, enabled: true,
       start_frame: 0, end_frame: state.project.settings.duration_frames - 1,
       intensity: 0.5, color: '#ffffff', count: 36, speed: 1, focus_depth: 0.5, range: 0.25,
       blink_interval: 48, mouth_cycle: 18,
+      ...(type === 'facial_animation' ? { target_layer_id: availableLayers[0].id } : {}),
+      ...(type === 'layer_mask' ? {
+        target_layer_id: availableLayers[0].id,
+        mask_layer_id: availableLayers.find(item => item.id !== availableLayers[0].id)?.id,
+      } : {}),
     };
     changeProjectArray('effects', [...(state.project.effects || []), effect], 'Add effect');
   }
