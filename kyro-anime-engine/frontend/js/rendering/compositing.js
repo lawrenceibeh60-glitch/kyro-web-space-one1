@@ -57,48 +57,118 @@ function rebuildLayerStack(ctx, layers, width, height, background, direction, ex
   return sorted.map(layer => layer.id);
 }
 
-/** Apply post-processing and optional layer-aware compositor nodes. */
-export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
-  const nodes = Array.isArray(graph && graph.nodes) ? graph.nodes : [];
-  const trace = [];
-  const layers = Array.isArray(options.layers) ? options.layers : [];
-  const byId = new Map(layers.map(layer => [layer.id, layer]));
-  const enabled = nodes.filter(node => node && node.enabled !== false);
-  const depthNode = enabled.find(node => node.type === 'z_depth');
-  const alphaNodes = enabled.filter(node => node.type === 'alpha_over');
-  const maskNodes = enabled.filter(node => node.type === 'alpha_mask');
-  if ((depthNode || alphaNodes.length || maskNodes.length) && layers.length) {
-    const excluded = new Set([...alphaNodes.map(node => node.params && node.params.overlay_layer_id), ...maskNodes.map(node => node.params && node.params.mask_layer_id)].filter(Boolean));
-    rebuildLayerStack(ctx, layers, width, height, options.background, depthNode ? (depthNode.params && depthNode.params.direction || 'far_to_near') : 'scene_order', excluded);
+function makeCanvas(documentRef, width, height) {
+  const canvas = documentRef.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  return canvas;
+}
+function copyCanvasInto(targetCtx, source, width, height, composite = 'copy') {
+  targetCtx.save();
+  targetCtx.setTransform(1, 0, 0, 1, 0, 0);
+  targetCtx.globalAlpha = 1;
+  targetCtx.globalCompositeOperation = composite;
+  targetCtx.filter = 'none';
+  targetCtx.clearRect(0, 0, width, height);
+  if (source) targetCtx.drawImage(source, 0, 0, width, height);
+  targetCtx.restore();
+}
+function topologicalCompositorOrder(nodes, links) {
+  const orderIndex = new Map(nodes.map((node, index) => [node.id, index]));
+  const incoming = new Map(nodes.map(node => [node.id, 0]));
+  const outgoing = new Map(nodes.map(node => [node.id, []]));
+  for (const link of links || []) {
+    if (!incoming.has(link.from) || !incoming.has(link.to)) continue;
+    outgoing.get(link.from).push(link.to);
+    incoming.set(link.to, incoming.get(link.to) + 1);
   }
-  for (const node of enabled) {
-    const p = node.params || {};
-    if (node.type === 'color_correct') {
-      const brightness = clamp(Number(p.brightness) || 0, -100, 100);
-      const contrast = clamp(Number(p.contrast) || 0, -100, 100);
-      const saturation = clamp(Number(p.saturation == null ? 100 : p.saturation), 0, 300);
-      compositeFilter(ctx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%) saturate(' + saturation + '%)');
-    } else if (node.type === 'levels') {
-      const brightness = clamp(Number(p.brightness) || 0, -100, 100);
-      const contrast = clamp(Number(p.contrast) || 0, -100, 100);
-      compositeFilter(ctx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%)');
-    } else if (node.type === 'vignette') {
-      vignette(ctx, width, height, p);
-    } else if (node.type === 'alpha_over') {
-      const layer = byId.get(String(p.overlay_layer_id || ''));
-      if (layer) drawLayerImage(ctx, layer, width, height, p.opacity == null ? 1 : p.opacity);
-    } else if (node.type === 'alpha_mask') {
-      const layer = byId.get(String(p.mask_layer_id || ''));
-      if (layer) {
-        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = p.invert ? 'destination-out' : 'destination-in';
-        ctx.drawImage(layer.canvas, 0, 0, width, height);
-        ctx.restore();
+  const queue = nodes.filter(node => incoming.get(node.id) === 0).map(node => node.id);
+  const result = [];
+  while (queue.length) {
+    queue.sort((a, b) => orderIndex.get(a) - orderIndex.get(b));
+    const id = queue.shift();
+    result.push(nodes[orderIndex.get(id)]);
+    for (const next of outgoing.get(id) || []) {
+      incoming.set(next, incoming.get(next) - 1);
+      if (incoming.get(next) === 0) queue.push(next);
+    }
+  }
+  return result.length === nodes.length ? result : nodes;
+}
+
+/** Evaluate image sockets as a DAG. Each node writes an isolated surface, so branches can be reused. */
+export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  const links = Array.isArray(graph?.links) ? graph.links : [];
+  const trace = [];
+  const documentRef = ctx?.canvas?.ownerDocument;
+  if (!documentRef?.createElement || !nodes.length) return trace;
+  const layers = Array.isArray(options.layers) ? options.layers : [];
+  const layerById = new Map(layers.map(layer => [layer.id, layer]));
+  const base = makeCanvas(documentRef, width, height);
+  base.getContext('2d')?.drawImage(ctx.canvas, 0, 0, width, height);
+  const outputs = new Map();
+  const order = topologicalCompositorOrder(nodes, links);
+  const getInputLink = (node, socket) => links.find(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket);
+  const getInputCanvas = (node, socket, fallback) => {
+    const link = getInputLink(node, socket);
+    return link ? outputs.get(link.from) || fallback : fallback;
+  };
+  let lastOutput = base;
+  for (const node of order) {
+    const params = node.params || {};
+    const input0 = getInputCanvas(node, 0, lastOutput || base);
+    const input1Link = getInputLink(node, 1);
+    const input1 = input1Link ? outputs.get(input1Link.from) : null;
+    const output = makeCanvas(documentRef, width, height);
+    const outCtx = output.getContext('2d');
+    if (!outCtx) continue;
+    if (node.enabled === false) {
+      copyCanvasInto(outCtx, input0 || base, width, height);
+    } else if (node.type === 'render_layers') {
+      copyCanvasInto(outCtx, base, width, height);
+    } else if (node.type === 'z_depth') {
+      rebuildLayerStack(outCtx, layers, width, height, options.background,
+        params.direction || 'far_to_near', new Set());
+    } else {
+      copyCanvasInto(outCtx, input0 || base, width, height);
+      if (node.type === 'color_correct') {
+        const brightness = clamp(Number(params.brightness) || 0, -100, 100);
+        const contrast = clamp(Number(params.contrast) || 0, -100, 100);
+        const saturation = clamp(Number(params.saturation == null ? 100 : params.saturation), 0, 300);
+        compositeFilter(outCtx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%) saturate(' + saturation + '%)');
+      } else if (node.type === 'levels') {
+        const brightness = clamp(Number(params.brightness) || 0, -100, 100);
+        const contrast = clamp(Number(params.contrast) || 0, -100, 100);
+        compositeFilter(outCtx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%)');
+      } else if (node.type === 'vignette') {
+        vignette(outCtx, width, height, params);
+      } else if (node.type === 'alpha_over') {
+        const layer = layerById.get(String(params.overlay_layer_id || ''));
+        const overlay = input1 || layer?.canvas || null;
+        if (overlay) {
+          outCtx.save(); outCtx.globalAlpha = clamp(Number(params.opacity ?? 1), 0, 1);
+          outCtx.globalCompositeOperation = 'source-over';
+          outCtx.drawImage(overlay, 0, 0, width, height); outCtx.restore();
+        }
+      } else if (node.type === 'alpha_mask') {
+        const layer = layerById.get(String(params.mask_layer_id || ''));
+        const matte = input1 || layer?.canvas || null;
+        if (matte) {
+          outCtx.save(); outCtx.globalAlpha = 1;
+          outCtx.globalCompositeOperation = params.invert ? 'destination-out' : 'destination-in';
+          outCtx.drawImage(matte, 0, 0, width, height); outCtx.restore();
+        }
       }
     }
+    outputs.set(node.id, output);
+    lastOutput = output;
     trace.push(node.type);
   }
+  const outputNode = order.find(node => node.type === 'output' && node.enabled !== false);
+  const finalCanvas = outputNode
+    ? getInputCanvas(outputNode, 0, outputs.get(outputNode.id) || lastOutput || base)
+    : lastOutput || base;
+  copyCanvasInto(ctx, finalCanvas, width, height);
   return trace;
 }
 
