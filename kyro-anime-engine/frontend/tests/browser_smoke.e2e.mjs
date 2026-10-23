@@ -91,7 +91,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#compositorNodeType').selectOption('alpha_over');
     await page.locator('#compositorAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.compositor_graph.nodes.some(node => node.type === 'alpha_over'));
-    const overlaySelect = page.locator('.compositor-node').filter({ hasText: 'Alpha Over' }).locator('select');
+    const overlaySelect = page.locator('.compositor-node').filter({ hasText: 'Alpha Over' }).first().locator('select').first();
     await overlaySelect.selectOption({ index: 1 });
     await page.waitForFunction(() => {
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_over');
@@ -99,14 +99,14 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     });
     await page.locator('#compositorNodeType').selectOption('alpha_mask');
     await page.locator('#compositorAddNode').click();
-    const matteCard = page.locator('.compositor-node').filter({ hasText: 'Alpha Mask / Matte' });
+    const matteCard = page.locator('.compositor-node').filter({ hasText: 'Alpha Mask / Matte' }).first();
     await matteCard.locator('select').selectOption({ index: 1 });
     await matteCard.locator('input[type="checkbox"]').check();
     await page.waitForFunction(() => {
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_mask');
       return !!node?.params?.mask_layer_id && node.params.invert === true;
     });
-    const alphaOverCard = page.locator('.compositor-node').filter({ hasText: 'Alpha Over' });
+    const alphaOverCard = page.locator('.compositor-node').filter({ hasText: 'Alpha Over' }).first();
     const secondarySocket = alphaOverCard.locator('select').nth(2);
     if (await secondarySocket.locator('option').count() > 1) {
       await secondarySocket.selectOption({ index: 1 });
