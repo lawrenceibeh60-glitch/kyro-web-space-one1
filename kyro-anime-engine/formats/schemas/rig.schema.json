@@ -359,12 +359,23 @@
             ]
           },
           "then": {
-            "required": [
-              "id",
-              "upper_bone_id",
-              "lower_bone_id",
-              "target",
-              "bend"
+            "oneOf": [
+              {
+                "required": [
+                  "bone_id",
+                  "target_bone_id",
+                  "bend_direction"
+                ]
+              },
+              {
+                "required": [
+                  "id",
+                  "upper_bone_id",
+                  "lower_bone_id",
+                  "target",
+                  "bend"
+                ]
+              }
             ]
           }
         }
