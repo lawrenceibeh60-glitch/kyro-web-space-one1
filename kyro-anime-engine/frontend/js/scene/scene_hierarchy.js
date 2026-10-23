@@ -37,6 +37,21 @@ export function indexLayerTree(layers = []) {
   return byId;
 }
 
+export function findLayerLocation(layers, targetId) {
+  const walk = (nodes, path = [], ancestors = []) => {
+    for (let index = 0; index < (Array.isArray(nodes) ? nodes.length : 0); index++) {
+      const layer = nodes[index];
+      if (!layer) continue;
+      const nextPath = [...path, index];
+      if (layer.id === targetId) return { layer, container: nodes, index, path: nextPath, ancestors };
+      const found = walk(layer.children || [], [...path, index, 'children'], [...ancestors, layer]);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(layers);
+}
+
 export function findLayerPath(layers, targetId) {
   const walk = (nodes, path) => {
     for (const layer of Array.isArray(nodes) ? nodes : []) {
