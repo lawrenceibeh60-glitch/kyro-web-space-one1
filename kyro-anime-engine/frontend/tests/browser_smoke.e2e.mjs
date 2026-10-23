@@ -84,6 +84,20 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#compositorNodeList input').first().press('Enter');
     await page.waitForFunction(() => window.kae.state.project.compositor_graph.nodes.find(node => node.type === 'levels')?.params?.brightness === 12);
 
+    await page.locator('#addLayer').click();
+    await page.locator('#compositorNodeType').selectOption('z_depth');
+    await page.locator('#compositorAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.compositor_graph.nodes.some(node => node.type === 'z_depth'));
+    await page.locator('#compositorNodeType').selectOption('alpha_over');
+    await page.locator('#compositorAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.compositor_graph.nodes.some(node => node.type === 'alpha_over'));
+    const overlaySelect = page.locator('.compositor-node').filter({ hasText: 'Alpha Over' }).locator('select');
+    await overlaySelect.selectOption({ index: 1 });
+    await page.waitForFunction(() => {
+      const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_over');
+      return !!node?.params?.overlay_layer_id;
+    });
+
     // A double-click on an empty exposure cell should author a real blank drawing cel.
     await page.locator('#addLayer').click();
     const celTarget = await page.evaluate(() => {
