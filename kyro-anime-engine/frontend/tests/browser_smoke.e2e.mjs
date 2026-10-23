@@ -117,11 +117,25 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       const depth = [...ctx.getImageData(20, 20, 1, 1).data];
       renderFrame(ctx, { ...base, compositor_graph: { nodes: [{ id: 'over', type: 'alpha_over', enabled: true, params: { overlay_layer_id: 'blue-layer', opacity: 0.5 } }] } }, 's', 0);
       const alpha = [...ctx.getImageData(20, 20, 1, 1).data];
-      return { ordinary, depth, alpha };
+      const maskProject = {
+        ...base,
+        drawings: { red: base.drawings.red, mask: { strokes: [{ commands: [['M', 8, 8], ['L', 32, 8], ['L', 32, 56], ['L', 8, 56], ['Z']], fill: '#ffffff', color: '#ffffff', width: 1 }] } },
+        scenes: [{ id: 's', layers: [
+          { id: 'red-layer', name: 'Red', depth: 1, blend: 'normal', exposures: [{ start: 0, length: 1, drawing: 'red' }] },
+          { id: 'mask-layer', name: 'Mask', depth: 2, blend: 'normal', exposures: [{ start: 0, length: 1, drawing: 'mask' }] },
+        ] }],
+        compositor_graph: { nodes: [{ id: 'matte', type: 'alpha_mask', enabled: true, params: { mask_layer_id: 'mask-layer', invert: false } }] },
+      };
+      renderFrame(ctx, maskProject, 's', 0);
+      const maskInside = [...ctx.getImageData(20, 20, 1, 1).data];
+      const maskOutside = [...ctx.getImageData(44, 20, 1, 1).data];
+      return { ordinary, depth, alpha, maskInside, maskOutside };
     });
     assert.ok(compositorPixels.ordinary[2] > compositorPixels.ordinary[0], 'normal scene order should leave the blue layer on top');
     assert.ok(compositorPixels.depth[0] > compositorPixels.depth[2], 'far-to-near Z-depth sorting should put the nearer red layer on top');
     assert.ok(Math.abs(compositorPixels.alpha[0] - compositorPixels.alpha[2]) < 8, '50% Alpha Over should blend red and blue approximately equally');
+    assert.ok(compositorPixels.maskInside[3] > 240, 'alpha mask should preserve pixels inside the matte');
+    assert.equal(compositorPixels.maskOutside[3], 0, 'alpha mask should remove pixels outside the matte');
 
     // A double-click on an empty exposure cell should author a real blank drawing cel.
     await page.locator('#addLayer').click();
