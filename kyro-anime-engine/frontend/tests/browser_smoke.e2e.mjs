@@ -60,6 +60,15 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.waitForURL(/editor\.html\?project=/);
     await page.locator('#canvas').waitFor({ state: 'visible' });
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
+    await page.waitForFunction(() => Boolean(window.kae.state.layerId));
+    await page.locator('#trackColorInput').evaluate(input => {
+      input.value = '#123456';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForFunction(() => {
+      const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
+      return scene?.layers.find(layer => layer.id === window.kae.state.layerId)?.timeline_color === '#123456';
+    });
     await page.locator('#compositorNodeType').selectOption('levels');
     await page.locator('#compositorAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.compositor_graph?.nodes?.some(node => node.type === 'levels'));
