@@ -230,6 +230,15 @@
                 <label class="chk"><input id="rigWalkLoop" type="checkbox" checked> Loop cycle</label>
                 <button id="rigWalkApply" class="primary">Apply walk-cycle settings</button>
                 <div id="rigWalkStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Motion Path</div>
+                <div class="hint">Animate the character root along a saved linear or eased path. Coordinates are project-space offsets and evaluate on every frame.</div>
+                <div class="xrow n"><span>Start frame</span><input id="motionPathStart" type="number" min="0" step="1" value="0"></div>
+                <div class="xrow n"><span>Duration</span><input id="motionPathDuration" type="number" min="1" max="10000" step="1" value="24"></div>
+                <div class="xrow n"><span>From X / Y</span><input id="motionPathFromX" type="number" step="1" value="0"><input id="motionPathFromY" type="number" step="1" value="0"></div>
+                <div class="xrow n"><span>To X / Y</span><input id="motionPathToX" type="number" step="1" value="240"><input id="motionPathToY" type="number" step="1" value="0"></div>
+                <label class="fld"><span>Interpolation</span><select id="motionPathEasing"><option value="linear">Linear</option><option value="ease_in_out">Ease in / out</option></select></label>
+                <button id="motionPathApply" class="primary">Apply Motion Path</button>
+                <div id="motionPathStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Front/profile turn</div>
                 <div class="hint">For character parts with matching front and profile artwork, create a perspective yaw and opacity crossfade as one undoable edit.</div>
                 <div class="xrow n"><span>Start frame</span><input id="turnStartFrame" type="number" min="0" step="1" value="0"></div>
