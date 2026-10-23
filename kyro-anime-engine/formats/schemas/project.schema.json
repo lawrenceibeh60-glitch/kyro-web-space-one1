@@ -258,6 +258,54 @@
       "items": {
         "$ref": "node_graph.schema.json"
       }
+    },
+    "editor_settings": {
+      "type": "object",
+      "description": "Editor-only workspace preferences persisted with the project; excluded from rendered artwork.",
+      "additionalProperties": true,
+      "properties": {
+        "guides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "grid": {
+              "type": "boolean"
+            },
+            "center": {
+              "type": "boolean"
+            },
+            "thirds": {
+              "type": "boolean"
+            },
+            "head": {
+              "type": "boolean"
+            },
+            "body": {
+              "type": "boolean"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "spacing": {
+              "type": "number",
+              "minimum": 8,
+              "maximum": 256
+            },
+            "centered": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
     }
   }
 }
