@@ -479,6 +479,10 @@ export function initStudioPanel({ onCharacterImported }) {
       motionPathFromY: animation.path_from_y ?? 0,
       motionPathToX: animation.path_to_x ?? 240,
       motionPathToY: animation.path_to_y ?? 0,
+      motionPathC1X: animation.path_c1_x ?? ((animation.path_from_x ?? 0) + ((animation.path_to_x ?? 240) - (animation.path_from_x ?? 0)) / 3),
+      motionPathC1Y: animation.path_c1_y ?? (animation.path_from_y ?? 0),
+      motionPathC2X: animation.path_c2_x ?? ((animation.path_from_x ?? 0) + 2 * ((animation.path_to_x ?? 240) - (animation.path_from_x ?? 0)) / 3),
+      motionPathC2Y: animation.path_c2_y ?? (animation.path_to_y ?? 0),
     };
     for (const [id, value] of Object.entries(fields)) {
       const input = $(id);
@@ -512,7 +516,11 @@ export function initStudioPanel({ onCharacterImported }) {
       path_from_y: Math.max(-8192, Math.min(8192, number('motionPathFromY', 0))),
       path_to_x: Math.max(-8192, Math.min(8192, number('motionPathToX', 240))),
       path_to_y: Math.max(-8192, Math.min(8192, number('motionPathToY', 0))),
-      path_easing: $('motionPathEasing').value === 'linear' ? 'linear' : 'ease_in_out',
+      path_c1_x: Math.max(-8192, Math.min(8192, number('motionPathC1X', 80))),
+      path_c1_y: Math.max(-8192, Math.min(8192, number('motionPathC1Y', 0))),
+      path_c2_x: Math.max(-8192, Math.min(8192, number('motionPathC2X', 160))),
+      path_c2_y: Math.max(-8192, Math.min(8192, number('motionPathC2Y', 0))),
+      path_easing: ['linear', 'ease_in_out', 'bezier'].includes($('motionPathEasing').value) ? $('motionPathEasing').value : 'ease_in_out',
     };
     updateRig({ ...clone(rig), animation });
     $('motionPathStatus').textContent = `Motion path applied · ${animation.path_easing.replaceAll('_', ' ')} · ${animation.path_duration_frames} frames`;
