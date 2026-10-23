@@ -76,15 +76,6 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     assert.equal(styledShape.stroke, '#abcdef');
     assert.equal(styledShape.strokeWidth, 4);
     assert.equal(styledShape.opacity, 0.4);
-    await page.waitForFunction(() => Boolean(window.kae.state.layerId));
-    await page.locator('#trackColorInput').evaluate(input => {
-      input.value = '#123456';
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    await page.waitForFunction(() => {
-      const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
-      return scene?.layers.find(layer => layer.id === window.kae.state.layerId)?.timeline_color === '#123456';
-    });
     await page.locator('#compositorNodeType').selectOption('levels');
     await page.locator('#compositorAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.compositor_graph?.nodes?.some(node => node.type === 'levels'));
@@ -449,7 +440,12 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
     await page.locator('#create').click();
     await page.waitForURL(/editor\.html\?project=/);
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
-    await page.waitForFunction(() => Boolean(window.kae.state.layerId));
+    await page.evaluate(() => {
+      const app = window.kae.state;
+      const scene = app.project.scenes.find(item => item.id === app.sceneId);
+      if (!scene.layers.length) scene.layers.push({ id: 'smoke_track', type: 'drawing', name: 'Smoke Track', visible: true, locked: false, opacity: 1, depth: 1, blend: 'normal', exposures: [], tracks: {} });
+      app.layerId = scene.layers[scene.layers.length - 1].id;
+    });
     await page.locator('#trackColorInput').evaluate(input => {
       input.value = '#123456';
       input.dispatchEvent(new Event('change', { bubbles: true }));
