@@ -66,7 +66,7 @@ export function initCompositorStudio() {
   const addButton = document.getElementById('compositorAddNode');
   if (!list || !typeSelect || !addButton) return;
   const current = () => state.project?.compositor_graph || null;
-  const commitGraph = (graph, label) => execute(setValue(['compositor_graph'], graph, label));
+  const commitGraph = (graph, label) => { execute(setValue(['compositor_graph'], graph, label)); render(); };
   const render = () => {
     list.replaceChildren();
     const graph = current();
