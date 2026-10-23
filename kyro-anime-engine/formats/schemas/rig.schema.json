@@ -40,7 +40,10 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "const": "walk"
+          "enum": [
+            "walk",
+            "motion_path"
+          ]
         },
         "enabled": {
           "type": "boolean"
@@ -76,6 +79,41 @@
         },
         "loop": {
           "type": "boolean"
+        },
+        "path_start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "path_duration_frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "path_from_x": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_from_y": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_to_x": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_to_y": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_easing": {
+          "enum": [
+            "linear",
+            "ease_in_out"
+          ]
         }
       }
     }
