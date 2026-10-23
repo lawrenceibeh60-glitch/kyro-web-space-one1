@@ -254,6 +254,33 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return rig.bones.some(bone => (bone.tracks?.rotation || []).some(key => key.t === window.kae.state.frame));
     });
 
+    // IK target schema accepts its real constraint shape and can be switched to FK mode.
+    const ikPair = await page.evaluate(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      return {
+        upper: rig.bones.find(bone => bone.name === 'Left Thigh')?.id,
+        lower: rig.bones.find(bone => bone.name === 'Left Shin')?.id,
+      };
+    });
+    assert.ok(ikPair.upper && ikPair.lower && ikPair.upper !== ikPair.lower);
+    await page.locator('#ikUpperBone').selectOption(ikPair.upper);
+    await page.locator('#ikLowerBone').selectOption(ikPair.lower);
+    await page.locator('#ikTargetX').fill('600');
+    await page.locator('#ikTargetY').fill('400');
+    await page.locator('#ikEnabled').check();
+    await page.locator('#ikApply').click();
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      return rig.constraints.some(item => item.type === 'ik_two_bone' && item.enabled === true
+        && item.upper_bone_id && item.lower_bone_id && item.target);
+    });
+    await page.locator('#ikEnabled').uncheck();
+    await page.locator('#ikApply').click();
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      return rig.constraints.some(item => item.type === 'ik_two_bone' && item.enabled === false);
+    });
+
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
