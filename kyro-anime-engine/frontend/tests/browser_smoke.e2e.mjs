@@ -107,7 +107,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return !!node?.params?.mask_layer_id && node.params.invert === true;
     });
     const alphaOverCard = page.locator('.compositor-node[data-node-type="alpha_over"]');
-    const secondarySocket = alphaOverCard.locator('select').nth(2);
+    const secondarySocket = alphaOverCard.locator('.compositor-socket select').nth(1);
     if (await secondarySocket.locator('option').count() > 1) {
       await secondarySocket.selectOption({ index: 1 });
       await page.waitForFunction(() => {
