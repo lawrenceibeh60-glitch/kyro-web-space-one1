@@ -274,7 +274,7 @@
             "additionalProperties": false,
             "properties": {
               "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-              "type": { "enum": ["render_layers", "color_correct", "levels", "vignette", "output"] },
+              "type": { "enum": ["render_layers", "color_correct", "levels", "vignette", "alpha_over", "z_depth", "output"] },
               "enabled": { "type": "boolean", "default": true },
               "params": {
                 "type": "object",
