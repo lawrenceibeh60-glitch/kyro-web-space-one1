@@ -400,6 +400,16 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
     await page.locator('#geoNodeType').selectOption('wave');
     await page.locator('#geoAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.node_graphs?.[0]?.nodes?.some(node => node.type === 'wave'));
+    await page.locator('#geoNodeType').selectOption('math');
+    await page.locator('#geoAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.node_graphs?.[0]?.nodes?.some(node => node.type === 'math'));
+    await page.locator('#geoInspector select').selectOption('abs_x');
+    await page.waitForFunction(() => window.kae.state.project.node_graphs[0].nodes.find(node => node.type === 'math')?.params?.operation === 'abs_x');
+    await page.locator('#geoNodeType').selectOption('switch');
+    await page.locator('#geoAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.node_graphs?.[0]?.nodes?.some(node => node.type === 'switch'));
+    await page.locator('#geoInspector input[type="checkbox"]').uncheck();
+    await page.waitForFunction(() => window.kae.state.project.node_graphs[0].nodes.find(node => node.type === 'switch')?.params?.enabled === false);
     await page.locator('#save').click();
     await page.waitForFunction(() => window.kae.state.dirty === false);
     const projectUrl = page.url();
