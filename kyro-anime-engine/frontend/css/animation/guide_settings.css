@@ -1,0 +1,7 @@
+/* Construction guides are editor overlays and never participate in export rendering. */
+#kaeGuideOverlay { contain:strict; }
+#p-studio [data-studio-pane="rig"] #kaeGuidesEnabled { accent-color:var(--accent,#36c5d8); }
+#p-studio [data-studio-pane="rig"] #kaeGuideColor { width:100%;min-height:28px;padding:2px;background:var(--field,#172333);border:1px solid var(--line,#354253); }
+#p-studio [data-studio-pane="rig"] #kaeGuideOpacity,
+#p-studio [data-studio-pane="rig"] #kaeGuideSpacing { width:100%;accent-color:var(--accent,#36c5d8); }
+#kaeGuideStatus { overflow-wrap:anywhere; }
