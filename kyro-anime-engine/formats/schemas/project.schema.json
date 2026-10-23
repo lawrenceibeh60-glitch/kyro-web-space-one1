@@ -302,6 +302,21 @@
             },
             "centered": {
               "type": "boolean"
+            },
+            "eyes": {
+              "type": "boolean"
+            },
+            "nose": {
+              "type": "boolean"
+            },
+            "mouth": {
+              "type": "boolean"
+            },
+            "ears": {
+              "type": "boolean"
+            },
+            "hairline": {
+              "type": "boolean"
             }
           }
         }
