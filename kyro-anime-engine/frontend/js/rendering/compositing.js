@@ -115,13 +115,17 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
     if (node.type === 'alpha_over' && node.params?.overlay_layer_id) layerInputsToExclude.add(String(node.params.overlay_layer_id));
     if (node.type === 'alpha_mask' && node.params?.mask_layer_id) layerInputsToExclude.add(String(node.params.mask_layer_id));
   }
+  const underlay = makeCanvas(documentRef, width, height);
+  const underlayCtx = underlay.getContext('2d');
+  if (layerInputsToExclude.size && layers.length) rebuildLayerStack(underlayCtx, layers, width, height, options.background, 'scene_order', layerInputsToExclude);
+  else copyCanvasInto(underlayCtx, base, width, height);
   const order = topologicalCompositorOrder(nodes, links);
   const getInputLink = (node, socket) => links.find(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket);
   const getInputCanvas = (node, socket, fallback) => {
     const link = getInputLink(node, socket);
     return link ? outputs.get(link.from) || fallback : fallback;
   };
-  let lastOutput = base;
+  let lastOutput = underlay;
   for (const node of order) {
     const params = node.params || {};
     const input0 = getInputCanvas(node, 0, lastOutput || base);
