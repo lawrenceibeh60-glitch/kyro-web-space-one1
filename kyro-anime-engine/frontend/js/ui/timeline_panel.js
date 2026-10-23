@@ -52,6 +52,10 @@ export function initTimelinePanel() {
       const d = document.createElement('div');
       d.className = 'dn' + (l.id === state.layerId ? ' active' : '');
       d.textContent = l.name || l.id;
+      const trackColor = /^#[0-9a-f]{6}$/i.test(l.timeline_color || '') ? l.timeline_color : '#e87d0d';
+      d.style.borderLeft = `3px solid ${trackColor}`;
+      d.style.paddingLeft = '5px';
+      d.title = `${l.name || l.id} · ${l.type || 'drawing'} track`;
       d.onclick = () => selectLayer(l.id);
       rowContainer.append(d);
     }
@@ -114,9 +118,12 @@ export function initTimelinePanel() {
         const x = PAD + e.start * px, ew = Math.min(e.length, n - e.start) * px;
         if (ew <= 0) continue;
         const activeExposure = l.id === state.layerId && (selectedExposure === e || findExposure(l, state.frame) === e);
-        ctx.fillStyle = activeExposure ? 'rgba(232,125,13,.58)' : 'rgba(232,125,13,.33)';
+        const trackColor = /^#[0-9a-f]{6}$/i.test(l.timeline_color || '') ? l.timeline_color : '#e87d0d';
+        ctx.globalAlpha = activeExposure ? .78 : .48;
+        ctx.fillStyle = trackColor;
         ctx.fillRect(x + 1, y + 4, Math.max(1, ew - 2), ROW - 8);
-        ctx.strokeStyle = '#e87d0d'; ctx.lineWidth = 1; ctx.strokeRect(x + 1.5, y + 4.5, ew - 3, ROW - 9);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = trackColor; ctx.lineWidth = 1; ctx.strokeRect(x + 1.5, y + 4.5, ew - 3, ROW - 9);
         if (ew > 38) {
           ctx.fillStyle = '#f0d2ad'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
           ctx.fillText(`D${exposureIndex + 1} · ${e.length}f`, x + 6, y + ROW / 2, ew - 14);
@@ -524,6 +531,20 @@ export function initTimelinePanel() {
   $('previewStart').onclick = setPreviewStart;
   $('previewEnd').onclick = setPreviewEnd;
   $('previewClear').onclick = clearPreviewRange;
+  $('trackColorButton').onclick = () => {
+    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    if (!layer) { toast('Select a track first', 'err'); return; }
+    const input = $('trackColorInput');
+    input.value = /^#[0-9a-f]{6}$/i.test(layer.timeline_color || '') ? layer.timeline_color : '#e87d0d';
+    input.click();
+  };
+  $('trackColorInput').onchange = () => {
+    const scene = getScene(), layer = scene?.layers.find(item => item.id === state.layerId);
+    if (!scene || !layer || !/^#[0-9a-f]{6}$/i.test($('trackColorInput').value)) return;
+    const si = state.project.scenes.indexOf(scene), li = scene.layers.indexOf(layer);
+    execute(setValue(['scenes', si, 'layers', li, 'timeline_color'], $('trackColorInput').value, 'Set timeline track color'));
+    renderNames(); requestDraw();
+  };
   $('addMarker').onclick = addMarker;
   $('renameMarker').onclick = renameSelectedMarker;
   $('deleteMarker').onclick = deleteSelectedMarker;
