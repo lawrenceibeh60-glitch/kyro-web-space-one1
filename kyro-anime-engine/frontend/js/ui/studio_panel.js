@@ -469,6 +469,54 @@ export function initStudioPanel({ onCharacterImported }) {
       : 'Walk cycle disabled.';
   }
 
+  function renderMotionPathControls(rig) {
+    const animation = rig?.animation || {};
+    const fields = {
+      motionPathStart: animation.path_start_frame ?? 0,
+      motionPathDuration: animation.path_duration_frames ?? 24,
+      motionPathFromX: animation.path_from_x ?? 0,
+      motionPathFromY: animation.path_from_y ?? 0,
+      motionPathToX: animation.path_to_x ?? 240,
+      motionPathToY: animation.path_to_y ?? 0,
+    };
+    for (const [id, value] of Object.entries(fields)) {
+      const input = $(id);
+      if (document.activeElement !== input) input.value = String(value);
+      input.disabled = !rig;
+    }
+    $('motionPathEasing').value = animation.path_easing || 'ease_in_out';
+    $('motionPathEasing').disabled = !rig;
+    $('motionPathApply').disabled = !rig;
+    $('motionPathStatus').textContent = !rig
+      ? 'Create a rig before authoring a motion path.'
+      : animation.type === 'motion_path' && animation.enabled !== false
+        ? `Motion path active · frame ${(animation.path_start_frame ?? 0) + 1} → ${(animation.path_start_frame ?? 0) + (animation.path_duration_frames ?? 24) + 1}`
+        : 'Path is ready to author; applying it switches this rig to the motion-path clip.';
+  }
+
+  function applyMotionPathControls() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    const number = (id, fallback) => {
+      const value = Number($(id).value);
+      return Number.isFinite(value) ? value : fallback;
+    };
+    const animation = {
+      ...(rig.animation || {}),
+      type: 'motion_path',
+      enabled: true,
+      path_start_frame: Math.max(0, Math.round(number('motionPathStart', 0))),
+      path_duration_frames: Math.max(1, Math.min(10000, Math.round(number('motionPathDuration', 24)))),
+      path_from_x: Math.max(-8192, Math.min(8192, number('motionPathFromX', 0))),
+      path_from_y: Math.max(-8192, Math.min(8192, number('motionPathFromY', 0))),
+      path_to_x: Math.max(-8192, Math.min(8192, number('motionPathToX', 240))),
+      path_to_y: Math.max(-8192, Math.min(8192, number('motionPathToY', 0))),
+      path_easing: $('motionPathEasing').value === 'linear' ? 'linear' : 'ease_in_out',
+    };
+    updateRig({ ...clone(rig), animation });
+    $('motionPathStatus').textContent = `Motion path applied · ${animation.path_easing.replaceAll('_', ' ')} · ${animation.path_duration_frames} frames`;
+  }
+
   function renderTurnControls() {
     const scene = state.project?.scenes?.find(item => item.id === state.sceneId) || state.project?.scenes?.[0];
     const pairs = scene ? countTurnPairs(scene.layers, selectedCharacterId) : 0;
