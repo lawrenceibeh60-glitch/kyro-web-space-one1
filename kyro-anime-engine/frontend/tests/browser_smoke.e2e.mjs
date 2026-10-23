@@ -97,6 +97,31 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_over');
       return !!node?.params?.overlay_layer_id;
     });
+    const compositorPixels = await page.evaluate(async () => {
+      const { renderFrame } = await import('/js/rendering/renderer.js');
+      const rect = color => ({ commands: [['M', 8, 8], ['L', 56, 8], ['L', 56, 56], ['L', 8, 56], ['Z']], fill: color, color, width: 1 });
+      const base = {
+        settings: { width: 64, height: 64, background: '#ffffff', duration_frames: 1 },
+        drawings: { red: { strokes: [rect('#ff0000')] }, blue: { strokes: [rect('#0000ff')] } },
+        effects: [], rigs: [],
+        scenes: [{ id: 's', layers: [
+          { id: 'red-layer', name: 'Red', depth: 1, blend: 'normal', exposures: [{ start: 0, length: 1, drawing: 'red' }] },
+          { id: 'blue-layer', name: 'Blue', depth: 2, blend: 'normal', exposures: [{ start: 0, length: 1, drawing: 'blue' }] },
+        ] }],
+      };
+      const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+      let ctx = canvas.getContext('2d');
+      renderFrame(ctx, base, 's', 0);
+      const ordinary = [...ctx.getImageData(20, 20, 1, 1).data];
+      renderFrame(ctx, { ...base, compositor_graph: { nodes: [{ id: 'depth', type: 'z_depth', enabled: true, params: { direction: 'far_to_near' } }] } }, 's', 0);
+      const depth = [...ctx.getImageData(20, 20, 1, 1).data];
+      renderFrame(ctx, { ...base, compositor_graph: { nodes: [{ id: 'over', type: 'alpha_over', enabled: true, params: { overlay_layer_id: 'blue-layer', opacity: 0.5 } }] } }, 's', 0);
+      const alpha = [...ctx.getImageData(20, 20, 1, 1).data];
+      return { ordinary, depth, alpha };
+    });
+    assert.ok(compositorPixels.ordinary[2] > compositorPixels.ordinary[0], 'normal scene order should leave the blue layer on top');
+    assert.ok(compositorPixels.depth[0] > compositorPixels.depth[2], 'far-to-near Z-depth sorting should put the nearer red layer on top');
+    assert.ok(Math.abs(compositorPixels.alpha[0] - compositorPixels.alpha[2]) < 8, '50% Alpha Over should blend red and blue approximately equally');
 
     // A double-click on an empty exposure cell should author a real blank drawing cel.
     await page.locator('#addLayer').click();
