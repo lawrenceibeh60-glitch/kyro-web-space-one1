@@ -31,6 +31,7 @@ import { svg, setIcon, hydrate } from '../ui/icons.js';
 import { toast } from '../ui/notifications.js';
 import { findLayerLocation, flattenLayerTree, reparentLayer } from '../scene/scene_hierarchy.js';
 import { renderLayerHierarchy } from './hierarchy_controller.js';
+import { createDrawingLayer, createGroupLayer } from '../scene/layers.js';
 
 const $ = id => document.getElementById(id);
 const TOOL_NAMES = { pan: 'Hand', camera: 'Camera', brush: 'Brush', grease: 'Grease Pencil', eraser: 'Eraser', edit: 'Edit', weight: 'Weight Paint', line: 'Line', rectangle: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', fill: 'Fill', eyedropper: 'Eyedropper', move: 'Move', rotate: 'Rotate', scale: 'Scale' };
@@ -117,9 +118,8 @@ function toggleFlag(id, key, value) {
   execute(setValue(['scenes', sceneIndex(), 'layers', ...location.path, key], value, 'Toggle ' + key));
 }
 function addLayer() {
-  const ids = new Set(state.project.scenes.flatMap(scene => flattenLayerTree(scene.layers || [], [], [], true).map(entry => entry.layer.id)));
-  let n = 1; while (ids.has('layer_' + n)) n++;
-  const layer = { id: 'layer_' + n, name: 'Layer ' + n, type: 'drawing', exposures: [] };
+  const allLayers = state.project.scenes.flatMap(scene => scene.layers || []);
+  const layer = createDrawingLayer(allLayers);
   execute(insertAt(['scenes', sceneIndex(), 'layers'], getScene().layers.length, layer, 'Add layer'));
   selectLayer(layer.id);
 }
@@ -141,9 +141,7 @@ function createGroup() {
   if (!scene) return;
   const layers = JSON.parse(JSON.stringify(scene.layers || []));
   const selected = state.layerId ? findLayerLocation(layers, state.layerId) : null;
-  const ids = new Set(flattenLayerTree(layers, [], [], true).map(entry => entry.layer.id));
-  let n = 1; while (ids.has('group_' + n)) n++;
-  const group = { id: 'group_' + n, name: 'Group ' + n, type: 'group', opacity: 1, visible: true, locked: false, transform: { x: 0, y: 0, rotation: 0, scale_x: 1, scale_y: 1, anchor_x: 0, anchor_y: 0 }, children: [] };
+  const group = createGroupLayer(layers);
   if (selected) {
     selected.container.splice(selected.index, 1);
     group.children.push(selected.layer);
