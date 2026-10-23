@@ -292,7 +292,9 @@
             "additionalProperties": false,
             "properties": {
               "from": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
-              "to": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }
+              "to": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+              "from_socket": { "type": "integer", "minimum": 0, "default": 0 },
+              "to_socket": { "type": "integer", "minimum": 0, "default": 0 }
             }
           }
         }
