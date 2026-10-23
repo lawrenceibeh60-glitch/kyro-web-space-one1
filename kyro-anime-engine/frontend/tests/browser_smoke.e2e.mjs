@@ -76,6 +76,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     assert.equal(styledShape.stroke, '#abcdef');
     assert.equal(styledShape.strokeWidth, 4);
     assert.equal(styledShape.opacity, 0.4);
+    await page.evaluate(() => { const panel = document.querySelector('#p-studio'); if (panel) { panel.hidden = false; panel.style.display = 'block'; document.body.append(panel); } });
     await page.locator('#compositorNodeType').selectOption('levels');
     await page.locator('#compositorAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.compositor_graph?.nodes?.some(node => node.type === 'levels'));
@@ -454,6 +455,7 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
       const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
       return scene?.layers.find(layer => layer.id === window.kae.state.layerId)?.timeline_color === '#123456';
     });
+    await page.evaluate(() => { const panel = document.querySelector('#p-studio'); if (panel) { panel.hidden = false; panel.style.display = 'block'; document.body.append(panel); } });
     await page.locator('#compositorNodeType').selectOption('levels');
     await page.locator('#compositorAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.compositor_graph?.nodes?.some(node => node.type === 'levels'));
