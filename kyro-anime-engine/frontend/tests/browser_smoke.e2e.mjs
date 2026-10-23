@@ -97,6 +97,15 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_over');
       return !!node?.params?.overlay_layer_id;
     });
+    await page.locator('#compositorNodeType').selectOption('alpha_mask');
+    await page.locator('#compositorAddNode').click();
+    const matteCard = page.locator('.compositor-node').filter({ hasText: 'Alpha Mask / Matte' });
+    await matteCard.locator('select').selectOption({ index: 1 });
+    await matteCard.locator('input[type="checkbox"]').check();
+    await page.waitForFunction(() => {
+      const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_mask');
+      return !!node?.params?.mask_layer_id && node.params.invert === true;
+    });
     const compositorPixels = await page.evaluate(async () => {
       const { renderFrame } = await import('/js/rendering/renderer.js');
       const rect = color => ({ commands: [['M', 8, 8], ['L', 56, 8], ['L', 56, 56], ['L', 8, 56], ['Z']], fill: color, color, width: 1 });
