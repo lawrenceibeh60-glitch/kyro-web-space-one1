@@ -419,6 +419,9 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
     await page.locator('#geoNodeType').selectOption('opacity');
     await page.locator('#geoAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.node_graphs?.[0]?.nodes?.some(node => node.type === 'opacity'));
+    await page.locator('#geoNodeType').selectOption('mask');
+    await page.locator('#geoAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.node_graphs?.[0]?.nodes?.some(node => node.type === 'mask'));
     await page.locator('#save').click();
     await page.waitForFunction(() => window.kae.state.dirty === false);
     const projectUrl = page.url();
@@ -436,6 +439,7 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
         hasAnimate: graph.nodes.some(node => node.type === 'animate'),
         hasStyle: graph.nodes.some(node => node.type === 'style'),
         hasOpacity: graph.nodes.some(node => node.type === 'opacity'),
+        hasMask: graph.nodes.some(node => node.type === 'mask'),
         graphCount: window.kae.state.project.node_graphs.length,
       };
     });
@@ -448,6 +452,7 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
     assert.equal(saved.hasAnimate, true);
     assert.equal(saved.hasStyle, true);
     assert.equal(saved.hasOpacity, true);
+    assert.equal(saved.hasMask, true);
     assert.ok(saved.graphCount >= 1);
     assert.deepEqual(pageErrors, [], 'geometry node runtime errors: ' + pageErrors.join('; '));
   } finally {
