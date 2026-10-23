@@ -486,8 +486,13 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
     await page.locator('#geoNodeType').selectOption('mask');
     await page.locator('#geoAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.node_graphs?.[0]?.nodes?.some(node => node.type === 'mask'));
+    const toastBeforeSave = await page.locator('#toasts').innerText();
     await page.locator('#save').click();
-    await page.waitForFunction(() => window.kae.state.dirty === false);
+    await page.waitForFunction(previous => window.kae.state.dirty === false
+      || (document.querySelector('#toasts')?.textContent || '').trim() !== previous.trim(),
+      toastBeforeSave, { timeout: 15000 });
+    const saveState = await page.evaluate(() => ({ dirty: window.kae.state.dirty, toast: document.querySelector('#toasts')?.textContent || '' }));
+    assert.equal(saveState.dirty, false, 'Project save failed: ' + saveState.toast);
     const projectUrl = page.url();
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.kae?.state?.project?.node_graphs?.length > 0);
