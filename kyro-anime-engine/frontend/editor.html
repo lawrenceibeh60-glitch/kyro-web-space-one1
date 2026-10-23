@@ -248,7 +248,9 @@
                 <div class="xrow n"><span>Duration</span><input id="motionPathDuration" type="number" min="1" max="10000" step="1" value="24"></div>
                 <div class="xrow n"><span>From X / Y</span><input id="motionPathFromX" type="number" step="1" value="0"><input id="motionPathFromY" type="number" step="1" value="0"></div>
                 <div class="xrow n"><span>To X / Y</span><input id="motionPathToX" type="number" step="1" value="240"><input id="motionPathToY" type="number" step="1" value="0"></div>
-                <label class="fld"><span>Interpolation</span><select id="motionPathEasing"><option value="linear">Linear</option><option value="ease_in_out">Ease in / out</option></select></label>
+                <div class="xrow n"><span>Bezier C1</span><input id="motionPathC1X" type="number" step="1" value="80"><input id="motionPathC1Y" type="number" step="1" value="0"></div>
+                <div class="xrow n"><span>Bezier C2</span><input id="motionPathC2X" type="number" step="1" value="160"><input id="motionPathC2Y" type="number" step="1" value="0"></div>
+                <label class="fld"><span>Interpolation</span><select id="motionPathEasing"><option value="linear">Linear</option><option value="ease_in_out">Ease in / out</option><option value="bezier">Cubic Bezier path</option></select></label>
                 <button id="motionPathApply" class="primary">Apply Motion Path</button>
                 <div id="motionPathStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Front/profile turn</div>
