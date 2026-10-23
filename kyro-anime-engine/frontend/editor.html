@@ -219,6 +219,12 @@
                 <label class="fld"><span>Bend direction</span><select id="ikBend"><option value="1">Positive</option><option value="-1">Negative</option></select></label>
                 <div class="xbtns"><button id="ikApply" class="primary">Save IK target</button><button id="ikRemove">Remove IK target</button></div>
                 <div id="ikStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Pose Library</div>
+                <div class="hint">Capture the current rig rotations as a reusable named pose. Applying a pose inserts rotation keys at the current frame without destroying other keys.</div>
+                <label class="fld"><span>Pose name</span><input id="rigPoseName" type="text" maxlength="80" value="New Pose"></label>
+                <div class="xrow"><select id="rigPoseSelect" aria-label="Saved poses"></select></div>
+                <div class="xbtns"><button id="rigPoseSave" class="primary">Save Current Pose</button><button id="rigPoseApply">Apply at Current Frame</button><button id="rigPoseDelete">Delete Pose</button></div>
+                <div id="rigPoseStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Procedural walk cycle</div>
                 <div class="hint">Apply a reusable walk clip to this rig. Bone names identify head, torso, upper/lower arms, thighs, shins, and feet; foot-contact IK runs when both leg chains are available.</div>
                 <label class="chk"><input id="rigWalkEnabled" type="checkbox"> Enable walk cycle</label>
