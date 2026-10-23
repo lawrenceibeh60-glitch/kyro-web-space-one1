@@ -53,7 +53,7 @@ export function renderLayerHierarchy(container, layers, {
       name.textContent = (layer.type === 'group' ? '▾ ' : '') + (layer.name || layer.id);
       name.title = 'Double-click to rename';
       item.append(visibility, lock, name);
-      item.onclick = () => onSelect(layer.id);
+      item.onclick = event => { event.stopPropagation(); onSelect(layer.id); };
       item.ondblclick = event => { event.preventDefault(); event.stopPropagation(); onRename(layer.id); };
       parent.append(item);
       if (Array.isArray(layer.children) && layer.children.length) {
