@@ -633,11 +633,11 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     }
     ctx.restore();
   }
-  drawGlowComposite(ctx, effects, width, height);
   ctx.save();
   applyCameraTransform(ctx, width, height, camera, frame);
   drawEffects(ctx, effects, width, height, frame);
   ctx.restore();
+  drawGlowComposite(ctx, effects, width, height);
   drawColorGradeComposite(ctx, effects, width, height);
   drawVignetteComposite(ctx, effects, width, height);
   if (project.compositor_graph) applyCompositorGraph(ctx, project.compositor_graph, width, height);
