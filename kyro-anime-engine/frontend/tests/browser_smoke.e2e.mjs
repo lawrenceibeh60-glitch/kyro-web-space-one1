@@ -239,6 +239,21 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     assert.equal(pathMotion.last.x, 200);
     assert.equal(pathMotion.last.y, 40);
 
+    // Cubic Bezier motion paths use the saved control points, not straight-line interpolation.
+    await page.locator('#motionPathC1X').fill('50');
+    await page.locator('#motionPathC1Y').fill('100');
+    await page.locator('#motionPathC2X').fill('150');
+    await page.locator('#motionPathC2Y').fill('100');
+    await page.locator('#motionPathEasing').selectOption('bezier');
+    await page.locator('#motionPathApply').click();
+    const curvedMotion = await page.evaluate(async () => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      const { evaluateRigAnimation } = await import('/js/animation/animation_clips.js');
+      return evaluateRigAnimation(rig, 10).rootOffset;
+    });
+    assert.ok(Math.abs(curvedMotion.x - 100) < 1e-6);
+    assert.ok(Math.abs(curvedMotion.y - 80) < 1e-6, `expected Bezier arc y≈80, got ${curvedMotion.y}`);
+
     // Pose Library captures a named pose and applies it as non-destructive rotation keys.
     await page.locator('#rigPoseName').fill('Smoke Pose');
     await page.locator('#rigPoseSave').click();
