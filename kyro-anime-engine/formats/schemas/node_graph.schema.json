@@ -52,7 +52,13 @@
               "join",
               "output",
               "array",
-              "mirror"
+              "mirror",
+              "polygon",
+              "grid",
+              "resample",
+              "translate",
+              "noise",
+              "bounds"
             ]
           },
           "x": {
