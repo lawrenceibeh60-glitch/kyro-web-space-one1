@@ -1107,6 +1107,7 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rigDelete').onclick = deleteRig;
   $('rigAuto').onclick = autoRig;
   $('rigWalkApply').onclick = applyWalkControls;
+  $('motionPathApply').onclick = applyMotionPathControls;
   $('rigPoseSelect').addEventListener('change', event => { selectedPoseId = event.target.value; renderPoseLibrary((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)); });
   $('rigPoseSave').onclick = saveCurrentPose;
   $('rigPoseApply').onclick = applySelectedPose;
