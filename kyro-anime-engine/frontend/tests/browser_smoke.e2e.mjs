@@ -477,7 +477,12 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
     await page.waitForFunction(() => window.kae?.state?.project?.node_graphs?.length > 0);
     const saved = await page.evaluate(() => {
       const graph = window.kae.state.project.node_graphs[0];
+      const compositor = window.kae.state.project.compositor_graph;
+      const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
       return {
+        hasCompositorLevels: compositor?.nodes?.some(node => node.type === 'levels'),
+        compositorBrightness: compositor?.nodes?.find(node => node.type === 'levels')?.params?.brightness,
+        trackColor: scene?.layers.find(layer => layer.id === window.kae.state.layerId)?.timeline_color,
         radius: graph.nodes.find(node => node.type === 'circle')?.params?.radius,
         hasArray: graph.nodes.some(node => node.type === 'array'),
         hasStar: graph.nodes.some(node => node.type === 'star'),
@@ -491,6 +496,9 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
         graphCount: window.kae.state.project.node_graphs.length,
       };
     });
+    assert.equal(saved.hasCompositorLevels, true);
+    assert.equal(saved.compositorBrightness, 12);
+    assert.equal(saved.trackColor, '#123456');
     assert.equal(saved.radius, 64);
     assert.equal(saved.hasArray, true);
     assert.equal(saved.hasStar, true);
