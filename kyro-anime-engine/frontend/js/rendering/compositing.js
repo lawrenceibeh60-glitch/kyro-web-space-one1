@@ -9,6 +9,7 @@ export const COMPOSITOR_NODE_TYPES = Object.freeze({
   levels: { label: 'Levels', defaults: { brightness: 0, contrast: 0 } },
   vignette: { label: 'Vignette', defaults: { strength: 0.35, radius: 0.7 } },
   alpha_over: { label: 'Alpha Over', defaults: { overlay_layer_id: '', opacity: 1 } },
+  alpha_mask: { label: 'Alpha Mask / Matte', defaults: { mask_layer_id: '', invert: false } },
   z_depth: { label: 'Z-Depth Sort', defaults: { direction: 'far_to_near' } },
   output: { label: 'Composite Output', defaults: {} },
 });
@@ -64,8 +65,9 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
   const enabled = nodes.filter(node => node && node.enabled !== false);
   const depthNode = enabled.find(node => node.type === 'z_depth');
   const alphaNodes = enabled.filter(node => node.type === 'alpha_over');
-  if ((depthNode || alphaNodes.length) && layers.length) {
-    const excluded = new Set(alphaNodes.map(node => node.params && node.params.overlay_layer_id).filter(Boolean));
+  const maskNodes = enabled.filter(node => node.type === 'alpha_mask');
+  if ((depthNode || alphaNodes.length || maskNodes.length) && layers.length) {
+    const excluded = new Set([...alphaNodes.map(node => node.params && node.params.overlay_layer_id), ...maskNodes.map(node => node.params && node.params.mask_layer_id)].filter(Boolean));
     rebuildLayerStack(ctx, layers, width, height, options.background, depthNode ? (depthNode.params && depthNode.params.direction || 'far_to_near') : 'scene_order', excluded);
   }
   for (const node of enabled) {
@@ -84,6 +86,15 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
     } else if (node.type === 'alpha_over') {
       const layer = byId.get(String(p.overlay_layer_id || ''));
       if (layer) drawLayerImage(ctx, layer, width, height, p.opacity == null ? 1 : p.opacity);
+    } else if (node.type === 'alpha_mask') {
+      const layer = byId.get(String(p.mask_layer_id || ''));
+      if (layer) {
+        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = p.invert ? 'destination-out' : 'destination-in';
+        ctx.drawImage(layer.canvas, 0, 0, width, height);
+        ctx.restore();
+      }
     }
     trace.push(node.type);
   }
@@ -124,18 +135,20 @@ export function initCompositorStudio() {
       for (const [key, fallback] of Object.entries(meta.defaults)) {
         const label = document.createElement('label'); label.className = 'compositor-param'; label.textContent = key.replaceAll('_', ' ');
         let input;
-        if (key === 'direction' || key === 'overlay_layer_id') {
+        if (key === 'direction' || key === 'overlay_layer_id' || key === 'mask_layer_id') {
           input = document.createElement('select');
           const choices = key === 'direction' ? [['far_to_near', 'Far to near'], ['near_to_far', 'Near to far']] : [['', 'Select layer'], ...((state.project && state.project.scenes || []).find(scene => scene.id === state.sceneId)?.layers || []).map(layer => [layer.id, layer.name || layer.id])];
           for (const choice of choices) { const option = document.createElement('option'); option.value = choice[0]; option.textContent = choice[1]; input.append(option); }
           input.value = params[key] == null ? fallback : params[key];
+        } else if (key === 'invert') {
+          input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!params[key];
         } else {
           input = document.createElement('input'); input.type = 'number'; input.step = 'any'; input.value = params[key] == null ? fallback : params[key];
           input.min = key === 'saturation' || key === 'strength' || key === 'opacity' ? '0' : '-100';
           input.max = key === 'saturation' ? '300' : key === 'strength' || key === 'opacity' ? '1' : key === 'radius' ? '1' : '100';
         }
         input.onchange = () => {
-          const value = input.tagName === 'SELECT' ? input.value : Number(input.value);
+          const value = input.tagName === 'SELECT' ? input.value : input.type === 'checkbox' ? input.checked : Number(input.value);
           if (typeof value === 'number' && !Number.isFinite(value)) return;
           const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, params: { ...(n.params || {}), [key]: value } } : { ...n });
           commitGraph(graphFromNodes(nodes), 'Edit compositor parameter');
