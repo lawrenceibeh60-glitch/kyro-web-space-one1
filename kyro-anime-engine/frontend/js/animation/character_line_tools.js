@@ -1,6 +1,6 @@
 // Character Line Tracement + Bone Rigging interaction for KAE.
 // Uses the existing viewport's project-space pointer events and native rig schema.
-import { state } from '../core/state_manager.js';
+import { state, setState } from '../core/state_manager.js';
 import { bus } from '../core/event_bus.js';
 import { execute, setValue } from '../core/command_manager.js';
 import { evaluateCamera } from './camera_evaluator.js';
@@ -124,7 +124,7 @@ function createBone(a, b) {
   if (parent) bone.parent_id = parent.id;
   const next = [...(rig.bones || []), bone];
   execute(setValue(['rigs', active.index, 'bones'], next, 'Create bone from Character Line Tracement'));
-  state.showRigOverlay = true;
+  setState({ showRigOverlay: true });
   const show = $('showRigOverlay'); if (show) show.checked = true;
   $('boneName').value = name + ' 2';
   notify('Created ' + name + (parent ? ' and connected it to ' + parent.name + '.' : '. No nearby parent joint was found.'));
