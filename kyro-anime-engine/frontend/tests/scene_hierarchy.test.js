@@ -4,6 +4,7 @@ import {
   flattenLayerTree, findLayerPath, indexLayerTree, effectiveLayerOpacity,
   worldTransformForLayer, reparentLayer,
 } from '../js/scene/scene_hierarchy.js';
+import { createDrawingLayer, createGroupLayer, nextLayerId, removeLayerFromTree, updateLayerTree } from '../js/scene/layers.js';
 
 const tree = [
   { id: 'background', type: 'drawing', exposures: [{ start: 0, length: 1, drawing: 'bg' }] },
@@ -47,4 +48,26 @@ test('reparentLayer moves a layer into a group immutably and rejects cycles', ()
   assert.equal(tree[0].id, 'background');
   assert.throws(() => reparentLayer(tree, 'character', 'faceGroup'), /own subtree/);
   assert.throws(() => reparentLayer(tree, 'background', 'body'), /Destination must be a group/);
+});
+
+test('layer factories avoid collisions with hidden nested layers and apply safe defaults', () => {
+  const layers = [{ id: 'layer_1', type: 'drawing', visible: false }, { id: 'group_1', type: 'group', children: [{ id: 'layer_2', type: 'drawing' }] }];
+  assert.equal(nextLayerId(layers, 'layer'), 'layer_3');
+  const drawing = createDrawingLayer(layers);
+  assert.equal(drawing.id, 'layer_3');
+  assert.equal(drawing.opacity, 1);
+  const group = createGroupLayer(layers);
+  assert.equal(group.id, 'group_2');
+  assert.deepEqual(group.children, []);
+});
+
+test('immutable layer tree update and removal target nested layers without mutating source', () => {
+  const source = [{ id: 'g', type: 'group', children: [{ id: 'l', type: 'drawing', visible: true }] }];
+  const updated = updateLayerTree(source, 'l', { visible: false, name: 'Hidden' });
+  assert.equal(updated[0].children[0].visible, false);
+  assert.equal(source[0].children[0].visible, true);
+  const removed = removeLayerFromTree(updated, 'l');
+  assert.equal(removed.removed.id, 'l');
+  assert.deepEqual(removed.layers[0].children, []);
+  assert.deepEqual(updated[0].children.map(layer => layer.id), ['l']);
 });
