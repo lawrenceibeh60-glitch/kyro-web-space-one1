@@ -223,8 +223,7 @@
     "constraint": {
       "type": "object",
       "required": [
-        "type",
-        "bone_id"
+        "type"
       ],
       "additionalProperties": false,
       "properties": {
@@ -304,7 +303,67 @@
         "enabled": {
           "type": "boolean"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "rotation_limit"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "bone_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "distance",
+                  "pin"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "bone_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "ik_two_bone"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "id",
+              "upper_bone_id",
+              "lower_bone_id",
+              "target",
+              "bend"
+            ]
+          }
+        }
+      ]
     }
   }
 }
