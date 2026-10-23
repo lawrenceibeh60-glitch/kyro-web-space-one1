@@ -161,6 +161,23 @@ function solveContactLeg(rig, pose, frame, side, layer, currentLayerTransform) {
 
 export function evaluateRigAnimation(rig, frame, options = {}) {
   if (!rig?.animation || rig.animation.enabled === false) return null;
+  if (rig.animation.type === 'motion_path') {
+    const config = rig.animation;
+    const start = Math.max(0, Number(config.path_start_frame) || 0);
+    const duration = Math.max(1, Number(config.path_duration_frames) || 24);
+    const raw = clamp((frame - start) / duration, 0, 1);
+    const t = config.path_easing === 'ease_in_out' ? raw * raw * (3 - 2 * raw) : raw;
+    const lerp = (a, b) => (Number(a) || 0) + ((Number(b) || 0) - (Number(a) || 0)) * t;
+    const pose = {
+      clip: 'motion_path', frame, phase: t, angles: {}, bones: {},
+      rootOffset: {
+        x: lerp(config.path_from_x, config.path_to_x),
+        y: lerp(config.path_from_y, config.path_to_y),
+      },
+    };
+    applySavedIKConstraints(rig, pose);
+    return pose;
+  }
   if (rig.animation.type !== 'walk') return null;
   const pose = evaluateWalkCycle(rig, frame);
   pose.bones = {};
