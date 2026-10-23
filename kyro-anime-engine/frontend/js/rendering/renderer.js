@@ -72,6 +72,48 @@ function drawGlowComposite(ctx, effects, width, height) {
   ctx.restore();
 }
 
+function drawColorGradeComposite(ctx, effects, width, height) {
+  const grades = effects.filter(effect => ['color_grade', 'levels'].includes(effect.type));
+  if (!grades.length || !ctx.canvas?.ownerDocument?.createElement) return;
+  const source = ctx.canvas.ownerDocument.createElement('canvas');
+  source.width = width; source.height = height;
+  const sourceCtx = source.getContext('2d');
+  if (!sourceCtx) return;
+  sourceCtx.drawImage(ctx.canvas, 0, 0, width, height);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const effect of grades) {
+    const amount = Math.max(0, Math.min(1, Number(effect.intensity ?? 0.5)));
+    const brightness = effect.type === 'levels' ? 100 + amount * 24 : 100 + amount * 12;
+    const contrast = effect.type === 'levels' ? 100 + amount * 55 : 100 + amount * 20;
+    const saturation = 100 + amount * (effect.type === 'levels' ? 18 : 35);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+    ctx.drawImage(source, 0, 0, width, height);
+    ctx.filter = 'none';
+  }
+  ctx.restore();
+}
+
+function drawVignetteComposite(ctx, effects, width, height) {
+  const vignette = effects.filter(effect => effect.type === 'vignette');
+  if (!vignette.length || !ctx.createRadialGradient) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (const effect of vignette) {
+    const strength = Math.max(0, Math.min(1, Number(effect.intensity ?? 0.5)));
+    if (!strength) continue;
+    const radius = Math.hypot(width, height) * 0.72;
+    const gradient = ctx.createRadialGradient(width / 2, height / 2, radius * 0.2, width / 2, height / 2, radius);
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, `rgba(0,0,0,${strength * 0.78})`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+  }
+  ctx.restore();
+}
+
 function drawEffects(ctx, effects, width, height, frame) {
   for (const effect of effects) {
     const speed = effect.speed ?? 1;
@@ -589,7 +631,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     }
     ctx.restore();
   }
-  drawGlowComposite(ctx, effects, width, height);
+  drawGlowComposite(ctx, effects, width, height);\n  drawColorGradeComposite(ctx, effects, width, height);\n  drawVignetteComposite(ctx, effects, width, height);
   ctx.save();
   applyCameraTransform(ctx, width, height, camera, frame);
   drawEffects(ctx, effects, width, height, frame);
