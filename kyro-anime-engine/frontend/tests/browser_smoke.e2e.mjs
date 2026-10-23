@@ -239,6 +239,21 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     assert.equal(pathMotion.last.x, 200);
     assert.equal(pathMotion.last.y, 40);
 
+    // Pose Library captures a named pose and applies it as non-destructive rotation keys.
+    await page.locator('#rigPoseName').fill('Smoke Pose');
+    await page.locator('#rigPoseSave').click();
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      return rig?.poses?.some(pose => pose.name === 'Smoke Pose' && Object.keys(pose.rotations || {}).length === rig.bones.length);
+    });
+    const savedPoseId = await page.locator('#rigPoseSelect').inputValue();
+    assert.ok(savedPoseId, 'saved pose must be selectable');
+    await page.locator('#rigPoseApply').click();
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      return rig.bones.some(bone => (bone.tracks?.rotation || []).some(key => key.t === window.kae.state.frame));
+    });
+
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
