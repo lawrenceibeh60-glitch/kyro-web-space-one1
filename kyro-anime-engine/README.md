@@ -100,3 +100,12 @@ The current editor already contains the rigging, IK, weighted vector deformation
 - Project import accepts `.kaa` as a JSON-based native project extension alongside `.json`. This is an extension-level compatibility step; it does not yet introduce a binary container or Base64 raster-asset pipeline.
 
 Current scope note: Character Line Tracement creates and connects bones; it does not automatically generate accurate skin weights, solve arbitrary IK chains, reconstruct unseen head views, or create a motion-path animation clip. Those behaviours require additional runtime integration and regression tests. The existing Geometry Nodes workspace is still a procedural vector-geometry graph, not yet a full image compositor graph.
+
+
+### Editor guide settings and expanded procedural nodes
+
+The Rig workspace now includes persistent viewport-only construction guides: grid, center axes, composition thirds, head proportion oval, and a simplified body pose guide. Guide color, opacity, and spacing are project-saved under `editor_settings.guides`; the overlay is separate from render/export output.
+
+The procedural geometry node library adds regular polygon, grid, resample curve, translate geometry, deterministic noise deformation, and bounding-box generation, alongside the existing circle/rectangle/ellipse/line/Bézier/subdivide/smooth/reverse/transform/join/array/mirror/output nodes. Node search filters the available node types. These are evaluated 2D geometry operations, not a claim of full Blender Geometry Nodes compatibility.
+
+**Validation note:** these changes have been committed to the feature branch, but must still pass a live browser/editor regression run. The timeline already uses requestAnimationFrame-coalesced drawing and virtualized visible rows; broader performance claims require profiling on real projects. Full compositor nodes, arbitrary motion-path IK authoring, true head-turn reconstruction, and complete skin-weight deformation remain separate work.
