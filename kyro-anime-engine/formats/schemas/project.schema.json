@@ -258,6 +258,108 @@
       "items": {
         "$ref": "node_graph.schema.json"
       }
+    },
+    "compositor_graph": {
+      "type": "object",
+      "description": "Saved ordered compositor node graph evaluated after scene effects.",
+      "required": ["nodes", "links"],
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "required": ["id", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+              "type": { "enum": ["render_layers", "color_correct", "levels", "vignette", "output"] },
+              "enabled": { "type": "boolean", "default": true },
+              "params": {
+                "type": "object",
+                "additionalProperties": { "type": ["number", "string", "boolean"] }
+              }
+            }
+          }
+        },
+        "links": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "additionalProperties": false,
+            "properties": {
+              "from": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
+              "to": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" }
+            }
+          }
+        }
+      }
+    },
+    "editor_settings": {
+      "type": "object",
+      "description": "Editor-only workspace preferences persisted with the project; excluded from rendered artwork.",
+      "additionalProperties": true,
+      "properties": {
+        "guides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "grid": {
+              "type": "boolean"
+            },
+            "center": {
+              "type": "boolean"
+            },
+            "thirds": {
+              "type": "boolean"
+            },
+            "head": {
+              "type": "boolean"
+            },
+            "body": {
+              "type": "boolean"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "spacing": {
+              "type": "number",
+              "minimum": 8,
+              "maximum": 256
+            },
+            "centered": {
+              "type": "boolean"
+            },
+            "eyes": {
+              "type": "boolean"
+            },
+            "nose": {
+              "type": "boolean"
+            },
+            "mouth": {
+              "type": "boolean"
+            },
+            "ears": {
+              "type": "boolean"
+            },
+            "hairline": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
     }
   }
 }

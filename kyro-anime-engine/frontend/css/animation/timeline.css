@@ -39,3 +39,7 @@
 
 .marker-divider { flex:0 0 1px; align-self:stretch; margin:3px 2px; background:var(--line); }
 .preview-range-label { flex:0 0 auto; color:#8ce5ef; font:10px ui-monospace,monospace; white-space:nowrap; }
+
+.fps-control { display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:10px; }
+.fps-control select { height:26px;min-width:48px;padding:0 4px;color:var(--text);background:var(--field);border:1px solid var(--line);font:inherit; }
+@media (max-width:700px) { .fps-control { gap:2px; } .fps-control select { min-width:42px;height:24px; } }

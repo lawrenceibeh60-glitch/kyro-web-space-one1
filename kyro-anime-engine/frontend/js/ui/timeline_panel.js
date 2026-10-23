@@ -10,6 +10,7 @@ import { execute, batch, insertAt, setValue } from '../core/command_manager.js';
 import { findExposure } from '../rendering/renderer.js';
 import { clamp, frameFromTimelineX, exposureBounds, previewExposureEdit, validateExposureTrack } from '../animation/timeline.js';
 import { toast } from './notifications.js';
+import { createDrawQueue } from '../rendering/draw_queue.js';
 
 const ROW = 20, RULER = 18, PAD = 6;
 
@@ -17,7 +18,7 @@ export function initTimelinePanel() {
   const $ = id => document.getElementById(id);
   const canvas = $('dope'), content = $('dopeContent'), scroll = $('dopeScroll');
   const names = $('dopeNames'), ctx = canvas.getContext('2d');
-  let px = 10, W = 0, H = 0, dpr = 1, canvasDpr = 0, queued = false;
+  let px = 10, W = 0, H = 0, dpr = 1, canvasDpr = 0;
   let mode = null, drag = null, exposureDrag = null, zoom = 1;
   let selectedMarkerId = null;
 
@@ -28,11 +29,8 @@ export function initTimelinePanel() {
   const frameX = f => PAD + f * px + px / 2;
   const frameAt = x => frameFromTimelineX(x, PAD, px, total());
 
-  function requestDraw() {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => { queued = false; draw(); });
-  }
+  const drawQueue = createDrawQueue(() => draw());
+  function requestDraw() { drawQueue.request(); }
 
   function renderNames() {
     names.innerHTML = '';
@@ -52,6 +50,10 @@ export function initTimelinePanel() {
       const d = document.createElement('div');
       d.className = 'dn' + (l.id === state.layerId ? ' active' : '');
       d.textContent = l.name || l.id;
+      const trackColor = /^#[0-9a-f]{6}$/i.test(l.timeline_color || '') ? l.timeline_color : '#e87d0d';
+      d.style.borderLeft = `3px solid ${trackColor}`;
+      d.style.paddingLeft = '5px';
+      d.title = `${l.name || l.id} · ${l.type || 'drawing'} track`;
       d.onclick = () => selectLayer(l.id);
       rowContainer.append(d);
     }
@@ -114,9 +116,12 @@ export function initTimelinePanel() {
         const x = PAD + e.start * px, ew = Math.min(e.length, n - e.start) * px;
         if (ew <= 0) continue;
         const activeExposure = l.id === state.layerId && (selectedExposure === e || findExposure(l, state.frame) === e);
-        ctx.fillStyle = activeExposure ? 'rgba(232,125,13,.58)' : 'rgba(232,125,13,.33)';
+        const trackColor = /^#[0-9a-f]{6}$/i.test(l.timeline_color || '') ? l.timeline_color : '#e87d0d';
+        ctx.globalAlpha = activeExposure ? .78 : .48;
+        ctx.fillStyle = trackColor;
         ctx.fillRect(x + 1, y + 4, Math.max(1, ew - 2), ROW - 8);
-        ctx.strokeStyle = '#e87d0d'; ctx.lineWidth = 1; ctx.strokeRect(x + 1.5, y + 4.5, ew - 3, ROW - 9);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = trackColor; ctx.lineWidth = 1; ctx.strokeRect(x + 1.5, y + 4.5, ew - 3, ROW - 9);
         if (ew > 38) {
           ctx.fillStyle = '#f0d2ad'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
           ctx.fillText(`D${exposureIndex + 1} · ${e.length}f`, x + 6, y + ROW / 2, ew - 14);
@@ -466,6 +471,26 @@ export function initTimelinePanel() {
     requestDraw();
   }
 
+  function syncTimelineFps() {
+    const control = $('timelineFps');
+    if (control) control.value = String(state.project?.settings?.fps || 24);
+  }
+
+  function setTimelineFps() {
+    const control = $('timelineFps');
+    if (!control || !state.project) return;
+    const fps = Number(control.value);
+    if (![8, 12, 15, 24, 25, 30, 48, 50, 60].includes(fps)) {
+      syncTimelineFps();
+      return;
+    }
+    if (fps === Number(state.project.settings.fps || 24)) return;
+    if (isPlaying()) stop();
+    execute(setValue(['settings', 'fps'], fps, 'Set project frame rate'));
+    syncTimelineFps();
+    toast('Project frame rate set to ' + fps + ' FPS');
+  }
+
   function renderPreviewRange() {
     const range = state.project?.preview_range;
     const valid = range && Number.isInteger(range.start) && Number.isInteger(range.end)
@@ -500,12 +525,59 @@ export function initTimelinePanel() {
     requestDraw();
   }
 
+  if ($('timelineFps')) $('timelineFps').addEventListener('change', setTimelineFps);
   $('previewStart').onclick = setPreviewStart;
   $('previewEnd').onclick = setPreviewEnd;
   $('previewClear').onclick = clearPreviewRange;
+  $('trackColorButton').onclick = () => {
+    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    if (!layer) { toast('Select a track first', 'err'); return; }
+    const input = $('trackColorInput');
+    input.value = /^#[0-9a-f]{6}$/i.test(layer.timeline_color || '') ? layer.timeline_color : '#e87d0d';
+    input.click();
+  };
+  $('trackColorInput').onchange = () => {
+    const scene = getScene(), layer = scene?.layers.find(item => item.id === state.layerId);
+    if (!scene || !layer || !/^#[0-9a-f]{6}$/i.test($('trackColorInput').value)) return;
+    const si = state.project.scenes.indexOf(scene), li = scene.layers.indexOf(layer);
+    execute(setValue(['scenes', si, 'layers', li, 'timeline_color'], $('trackColorInput').value, 'Set timeline track color'));
+    renderNames(); requestDraw();
+  };
   $('addMarker').onclick = addMarker;
   $('renameMarker').onclick = renameSelectedMarker;
   $('deleteMarker').onclick = deleteSelectedMarker;
+  let copiedKeys = null;
+  function copyKeyframe() {
+    const layer = getScene()?.layers.find(item => item.id === (state.selKey?.layerId || state.layerId));
+    const frame = state.selKey?.frame ?? state.frame;
+    if (!layer) { toast('Select a track first', 'err'); return; }
+    const channels = Object.entries(layer.tracks || {}).map(([name, keys]) => [name, keys.filter(key => key.t === frame).map(key => ({ ...key }))]).filter(([, keys]) => keys.length);
+    if (!channels.length) { toast('No transform or opacity keys at this frame', 'err'); return; }
+    copiedKeys = { channels, sourceFrame: frame };
+    toast('Copied ' + channels.length + ' animated channel(s)');
+  }
+  function pasteKeyframe() {
+    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    if (!layer || !copiedKeys) { toast(!layer ? 'Select a track first' : 'Copy keys before pasting', 'err'); return; }
+    const tracks = JSON.parse(JSON.stringify(layer.tracks || {})), frame = state.frame;
+    let count = 0;
+    for (const [channel, keys] of copiedKeys.channels) {
+      tracks[channel] ||= [];
+      for (const source of keys) {
+        const existing = tracks[channel].find(key => key.t === frame);
+        if (existing) { existing.v = source.v; existing.ease = source.ease; }
+        else tracks[channel].push({ ...source, t: frame });
+        tracks[channel].sort((a, b) => a.t - b.t); count++;
+      }
+    }
+    if (!count) return;
+    const scene = getScene(), si = state.project.scenes.indexOf(scene), li = scene.layers.indexOf(layer);
+    execute(setValue(['scenes', si, 'layers', li, 'tracks'], tracks, 'Paste keyframes'));
+    state.selKey = { layerId: layer.id, frame };
+    requestDraw();
+  }
+  $('copyKeyframe').onclick = copyKeyframe;
+  $('pasteKeyframe').onclick = pasteKeyframe;
   $('newDrawing').onclick = () => newDrawing(false);
   $('duplicateDrawing').onclick = () => newDrawing(true);
   $('holdDrawing').onclick = holdDrawing;
@@ -518,6 +590,7 @@ export function initTimelinePanel() {
   new ResizeObserver(() => { renderNames(); requestDraw(); }).observe(scroll);
 
   bus.on('state', p => {
+    if ('project' in p) syncTimelineFps();
     if ('frame' in p || 'project' in p || 'sceneId' in p || 'layerId' in p) requestDraw();
     if ('project' in p) {
       if (!markers().some(marker => marker.id === selectedMarkerId)) selectedMarkerId = null;
@@ -525,7 +598,7 @@ export function initTimelinePanel() {
       renderPreviewRange();
     }
   });
-  bus.on('project:changed', () => { selectedExposure = null; renderNames(); renderMarkers(); renderPreviewRange(); requestDraw(); });
+  bus.on('project:changed', () => { selectedExposure = null; syncTimelineFps(); renderNames(); renderMarkers(); renderPreviewRange(); requestDraw(); });
   bus.on('selection', () => { renderNames(); requestDraw(); });
   bus.on('playback', requestDraw);
   renderNames(); renderMarkers(); renderPreviewRange(); requestDraw();

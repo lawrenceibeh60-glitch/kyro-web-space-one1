@@ -42,11 +42,31 @@
             "enum": [
               "circle",
               "rectangle",
+              "ellipse",
+              "line",
+              "bezier",
+              "subdivide",
+              "smooth",
+              "reverse",
               "transform",
               "join",
               "output",
               "array",
-              "mirror"
+              "mirror",
+              "polygon",
+              "star",
+              "wave",
+              "math",
+              "switch",
+              "animate",
+              "style",
+              "opacity",
+              "mask",
+              "grid",
+              "resample",
+              "translate",
+              "noise",
+              "bounds"
             ]
           },
           "x": {

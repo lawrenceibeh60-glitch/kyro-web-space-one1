@@ -1045,9 +1045,15 @@ def _check_node_graphs(project, errs):
         errs.append("node_graphs: must be a list")
         return
     graph_ids = set()
+    # Keep socket counts aligned with frontend/js/animation/geometry_nodes.js TYPES.
     allowed = {
-        "circle": (0, 1), "rectangle": (0, 1), "transform": (1, 1),
-        "join": (2, 1), "array": (1, 1), "mirror": (1, 1), "output": (1, 0),
+        "circle": (0, 1), "rectangle": (0, 1), "ellipse": (0, 1), "line": (0, 1),
+        "bezier": (0, 1), "polygon": (0, 1), "star": (0, 1), "grid": (0, 1),
+        "transform": (1, 1), "subdivide": (1, 1), "smooth": (1, 1), "reverse": (1, 1),
+        "join": (2, 1), "array": (1, 1), "mirror": (1, 1), "resample": (1, 1),
+        "translate": (1, 1), "noise": (1, 1), "wave": (1, 1), "math": (1, 1),
+        "animate": (1, 1), "style": (1, 1), "opacity": (1, 1), "mask": (2, 1),
+        "switch": (2, 1), "bounds": (1, 1), "output": (1, 0),
     }
     for gi, graph in enumerate(graphs):
         where = f"node_graphs[{gi}]"

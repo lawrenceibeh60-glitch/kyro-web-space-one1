@@ -1,0 +1,7 @@
+.kae-line-tool-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.kae-line-tool-buttons button{min-width:0;white-space:normal;line-height:1.25;padding:7px 8px}
+#characterLineTrace[aria-pressed="true"],#boneRiggingMode[aria-pressed="true"]{border-color:var(--kae-gold,#e6b84c);box-shadow:inset 0 0 0 1px var(--kae-gold,#e6b84c);color:var(--kae-gold-hot,#ffd778)}
+#lineTraceCancel{grid-column:1/-1}
+#lineTraceStatus{padding:7px 8px;border-left:2px solid var(--kae-gold,#e6b84c);background:#e6b84c0b;line-height:1.45;min-height:18px}
+#characterLineOverlay{touch-action:none}
+@media(max-width:720px){.kae-line-tool-buttons{grid-template-columns:1fr}.kae-line-tool-buttons button{min-height:38px}#lineTraceCancel{grid-column:auto}}

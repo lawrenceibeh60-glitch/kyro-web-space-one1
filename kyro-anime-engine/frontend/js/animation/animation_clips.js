@@ -161,6 +161,35 @@ function solveContactLeg(rig, pose, frame, side, layer, currentLayerTransform) {
 
 export function evaluateRigAnimation(rig, frame, options = {}) {
   if (!rig?.animation || rig.animation.enabled === false) return null;
+  if (rig.animation.type === 'motion_path') {
+    const config = rig.animation;
+    const start = Math.max(0, Number(config.path_start_frame) || 0);
+    const duration = Math.max(1, Number(config.path_duration_frames) || 24);
+    const raw = clamp((frame - start) / duration, 0, 1);
+    const t = config.path_easing === 'ease_in_out' ? raw * raw * (3 - 2 * raw) : raw;
+    const fromX = Number(config.path_from_x) || 0;
+    const fromY = Number(config.path_from_y) || 0;
+    const toX = Number(config.path_to_x) || 0;
+    const toY = Number(config.path_to_y) || 0;
+    const cubic = (p0, p1, p2, p3, u) => {
+      const v = 1 - u;
+      return v * v * v * p0 + 3 * v * v * u * p1 + 3 * v * u * u * p2 + u * u * u * p3;
+    };
+    const useBezier = config.path_easing === 'bezier';
+    const lerp = (a, b) => (Number(a) || 0) + ((Number(b) || 0) - (Number(a) || 0)) * t;
+    const pose = {
+      clip: 'motion_path', frame, phase: t, angles: {}, bones: {},
+      rootOffset: useBezier ? {
+        x: cubic(fromX, Number(config.path_c1_x ?? (fromX + (toX - fromX) / 3)), Number(config.path_c2_x ?? (fromX + 2 * (toX - fromX) / 3)), toX, raw),
+        y: cubic(fromY, Number(config.path_c1_y ?? fromY), Number(config.path_c2_y ?? toY), toY, raw),
+      } : {
+        x: lerp(fromX, toX),
+        y: lerp(fromY, toY),
+      },
+    };
+    applySavedIKConstraints(rig, pose);
+    return pose;
+  }
   if (rig.animation.type !== 'walk') return null;
   const pose = evaluateWalkCycle(rig, frame);
   pose.bones = {};

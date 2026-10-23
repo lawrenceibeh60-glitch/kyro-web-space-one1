@@ -18,6 +18,8 @@
 <link rel="stylesheet" href="css/animation/dope_sheet.css">
 <link rel="stylesheet" href="css/animation/graph_editor.css">
 <link rel="stylesheet" href="css/animation/geometry_nodes.css">
+<link rel="stylesheet" href="css/animation/character_line_tools.css">
+<link rel="stylesheet" href="css/animation/guide_settings.css">
 <link rel="stylesheet" href="css/rendering/export_dialog.css">
 <link rel="stylesheet" href="css/layout/responsive.css">
 <link rel="stylesheet" href="css/themes/production_workspace.css">
@@ -156,9 +158,13 @@
               <div class="hint">Effects are saved with the project and included in frame, GIF, sprite, and WebM rendering. Layer masks use one layer's alpha to clip another; facial animation uses generated eye/mouth variants.</div>
               <div class="xrow"><select id="effectType" aria-label="Effect type">
                 <option value="lightning">Lightning</option><option value="particles">Particles</option>
-                <option value="speed_lines">Speed lines</option><option value="camera_shake">Camera shake</option><option value="glow">Cinematic glow</option><option value="impact_flash">Impact flash</option><option value="soft_shadow">Soft shadow</option><option value="depth_of_field">Depth of field</option><option value="layer_mask">Layer mask</option><option value="facial_animation">Facial animation</option>
+                <option value="speed_lines">Speed lines</option><option value="camera_shake">Camera shake</option><option value="glow">Cinematic glow</option><option value="impact_flash">Impact flash</option><option value="soft_shadow">Soft shadow</option><option value="depth_of_field">Depth of field</option><option value="color_grade">Color Grade</option><option value="levels">Levels / Contrast</option><option value="vignette">Cinematic Vignette</option><option value="layer_mask">Layer mask</option><option value="facial_animation">Facial animation</option>
               </select><button id="effectAdd" class="primary">Add</button></div>
               <div id="effectList" class="studio-list"></div>
+              <div class="grp-title">Compositor Node Stack</div>
+              <div class="hint">Build a saved post-processing chain. Render Layers feeds ordered processing nodes and Composite Output.</div>
+              <div class="xrow"><select id="compositorNodeType" aria-label="Compositor node type"><option value="color_correct">Color Correct</option><option value="levels">Levels</option><option value="vignette">Vignette</option></select><button id="compositorAddNode" type="button">Add Node</button></div>
+              <div id="compositorNodeList" class="compositor-node-list"></div>
             </section>
             <section data-studio-pane="rig" hidden>
               <div class="grp-title">2D character rig</div>
@@ -171,6 +177,32 @@
                 <div class="grp-title">Automatic rig setup</div>
                 <button id="rigAuto" class="primary">Auto-rig all character parts</button>
                 <div class="hint">Creates one pivoted bone per unrigged part, infers common head/torso/arm/leg parent chains, and keeps existing bones intact.</div>
+                <div class="grp-title">Drawing & pose guides</div>
+                <div class="hint">Viewport construction overlays for consistent proportions and animation poses. Guides are project-saved and never appear in exports.</div>
+                <label class="chk"><input id="kaeGuidesEnabled" type="checkbox"> Enable viewport guides</label>
+                <label class="chk"><input id="kaeGuideGrid" type="checkbox" checked> Perspective/grid guide</label>
+                <label class="chk"><input id="kaeGuideCenter" type="checkbox" checked> Center axes</label>
+                <label class="chk"><input id="kaeGuideThirds" type="checkbox"> Composition thirds</label>
+                <label class="chk"><input id="kaeGuideHead" type="checkbox"> Head proportion guide</label>
+                <label class="chk"><input id="kaeGuideEyes" type="checkbox"> Eye line / eye spacing</label>
+                <label class="chk"><input id="kaeGuideNose" type="checkbox"> Nose placement</label>
+                <label class="chk"><input id="kaeGuideMouth" type="checkbox"> Mouth placement</label>
+                <label class="chk"><input id="kaeGuideEars" type="checkbox"> Ear alignment</label>
+                <label class="chk"><input id="kaeGuideHairline" type="checkbox"> Hairline / brow arc</label>
+                <label class="chk"><input id="kaeGuideBody" type="checkbox"> Body pose / shoulder-hip guide</label>
+                <label class="fld"><span>Guide color</span><input id="kaeGuideColor" type="color" value="#36c5d8"></label>
+                <label class="fld"><span>Opacity</span><input id="kaeGuideOpacity" type="range" min="0.05" max="1" step="0.05" value="0.55"></label>
+                <label class="fld"><span>Grid spacing</span><input id="kaeGuideSpacing" type="range" min="8" max="128" step="4" value="32"></label>
+                <div class="xbtns"><button id="kaeGuideReset" type="button">Reset guides</button><button id="kaeGuideCenterView" type="button">Center guide</button></div>
+                <div id="kaeGuideStatus" class="hint" aria-live="polite">Guides disabled</div>
+                <div class="grp-title">Character Line Tracement</div>
+                <div class="hint">Draw a joint-to-joint guide on the viewport. With both tools enabled, releasing the line creates a native rig bone.</div>
+                <div class="xbtns kae-line-tool-buttons">
+                  <button id="characterLineTrace" type="button" aria-pressed="false">Character Line Tracement</button>
+                  <button id="boneRiggingMode" type="button" aria-pressed="false">Bone Rigging</button>
+                  <button id="lineTraceCancel" type="button" title="Cancel the current line">Cancel</button>
+                </div>
+                <div id="lineTraceStatus" class="hint" role="status" aria-live="polite">Select a rig and Character Part, then enable both tools.</div>
                 <div class="grp-title">Add bone</div>
                 <label class="fld"><span>Bone name</span><input id="boneName" type="text" maxlength="64" value="Bone"></label>
                 <label class="fld"><span>Character part</span><select id="bonePart"></select></label>
@@ -194,8 +226,15 @@
                 <div class="xrow n"><span>Target X</span><input id="ikTargetX" type="number" step="1" value="0"></div>
                 <div class="xrow n"><span>Target Y</span><input id="ikTargetY" type="number" step="1" value="0"></div>
                 <label class="fld"><span>Bend direction</span><select id="ikBend"><option value="1">Positive</option><option value="-1">Negative</option></select></label>
+                <label class="chk"><input id="ikEnabled" type="checkbox" checked> Enable IK solve (off = FK pose)</label>
                 <div class="xbtns"><button id="ikApply" class="primary">Save IK target</button><button id="ikRemove">Remove IK target</button></div>
                 <div id="ikStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Pose Library</div>
+                <div class="hint">Capture the current rig rotations as a reusable named pose. Applying a pose inserts rotation keys at the current frame without destroying other keys.</div>
+                <label class="fld"><span>Pose name</span><input id="rigPoseName" type="text" maxlength="80" value="New Pose"></label>
+                <div class="xrow"><select id="rigPoseSelect" aria-label="Saved poses"></select></div>
+                <div class="xbtns"><button id="rigPoseSave" class="primary">Save Current Pose</button><button id="rigPoseApply">Apply at Current Frame</button><button id="rigPoseDelete">Delete Pose</button></div>
+                <div id="rigPoseStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Procedural walk cycle</div>
                 <div class="hint">Apply a reusable walk clip to this rig. Bone names identify head, torso, upper/lower arms, thighs, shins, and feet; foot-contact IK runs when both leg chains are available.</div>
                 <label class="chk"><input id="rigWalkEnabled" type="checkbox"> Enable walk cycle</label>
@@ -207,12 +246,31 @@
                 <label class="chk"><input id="rigWalkLoop" type="checkbox" checked> Loop cycle</label>
                 <button id="rigWalkApply" class="primary">Apply walk-cycle settings</button>
                 <div id="rigWalkStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Motion Path</div>
+                <div class="hint">Animate the character root along a saved linear or eased path. Coordinates are project-space offsets and evaluate on every frame.</div>
+                <div class="xrow n"><span>Start frame</span><input id="motionPathStart" type="number" min="0" step="1" value="0"></div>
+                <div class="xrow n"><span>Duration</span><input id="motionPathDuration" type="number" min="1" max="10000" step="1" value="24"></div>
+                <div class="xrow n"><span>From X / Y</span><input id="motionPathFromX" type="number" step="1" value="0"><input id="motionPathFromY" type="number" step="1" value="0"></div>
+                <div class="xrow n"><span>To X / Y</span><input id="motionPathToX" type="number" step="1" value="240"><input id="motionPathToY" type="number" step="1" value="0"></div>
+                <div class="xrow n"><span>Bezier C1</span><input id="motionPathC1X" type="number" step="1" value="80"><input id="motionPathC1Y" type="number" step="1" value="0"></div>
+                <div class="xrow n"><span>Bezier C2</span><input id="motionPathC2X" type="number" step="1" value="160"><input id="motionPathC2Y" type="number" step="1" value="0"></div>
+                <label class="fld"><span>Interpolation</span><select id="motionPathEasing"><option value="linear">Linear</option><option value="ease_in_out">Ease in / out</option><option value="bezier">Cubic Bezier path</option></select></label>
+                <button id="motionPathApply" class="primary">Apply Motion Path</button>
+                <div id="motionPathStatus" class="hint" aria-live="polite"></div>
                 <div class="grp-title">Front/profile turn</div>
                 <div class="hint">For character parts with matching front and profile artwork, create a perspective yaw and opacity crossfade as one undoable edit.</div>
                 <div class="xrow n"><span>Start frame</span><input id="turnStartFrame" type="number" min="0" step="1" value="0"></div>
                 <div class="xrow n"><span>Duration</span><input id="turnDuration" type="number" min="4" max="240" step="1" value="12"></div>
                 <button id="rigTurnApply" class="primary">Build front/profile turn</button>
                 <div id="rigTurnStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Head / face orientation</div>
+                <div class="hint">Select the head or face artwork layer. Key orientation at the current frame: yaw uses the renderer's perspective projection, pitch controls vertical foreshortening, roll rotates in 2D, and depth scales the layer.</div>
+                <label class="fld"><span>Yaw <b id="faceYawValue">0°</b></span><input id="faceYaw" type="range" min="-90" max="90" step="1" value="0"></label>
+                <label class="fld"><span>Pitch <b id="facePitchValue">0°</b></span><input id="facePitch" type="range" min="-80" max="80" step="1" value="0"></label>
+                <label class="fld"><span>Roll <b id="faceRollValue">0°</b></span><input id="faceRoll" type="range" min="-180" max="180" step="1" value="0"></label>
+                <label class="fld"><span>Depth / scale <b id="faceDepthValue">1.00×</b></span><input id="faceDepth" type="range" min="0.1" max="3" step="0.05" value="1"></label>
+                <button id="facePoseKey" class="primary">Key Face Orientation at Current Frame</button>
+                <div id="facePoseStatus" class="hint" aria-live="polite">Select a head or face artwork layer.</div>
                 <div class="grp-title">Vector skinning</div>
                 <div class="hint">Bind every point or Bézier control point in the active drawing to bones. Auto-weight assigns the nearest pivot; edit weights after for better joints.</div>
                 <label class="fld"><span>Influence bone</span><select id="skinBone"></select></label>
@@ -433,7 +491,17 @@
   </section>
 
   <section class="panel" id="p-geometry">
-    <div class="panel-h"><span class="dim">Geometry Nodes · procedural 2D graph</span><div class="panel-actions"><button id="geoNewGraph">New Graph</button><button id="geoDeleteGraph">Delete Graph</button><select id="geoNodeType" aria-label="Node type"><option value="circle">Circle</option><option value="rectangle">Rectangle</option><option value="transform">Transform 2D</option><option value="join">Join Geometry</option><option value="array">Array</option><option value="mirror">Mirror</option><option value="output">Group Output</option></select><button id="geoAddNode" class="primary">Add Node</button></div></div>
+    <div class="panel-h"><span class="dim">Geometry Nodes · procedural 2D graph</span><div class="panel-actions"><button id="geoNewGraph">New Graph</button><button id="geoDeleteGraph">Delete Graph</button><input id="geoNodeSearch" type="search" placeholder="Search nodes…" aria-label="Search node library" autocomplete="off"><select id="geoNodeType" aria-label="Node type">
+                <optgroup label="Generate"><option value="circle">Circle</option><option value="ellipse">Ellipse</option><option value="rectangle">Rectangle</option><option value="polygon">Regular Polygon</option><option value="star">Star Polygon</option><option value="grid">Grid</option><option value="line">Line</option><option value="bezier">Bezier Curve</option></optgroup>
+                <optgroup label="Curve Tools"><option value="resample">Resample Curve</option><option value="subdivide">Subdivide</option><option value="smooth">Smooth Curve</option><option value="reverse">Reverse Curve</option></optgroup>
+                <optgroup label="Transform / Deform"><option value="transform">Transform 2D</option><option value="translate">Translate Geometry</option><option value="mirror">Mirror</option><option value="noise">Noise Deform</option><option value="wave">Wave Deform</option><option value="array">Array</option></optgroup>
+                <optgroup label="Animation"><option value="animate">Animate / Oscillate</option></optgroup>
+                <optgroup label="Effects"><option value="style">Stroke / Fill Style</option><option value="opacity">Opacity</option></optgroup>
+                <optgroup label="Mask / Matte"><option value="mask">Mask / Matte</option></optgroup>
+                <optgroup label="Math / Logic"><option value="math">Math Deform</option><option value="switch">Geometry Switch</option></optgroup>
+                <optgroup label="Combine / Inspect"><option value="join">Join Geometry</option><option value="bounds">Bounding Box</option></optgroup>
+                <optgroup label="Output"><option value="output">Group Output</option></optgroup>
+              </select><button id="geoAddNode" class="primary">Add Node</button></div></div>
     <div class="geo-toolbar"><label>Graph <select id="geoGraphSelect"></select></label><span class="geo-help">Connect output sockets to inputs. Drag node headers to arrange.</span></div>
     <div class="geo-workspace"><div class="geo-canvas-wrap"><div id="geoCanvas" class="geo-canvas"></div></div><aside class="geo-inspector"><div class="grp-title">Node Inspector</div><div id="geoInspector" class="geo-inspector-body"><p class="hint">Select a node to inspect parameters.</p></div><div class="grp-title">Live Geometry Preview</div><div id="geoPreview" class="geo-preview"></div><p id="geoStatus" class="geo-status">Ready · saved in project</p></aside></div>
   </section>
@@ -449,7 +517,7 @@
       </div>
       <div class="tl-ctrls">
         <input id="frameNum" class="num" type="number" min="1" title="Frame">
-        <span class="dim">End</span><input id="endFrame" class="num" type="number" min="1" max="2000" title="Last frame">
+        <span class="dim">End</span><input id="endFrame" class="num" type="number" min="1" max="2000" title="Last frame"><label class="fps-control" title="Project playback frame rate"><span class="dim">FPS</span><select id="timelineFps" aria-label="Project frame rate"><option value="8">8</option><option value="12">12</option><option value="15">15</option><option value="24">24</option><option value="25">25</option><option value="30">30</option><option value="48">48</option><option value="50">50</option><option value="60">60</option></select></label>
         <button id="loop" class="tgl" title="Loop"><i data-icon="loop"></i></button>
         <button id="autokey" class="tgl" title="Auto-key"><i data-icon="record"></i></button>
       </div>
@@ -458,11 +526,13 @@
         <button id="duplicateDrawing" title="Duplicate the current drawing exposure">Duplicate</button>
         <button id="holdDrawing" title="Extend the current drawing to the next exposure">Hold</button>
         <button id="clearExposure" title="Clear the drawing exposure on the current frame">Clear Cel</button>
+        <button id="copyKeyframe" title="Copy all transform/opacity keys at the current frame">Copy Keys</button><button id="pasteKeyframe" title="Paste copied transform/opacity keys at the current frame">Paste Keys</button>
         <label class="zoom-control" title="Timeline zoom"><span>Zoom</span><input id="dopeZoom" type="range" min="1" max="12" value="1"><b id="dopeZoomValue">1×</b></label>
       </div>
     </div>
     <div class="timeline-markers" id="timelineMarkers" aria-label="Animation frame markers">
       <span class="marker-heading">MARKERS</span>
+      <button id="trackColorButton" type="button" title="Set selected track color">Track Color</button><input id="trackColorInput" type="color" value="#e87d0d" aria-label="Track color" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
       <button id="addMarker" type="button" title="Add a marker at the current frame">+ Marker</button>
       <button id="renameMarker" type="button" title="Rename the selected marker" disabled>Rename</button>
       <button id="deleteMarker" type="button" title="Delete the selected marker" disabled>Delete</button>
@@ -516,9 +586,11 @@
   </div>
 </div>
 
-<input id="jsonImportFile" type="file" accept=".json,application/json" multiple hidden>
+<input id="jsonImportFile" type="file" accept=".kaa,.json,application/json" multiple hidden>
 <div id="toasts" class="toasts"></div>
 <script type="module" src="js/editor/editor_controller.js"></script>
 <script type="module" src="js/editor/studio_chrome.js"></script>
+<script type="module" src="js/animation/character_line_tools.js"></script>
+<script type="module" src="js/animation/guide_settings.js"></script>
 </body>
 </html>

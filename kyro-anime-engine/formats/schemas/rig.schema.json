@@ -40,7 +40,10 @@
       "additionalProperties": false,
       "properties": {
         "type": {
-          "const": "walk"
+          "enum": [
+            "walk",
+            "motion_path"
+          ]
         },
         "enabled": {
           "type": "boolean"
@@ -76,6 +79,78 @@
         },
         "loop": {
           "type": "boolean"
+        },
+        "path_start_frame": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "path_duration_frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "path_from_x": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_from_y": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_to_x": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_to_y": {
+          "type": "number",
+          "minimum": -8192,
+          "maximum": 8192
+        },
+        "path_c1_x": { "type": "number", "minimum": -8192, "maximum": 8192 },
+        "path_c1_y": { "type": "number", "minimum": -8192, "maximum": 8192 },
+        "path_c2_x": { "type": "number", "minimum": -8192, "maximum": 8192 },
+        "path_c2_y": { "type": "number", "minimum": -8192, "maximum": 8192 },
+        "path_easing": {
+          "enum": [
+            "linear",
+            "ease_in_out",
+            "bezier"
+          ]
+        }
+      }
+    },
+    "poses": {
+      "type": "array",
+      "description": "Reusable named poses. Rotations are captured in degrees by bone ID and can be applied as keys at the current frame.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "rotations"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "rotations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": -3600,
+              "maximum": 3600
+            }
+          }
         }
       }
     }
@@ -153,8 +228,7 @@
     "constraint": {
       "type": "object",
       "required": [
-        "type",
-        "bone_id"
+        "type"
       ],
       "additionalProperties": false,
       "properties": {
@@ -191,8 +265,121 @@
             -1,
             1
           ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "upper_bone_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "lower_bone_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": -8192,
+              "maximum": 8192
+            },
+            "y": {
+              "type": "number",
+              "minimum": -8192,
+              "maximum": 8192
+            }
+          }
+        },
+        "bend": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "rotation_limit"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "bone_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "distance",
+                  "pin"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "bone_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "ik_two_bone"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "oneOf": [
+              {
+                "required": [
+                  "bone_id",
+                  "target_bone_id",
+                  "bend_direction"
+                ]
+              },
+              {
+                "required": [
+                  "id",
+                  "upper_bone_id",
+                  "lower_bone_id",
+                  "target",
+                  "bend"
+                ]
+              }
+            ]
+          }
+        }
+      ]
     }
   }
 }

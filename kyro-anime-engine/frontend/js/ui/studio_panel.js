@@ -58,6 +58,7 @@ export function initStudioPanel({ onCharacterImported }) {
   const root = $('p-studio');
   let activeTab = 'effects';
   let selectedCharacterId = '';
+  let selectedPoseId = '';
 
   function showTab(name) {
     activeTab = name;
@@ -469,6 +470,62 @@ export function initStudioPanel({ onCharacterImported }) {
       : 'Walk cycle disabled.';
   }
 
+  function renderMotionPathControls(rig) {
+    const animation = rig?.animation || {};
+    const fields = {
+      motionPathStart: animation.path_start_frame ?? 0,
+      motionPathDuration: animation.path_duration_frames ?? 24,
+      motionPathFromX: animation.path_from_x ?? 0,
+      motionPathFromY: animation.path_from_y ?? 0,
+      motionPathToX: animation.path_to_x ?? 240,
+      motionPathToY: animation.path_to_y ?? 0,
+      motionPathC1X: animation.path_c1_x ?? ((animation.path_from_x ?? 0) + ((animation.path_to_x ?? 240) - (animation.path_from_x ?? 0)) / 3),
+      motionPathC1Y: animation.path_c1_y ?? (animation.path_from_y ?? 0),
+      motionPathC2X: animation.path_c2_x ?? ((animation.path_from_x ?? 0) + 2 * ((animation.path_to_x ?? 240) - (animation.path_from_x ?? 0)) / 3),
+      motionPathC2Y: animation.path_c2_y ?? (animation.path_to_y ?? 0),
+    };
+    for (const [id, value] of Object.entries(fields)) {
+      const input = $(id);
+      if (document.activeElement !== input) input.value = String(value);
+      input.disabled = !rig;
+    }
+    $('motionPathEasing').value = animation.path_easing || 'ease_in_out';
+    $('motionPathEasing').disabled = !rig;
+    $('motionPathApply').disabled = !rig;
+    $('motionPathStatus').textContent = !rig
+      ? 'Create a rig before authoring a motion path.'
+      : animation.type === 'motion_path' && animation.enabled !== false
+        ? `Motion path active · frame ${(animation.path_start_frame ?? 0) + 1} → ${(animation.path_start_frame ?? 0) + (animation.path_duration_frames ?? 24) + 1}`
+        : 'Path is ready to author; applying it switches this rig to the motion-path clip.';
+  }
+
+  function applyMotionPathControls() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig) return;
+    const number = (id, fallback) => {
+      const value = Number($(id).value);
+      return Number.isFinite(value) ? value : fallback;
+    };
+    const animation = {
+      ...(rig.animation || {}),
+      type: 'motion_path',
+      enabled: true,
+      path_start_frame: Math.max(0, Math.round(number('motionPathStart', 0))),
+      path_duration_frames: Math.max(1, Math.min(10000, Math.round(number('motionPathDuration', 24)))),
+      path_from_x: Math.max(-8192, Math.min(8192, number('motionPathFromX', 0))),
+      path_from_y: Math.max(-8192, Math.min(8192, number('motionPathFromY', 0))),
+      path_to_x: Math.max(-8192, Math.min(8192, number('motionPathToX', 240))),
+      path_to_y: Math.max(-8192, Math.min(8192, number('motionPathToY', 0))),
+      path_c1_x: Math.max(-8192, Math.min(8192, number('motionPathC1X', 80))),
+      path_c1_y: Math.max(-8192, Math.min(8192, number('motionPathC1Y', 0))),
+      path_c2_x: Math.max(-8192, Math.min(8192, number('motionPathC2X', 160))),
+      path_c2_y: Math.max(-8192, Math.min(8192, number('motionPathC2Y', 0))),
+      path_easing: ['linear', 'ease_in_out', 'bezier'].includes($('motionPathEasing').value) ? $('motionPathEasing').value : 'ease_in_out',
+    };
+    updateRig({ ...clone(rig), animation });
+    $('motionPathStatus').textContent = `Motion path applied · ${animation.path_easing.replaceAll('_', ' ')} · ${animation.path_duration_frames} frames`;
+  }
+
   function renderTurnControls() {
     const scene = state.project?.scenes?.find(item => item.id === state.sceneId) || state.project?.scenes?.[0];
     const pairs = scene ? countTurnPairs(scene.layers, selectedCharacterId) : 0;
@@ -500,6 +557,76 @@ export function initStudioPanel({ onCharacterImported }) {
       $('rigTurnStatus').textContent = error.message || 'Could not build the turn.';
       toast(error.message || 'Could not build the turn.', 'err');
     }
+  }
+
+  function syncFacePoseLabels() {
+    $('faceYawValue').textContent = `${Number($('faceYaw').value) || 0}°`;
+    $('facePitchValue').textContent = `${Number($('facePitch').value) || 0}°`;
+    $('faceRollValue').textContent = `${Number($('faceRoll').value) || 0}°`;
+    $('faceDepthValue').textContent = `${(Number($('faceDepth').value) || 1).toFixed(2)}×`;
+  }
+
+  function renderFacePoseControls() {
+    const info = activeDrawingInfo();
+    const layer = info?.layer;
+    const enabled = !!layer;
+    for (const id of ['faceYaw', 'facePitch', 'faceRoll', 'faceDepth', 'facePoseKey']) $(id).disabled = !enabled;
+    if (!layer) {
+      $('facePoseStatus').textContent = 'Select a head or face artwork layer exposed at the current frame.';
+      syncFacePoseLabels();
+      return;
+    }
+    const transform = evaluateLayerTransform(layer, state.frame);
+    const depth = Math.max(0.1, Math.min(3, Math.abs(Number(transform.scale_x) || 1)));
+    const ratio = Math.max(0.05, Math.min(1, Math.abs((Number(transform.scale_y) || depth) / depth)));
+    const values = {
+      faceYaw: Math.round(Number(transform.rotation_y) || 0),
+      facePitch: Math.round(Math.acos(ratio) * 180 / Math.PI),
+      faceRoll: Math.round(Number(transform.rotation) || 0),
+      faceDepth: depth,
+    };
+    for (const [id, value] of Object.entries(values)) {
+      if (document.activeElement !== $(id)) $(id).value = String(value);
+    }
+    syncFacePoseLabels();
+    const label = `${layer.name || layer.id}`;
+    $('facePoseStatus').textContent = `Target: ${label} · frame ${state.frame + 1}. Values are evaluated from existing transform keys.`;
+  }
+
+  function keyFacePose() {
+    const info = activeDrawingInfo();
+    if (!info?.layer || !state.project) {
+      $('facePoseStatus').textContent = 'No active drawing layer at this frame.';
+      return;
+    }
+    const sceneIndex = (state.project.scenes || []).findIndex(item => item.id === info.scene.id);
+    if (sceneIndex < 0) return;
+    const layers = [...info.scene.layers];
+    const layerIndex = layers.findIndex(item => item.id === info.layer.id);
+    if (layerIndex < 0) return;
+    const yaw = Math.max(-90, Math.min(90, Number($('faceYaw').value) || 0));
+    const pitch = Math.max(-80, Math.min(80, Number($('facePitch').value) || 0));
+    const roll = Math.max(-180, Math.min(180, Number($('faceRoll').value) || 0));
+    const depth = Math.max(0.1, Math.min(3, Number($('faceDepth').value) || 1));
+    const channels = {
+      rotation_y: yaw,
+      rotation: roll,
+      scale_x: depth,
+      scale_y: depth * Math.max(0.05, Math.cos(pitch * Math.PI / 180)),
+    };
+    const tracks = { ...(info.layer.tracks || {}) };
+    for (const [channel, value] of Object.entries(channels)) {
+      const keys = [...(tracks[channel] || [])];
+      const key = { t: state.frame, v: value, ease: 'linear' };
+      const existing = keys.findIndex(item => item.t === state.frame);
+      if (existing >= 0) keys[existing] = key; else keys.push(key);
+      keys.sort((a, b) => a.t - b.t);
+      tracks[channel] = keys;
+    }
+    layers[layerIndex] = { ...info.layer, tracks };
+    execute(setValue(['scenes', sceneIndex, 'layers'], layers, 'Key head / face orientation'));
+    $('facePoseStatus').textContent = `Keyed yaw ${yaw}°, pitch ${pitch}°, roll ${roll}°, depth ${depth.toFixed(2)}× at frame ${state.frame + 1}.`;
+    toast('Face orientation keyframes added.', 'ok');
   }
 
   function renderRotationLimitControls(rig) {
@@ -565,12 +692,13 @@ export function initStudioPanel({ onCharacterImported }) {
       $('ikTargetY').value = constraint.target.y;
       $('ikBend').value = String(constraint.bend || 1);
     }
+    $('ikEnabled').checked = constraint?.enabled !== false;
     const enabled = !!rig && bones.length >= 2;
-    for (const id of ['ikUpperBone', 'ikLowerBone', 'ikTargetX', 'ikTargetY', 'ikBend', 'ikApply', 'ikRemove']) {
+    for (const id of ['ikUpperBone', 'ikLowerBone', 'ikTargetX', 'ikTargetY', 'ikBend', 'ikEnabled', 'ikApply', 'ikRemove']) {
       $(id).disabled = !enabled;
     }
     $('ikStatus').textContent = constraint
-      ? `Saved target (${constraint.target.x}, ${constraint.target.y}) for this bone pair.`
+      ? `Saved target (${constraint.target.x}, ${constraint.target.y}); ${constraint.enabled === false ? 'FK mode' : 'IK mode'}.`
       : 'Choose two bones, set the end target, then save.';
   }
 
@@ -592,10 +720,13 @@ export function initStudioPanel({ onCharacterImported }) {
         targetX: Number($('ikTargetX').value),
         targetY: Number($('ikTargetY').value),
         bend: Number($('ikBend').value),
-      });
+      }).map(item => item.type === 'ik_two_bone'
+        && item.upper_bone_id === upperBoneId && item.lower_bone_id === lowerBoneId
+        ? { ...item, enabled: $('ikEnabled').checked }
+        : item);
       updateRig({ ...clone(rig), constraints });
-      $('ikStatus').textContent = 'IK target saved. It will be applied during procedural rig playback.';
-      toast('IK target saved.', 'ok');
+      $('ikStatus').textContent = `IK target saved in ${$('ikEnabled').checked ? 'IK' : 'FK'} mode.`;
+      toast(`IK target saved · ${$('ikEnabled').checked ? 'IK' : 'FK'} mode`, 'ok');
     } catch (error) {
       $('ikStatus').textContent = error.message || 'Invalid IK target.';
       toast(error.message || 'Invalid IK target.', 'err');
@@ -615,6 +746,74 @@ export function initStudioPanel({ onCharacterImported }) {
     updateRig({ ...clone(rig), constraints });
     $('ikStatus').textContent = 'IK target removed.';
     toast('IK target removed.', 'ok');
+  }
+
+  function renderPoseLibrary(rig) {
+    const poses = Array.isArray(rig?.poses) ? rig.poses : [];
+    if (!poses.some(pose => pose.id === selectedPoseId)) selectedPoseId = poses[0]?.id || '';
+    selectOptions($('rigPoseSelect'), poses.map(pose => [pose.id, pose.name]), selectedPoseId, 'No saved poses');
+    $('rigPoseSave').disabled = !rig || !(rig.bones || []).length;
+    $('rigPoseApply').disabled = !rig || !poses.some(pose => pose.id === selectedPoseId);
+    $('rigPoseDelete').disabled = !rig || !poses.some(pose => pose.id === selectedPoseId);
+    $('rigPoseSelect').disabled = !rig || !poses.length;
+    if (!poses.length) $('rigPoseStatus').textContent = 'No saved poses yet.';
+    else $('rigPoseStatus').textContent = `${poses.length} saved pose${poses.length === 1 ? '' : 's'} · applying inserts keys at frame ${state.frame + 1}.`;
+  }
+
+  function saveCurrentPose() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig || !(rig.bones || []).length) return;
+    const name = ($('rigPoseName').value || '').trim().slice(0, 80);
+    if (!name) { $('rigPoseStatus').textContent = 'Enter a name for this pose.'; return; }
+    const rotations = {};
+    for (const bone of rig.bones) {
+      rotations[bone.id] = bone.tracks?.rotation?.length
+        ? evaluateTrack(bone.tracks.rotation, state.frame)
+        : (Number(bone.rotation) || 0);
+    }
+    const poses = [...(rig.poses || [])];
+    const existing = poses.findIndex(pose => pose.name.toLowerCase() === name.toLowerCase());
+    const pose = existing >= 0
+      ? { ...poses[existing], rotations }
+      : { id: nextId('pose', poses.map(item => item.id)), name, rotations };
+    if (existing >= 0) poses[existing] = pose; else poses.push(pose);
+    selectedPoseId = pose.id;
+    updateRig({ ...clone(rig), poses });
+    $('rigPoseStatus').textContent = `Saved “${name}” from frame ${state.frame + 1}.`;
+    toast(`Pose saved: ${name}`, 'ok');
+  }
+
+  function applySelectedPose() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const pose = (rig?.poses || []).find(item => item.id === selectedPoseId);
+    if (!rig || !pose) return;
+    const ease = state.keyEase || 'linear';
+    const bones = rig.bones.map(bone => {
+      if (!Object.prototype.hasOwnProperty.call(pose.rotations || {}, bone.id)) return bone;
+      const value = Number(pose.rotations[bone.id]);
+      if (!Number.isFinite(value)) return bone;
+      const tracks = clone(bone.tracks || {});
+      const keys = [...(tracks.rotation || [])];
+      const key = { t: state.frame, v: value, ease };
+      const index = keys.findIndex(item => item.t === state.frame);
+      if (index >= 0) keys[index] = key; else keys.push(key);
+      keys.sort((a, b) => a.t - b.t);
+      tracks.rotation = keys;
+      return { ...bone, tracks };
+    });
+    updateRig({ ...clone(rig), bones });
+    $('rigPoseStatus').textContent = `Applied “${pose.name}” at frame ${state.frame + 1}; existing keys were preserved.`;
+    toast(`Pose applied at frame ${state.frame + 1}`, 'ok');
+  }
+
+  function deleteSelectedPose() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const pose = (rig?.poses || []).find(item => item.id === selectedPoseId);
+    if (!rig || !pose) return;
+    const poses = rig.poses.filter(item => item.id !== pose.id);
+    selectedPoseId = poses[0]?.id || '';
+    updateRig({ ...clone(rig), poses });
+    $('rigPoseStatus').textContent = `Deleted “${pose.name}”.`;
   }
 
   function renderRig() {
@@ -642,6 +841,7 @@ export function initStudioPanel({ onCharacterImported }) {
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
     renderRotationLimitControls(rig);
     renderIKControls(rig);
+    renderPoseLibrary(rig);
     renderSkinTools(rig);
     renderWalkControls(rig);
     renderTurnControls();
@@ -893,6 +1093,7 @@ export function initStudioPanel({ onCharacterImported }) {
     renderRig();
     renderCharacterList();
     renderAudio();
+    renderFacePoseControls();
   }
 
   root.querySelectorAll('[data-studio-tab]').forEach(button => {
@@ -906,7 +1107,14 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rigDelete').onclick = deleteRig;
   $('rigAuto').onclick = autoRig;
   $('rigWalkApply').onclick = applyWalkControls;
+  $('motionPathApply').onclick = applyMotionPathControls;
+  $('rigPoseSelect').addEventListener('change', event => { selectedPoseId = event.target.value; renderPoseLibrary((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)); });
+  $('rigPoseSave').onclick = saveCurrentPose;
+  $('rigPoseApply').onclick = applySelectedPose;
+  $('rigPoseDelete').onclick = deleteSelectedPose;
   $('rigTurnApply').onclick = applyTurnChoreography;
+  $('facePoseKey').onclick = keyFacePose;
+  for (const id of ['faceYaw', 'facePitch', 'faceRoll', 'faceDepth']) $(id).addEventListener('input', syncFacePoseLabels);
   for (const id of ['rigWalkStride', 'rigWalkBob', 'rigWalkWeight']) {
     $(id).addEventListener('input', () => {
       const value = Number($(id).value);
@@ -948,7 +1156,7 @@ export function initStudioPanel({ onCharacterImported }) {
   $('audioUpload').onclick = uploadAudio;
   bus.on('project:changed', render);
   bus.on('state', patch => {
-    if ('project' in patch || 'sceneId' in patch) render();
+    if ('project' in patch || 'sceneId' in patch || 'frame' in patch || 'layerId' in patch) render();
   });
   showTab(activeTab);
   render();
