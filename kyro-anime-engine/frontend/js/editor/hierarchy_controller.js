@@ -32,6 +32,7 @@ export function renderLayerHierarchy(container, layers, {
       };
       item.ondrop = event => {
         event.preventDefault(); event.stopPropagation();
+        if (layer.type !== 'group' && layer.type !== 'character_instance') return;
         const sourceId = event.dataTransfer?.getData('text/kae-layer-id');
         if (!sourceId || sourceId === layer.id) return;
         try { onReparent(sourceId, layer.id); } catch (error) { onError(error); }
