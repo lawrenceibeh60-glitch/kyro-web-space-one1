@@ -10,6 +10,7 @@ import { execute, batch, insertAt, setValue } from '../core/command_manager.js';
 import { findExposure } from '../rendering/renderer.js';
 import { clamp, frameFromTimelineX, exposureBounds, previewExposureEdit, validateExposureTrack } from '../animation/timeline.js';
 import { toast } from './notifications.js';
+import { createDrawQueue } from '../rendering/draw_queue.js';
 
 const ROW = 20, RULER = 18, PAD = 6;
 
@@ -17,7 +18,7 @@ export function initTimelinePanel() {
   const $ = id => document.getElementById(id);
   const canvas = $('dope'), content = $('dopeContent'), scroll = $('dopeScroll');
   const names = $('dopeNames'), ctx = canvas.getContext('2d');
-  let px = 10, W = 0, H = 0, dpr = 1, canvasDpr = 0, queued = false;
+  let px = 10, W = 0, H = 0, dpr = 1, canvasDpr = 0;
   let mode = null, drag = null, exposureDrag = null, zoom = 1;
   let selectedMarkerId = null;
 
@@ -28,11 +29,8 @@ export function initTimelinePanel() {
   const frameX = f => PAD + f * px + px / 2;
   const frameAt = x => frameFromTimelineX(x, PAD, px, total());
 
-  function requestDraw() {
-    if (queued) return;
-    queued = true;
-    requestAnimationFrame(() => { queued = false; draw(); });
-  }
+  const drawQueue = createDrawQueue(() => draw());
+  function requestDraw() { drawQueue.request(); }
 
   function renderNames() {
     names.innerHTML = '';
