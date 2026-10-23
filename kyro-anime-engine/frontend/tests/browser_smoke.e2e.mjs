@@ -60,6 +60,22 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.waitForURL(/editor\.html\?project=/);
     await page.locator('#canvas').waitFor({ state: 'visible' });
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
+    const styledShape = await page.evaluate(async () => {
+      const { evaluateGeometryGraph } = await import('/js/animation/geometry_nodes.js');
+      const nodes = [
+        { id: 'circle', type: 'circle', params: { radius: 20, segments: 16 } },
+        { id: 'style', type: 'style', params: { fill: '#123456', stroke: '#abcdef', stroke_width: 4 } },
+        { id: 'opacity', type: 'opacity', params: { opacity: 0.4 } },
+        { id: 'output', type: 'output', params: {} },
+      ];
+      return evaluateGeometryGraph({ nodes, links: [
+        { from: 'circle', to: 'style' }, { from: 'style', to: 'opacity' }, { from: 'opacity', to: 'output' },
+      ] })[0];
+    });
+    assert.equal(styledShape.fill, '#123456');
+    assert.equal(styledShape.stroke, '#abcdef');
+    assert.equal(styledShape.strokeWidth, 4);
+    assert.equal(styledShape.opacity, 0.4);
     await page.waitForFunction(() => Boolean(window.kae.state.layerId));
     await page.locator('#trackColorInput').evaluate(input => {
       input.value = '#123456';
