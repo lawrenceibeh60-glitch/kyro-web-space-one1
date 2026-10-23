@@ -211,7 +211,7 @@ export function initCompositorStudio() {
     graph.nodes.forEach((node, index) => {
       const meta = COMPOSITOR_NODE_TYPES[node.type];
       if (!meta) return;
-      const card = document.createElement('article'); card.className = 'compositor-node' + (node.enabled === false ? ' disabled' : '');
+      const card = document.createElement('article'); card.className = 'compositor-node' + (node.enabled === false ? ' disabled' : ''); card.dataset.nodeType = node.type; card.dataset.nodeId = node.id;
       const head = document.createElement('div'); head.className = 'compositor-node-head';
       const title = document.createElement('strong'); title.textContent = meta.label; head.append(title);
       const toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = node.enabled === false ? 'Enable' : 'On'; toggle.title = 'Toggle compositor node'; toggle.onclick = () => { const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, enabled: n.enabled === false } : { ...n }); commitGraph(graphFromNodes(nodes, graph.links), 'Toggle compositor node'); }; head.append(toggle);
