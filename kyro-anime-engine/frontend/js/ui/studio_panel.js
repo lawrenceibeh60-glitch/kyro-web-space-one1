@@ -58,6 +58,7 @@ export function initStudioPanel({ onCharacterImported }) {
   const root = $('p-studio');
   let activeTab = 'effects';
   let selectedCharacterId = '';
+  let selectedPoseId = '';
 
   function showTab(name) {
     activeTab = name;
@@ -665,6 +666,74 @@ export function initStudioPanel({ onCharacterImported }) {
     toast('IK target removed.', 'ok');
   }
 
+  function renderPoseLibrary(rig) {
+    const poses = Array.isArray(rig?.poses) ? rig.poses : [];
+    if (!poses.some(pose => pose.id === selectedPoseId)) selectedPoseId = poses[0]?.id || '';
+    selectOptions($('rigPoseSelect'), poses.map(pose => [pose.id, pose.name]), selectedPoseId, 'No saved poses');
+    $('rigPoseSave').disabled = !rig || !(rig.bones || []).length;
+    $('rigPoseApply').disabled = !rig || !poses.some(pose => pose.id === selectedPoseId);
+    $('rigPoseDelete').disabled = !rig || !poses.some(pose => pose.id === selectedPoseId);
+    $('rigPoseSelect').disabled = !rig || !poses.length;
+    if (!poses.length) $('rigPoseStatus').textContent = 'No saved poses yet.';
+    else $('rigPoseStatus').textContent = `${poses.length} saved pose${poses.length === 1 ? '' : 's'} · applying inserts keys at frame ${state.frame + 1}.`;
+  }
+
+  function saveCurrentPose() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    if (!rig || !(rig.bones || []).length) return;
+    const name = ($('rigPoseName').value || '').trim().slice(0, 80);
+    if (!name) { $('rigPoseStatus').textContent = 'Enter a name for this pose.'; return; }
+    const rotations = {};
+    for (const bone of rig.bones) {
+      rotations[bone.id] = bone.tracks?.rotation?.length
+        ? evaluateTrack(bone.tracks.rotation, state.frame)
+        : (Number(bone.rotation) || 0);
+    }
+    const poses = [...(rig.poses || [])];
+    const existing = poses.findIndex(pose => pose.name.toLowerCase() === name.toLowerCase());
+    const pose = existing >= 0
+      ? { ...poses[existing], rotations }
+      : { id: nextId('pose', poses.map(item => item.id)), name, rotations };
+    if (existing >= 0) poses[existing] = pose; else poses.push(pose);
+    selectedPoseId = pose.id;
+    updateRig({ ...clone(rig), poses });
+    $('rigPoseStatus').textContent = `Saved “${name}” from frame ${state.frame + 1}.`;
+    toast(`Pose saved: ${name}`, 'ok');
+  }
+
+  function applySelectedPose() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const pose = (rig?.poses || []).find(item => item.id === selectedPoseId);
+    if (!rig || !pose) return;
+    const ease = state.keyEase || 'linear';
+    const bones = rig.bones.map(bone => {
+      if (!Object.prototype.hasOwnProperty.call(pose.rotations || {}, bone.id)) return bone;
+      const value = Number(pose.rotations[bone.id]);
+      if (!Number.isFinite(value)) return bone;
+      const tracks = clone(bone.tracks || {});
+      const keys = [...(tracks.rotation || [])];
+      const key = { t: state.frame, v: value, ease };
+      const index = keys.findIndex(item => item.t === state.frame);
+      if (index >= 0) keys[index] = key; else keys.push(key);
+      keys.sort((a, b) => a.t - b.t);
+      tracks.rotation = keys;
+      return { ...bone, tracks };
+    });
+    updateRig({ ...clone(rig), bones });
+    $('rigPoseStatus').textContent = `Applied “${pose.name}” at frame ${state.frame + 1}; existing keys were preserved.`;
+    toast(`Pose applied at frame ${state.frame + 1}`, 'ok');
+  }
+
+  function deleteSelectedPose() {
+    const rig = (state.project?.rigs || []).find(item => item.character_id === selectedCharacterId);
+    const pose = (rig?.poses || []).find(item => item.id === selectedPoseId);
+    if (!rig || !pose) return;
+    const poses = rig.poses.filter(item => item.id !== pose.id);
+    selectedPoseId = poses[0]?.id || '';
+    updateRig({ ...clone(rig), poses });
+    $('rigPoseStatus').textContent = `Deleted “${pose.name}”.`;
+  }
+
   function renderRig() {
     if (!state.project) return;
     const characters = state.project.characters || [];
@@ -690,6 +759,7 @@ export function initStudioPanel({ onCharacterImported }) {
     selectOptions($('boneParent'), [['', 'No parent'], ...boneOptions], $('boneParent').value, 'No bones');
     renderRotationLimitControls(rig);
     renderIKControls(rig);
+    renderPoseLibrary(rig);
     renderSkinTools(rig);
     renderWalkControls(rig);
     renderTurnControls();
@@ -954,6 +1024,10 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rigDelete').onclick = deleteRig;
   $('rigAuto').onclick = autoRig;
   $('rigWalkApply').onclick = applyWalkControls;
+  $('rigPoseSelect').addEventListener('change', event => { selectedPoseId = event.target.value; renderPoseLibrary((state.project?.rigs || []).find(item => item.character_id === selectedCharacterId)); });
+  $('rigPoseSave').onclick = saveCurrentPose;
+  $('rigPoseApply').onclick = applySelectedPose;
+  $('rigPoseDelete').onclick = deleteSelectedPose;
   $('rigTurnApply').onclick = applyTurnChoreography;
   for (const id of ['rigWalkStride', 'rigWalkBob', 'rigWalkWeight']) {
     $(id).addEventListener('input', () => {
