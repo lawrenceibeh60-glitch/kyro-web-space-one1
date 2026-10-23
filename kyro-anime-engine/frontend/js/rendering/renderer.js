@@ -80,19 +80,20 @@ function drawColorGradeComposite(ctx, effects, width, height) {
   const sourceCtx = source.getContext('2d');
   if (!sourceCtx) return;
   sourceCtx.drawImage(ctx.canvas, 0, 0, width, height);
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  let brightness = 1, contrast = 1, saturation = 1;
   for (const effect of grades) {
     const amount = Math.max(0, Math.min(1, Number(effect.intensity ?? 0.5)));
-    const brightness = effect.type === 'levels' ? 100 + amount * 24 : 100 + amount * 12;
-    const contrast = effect.type === 'levels' ? 100 + amount * 55 : 100 + amount * 20;
-    const saturation = 100 + amount * (effect.type === 'levels' ? 18 : 35);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
-    ctx.drawImage(source, 0, 0, width, height);
-    ctx.filter = 'none';
+    brightness *= 1 + amount * (effect.type === 'levels' ? 0.24 : 0.12);
+    contrast *= 1 + amount * (effect.type === 'levels' ? 0.55 : 0.20);
+    saturation *= 1 + amount * (effect.type === 'levels' ? 0.18 : 0.35);
   }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'copy';
+  ctx.filter = `brightness(${brightness * 100}%) contrast(${contrast * 100}%) saturate(${saturation * 100}%)`;
+  ctx.drawImage(source, 0, 0, width, height);
+  ctx.filter = 'none';
   ctx.restore();
 }
 
