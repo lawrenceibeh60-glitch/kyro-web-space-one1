@@ -466,6 +466,26 @@ export function initTimelinePanel() {
     requestDraw();
   }
 
+  function syncTimelineFps() {
+    const control = $('timelineFps');
+    if (control) control.value = String(state.project?.settings?.fps || 24);
+  }
+
+  function setTimelineFps() {
+    const control = $('timelineFps');
+    if (!control || !state.project) return;
+    const fps = Number(control.value);
+    if (![8, 12, 15, 24, 25, 30, 48, 50, 60].includes(fps)) {
+      syncTimelineFps();
+      return;
+    }
+    if (fps === Number(state.project.settings.fps || 24)) return;
+    if (isPlaying()) stop();
+    execute(setValue(['settings', 'fps'], fps, 'Set project frame rate'));
+    syncTimelineFps();
+    toast('Project frame rate set to ' + fps + ' FPS');
+  }
+
   function renderPreviewRange() {
     const range = state.project?.preview_range;
     const valid = range && Number.isInteger(range.start) && Number.isInteger(range.end)
@@ -500,6 +520,7 @@ export function initTimelinePanel() {
     requestDraw();
   }
 
+  if ($('timelineFps')) $('timelineFps').addEventListener('change', setTimelineFps);
   $('previewStart').onclick = setPreviewStart;
   $('previewEnd').onclick = setPreviewEnd;
   $('previewClear').onclick = clearPreviewRange;
@@ -518,6 +539,7 @@ export function initTimelinePanel() {
   new ResizeObserver(() => { renderNames(); requestDraw(); }).observe(scroll);
 
   bus.on('state', p => {
+    if ('project' in p) syncTimelineFps();
     if ('frame' in p || 'project' in p || 'sceneId' in p || 'layerId' in p) requestDraw();
     if ('project' in p) {
       if (!markers().some(marker => marker.id === selectedMarkerId)) selectedMarkerId = null;
