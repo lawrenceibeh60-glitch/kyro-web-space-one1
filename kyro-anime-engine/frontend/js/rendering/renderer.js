@@ -495,11 +495,12 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   if (!opts?.transparent) { ctx.fillStyle = background || '#ffffff'; ctx.fillRect(0, 0, width, height); }
   const documentRef = ctx.canvas?.ownerDocument;
   const layerEffects = effects.filter(effect => ['soft_shadow', 'depth_of_field', 'layer_mask'].includes(effect.type));
+  const compositorLayers = [];
   const shadowEffect = layerEffects.find(effect => effect.type === 'soft_shadow');
   const depthEffect = layerEffects.find(effect => effect.type === 'depth_of_field');
   const maskEffects = layerEffects.filter(effect => effect.type === 'layer_mask');
   let layerCanvas = null, layerCtx = null, shadowCanvas = null, shadowCtx = null, maskCanvas = null, maskCtx = null;
-  if (layerEffects.length && documentRef?.createElement) {
+  if (documentRef?.createElement) {
     layerCanvas = documentRef.createElement('canvas');
     layerCanvas.width = width; layerCanvas.height = height;
     layerCtx = layerCanvas.getContext('2d');
@@ -583,6 +584,24 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
         layerCtx.drawImage(maskCanvas, 0, 0);
         layerCtx.restore();
       }
+      // Keep an isolated, transformed surface per visible layer for layer-aware
+      // Alpha Over and Z-depth compositor nodes. The regular render path below
+      // remains the default, so projects without advanced nodes render unchanged.
+      if (documentRef?.createElement) {
+        const layerSnapshot = documentRef.createElement('canvas');
+        layerSnapshot.width = width; layerSnapshot.height = height;
+        const snapshotCtx = layerSnapshot.getContext('2d');
+        if (snapshotCtx) {
+          snapshotCtx.drawImage(layerCanvas, 0, 0, width, height);
+          compositorLayers.push({
+            id: layer.id,
+            name: layer.name || layer.id,
+            depth: Number(layer.depth ?? 1),
+            blend: layer.blend || 'normal',
+            canvas: layerSnapshot,
+          });
+        }
+      }
       ctx.save();
       if (shadowEffect && shadowCtx) {
         shadowCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -640,7 +659,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   drawGlowComposite(ctx, effects, width, height);
   drawColorGradeComposite(ctx, effects, width, height);
   drawVignetteComposite(ctx, effects, width, height);
-  if (project.compositor_graph) applyCompositorGraph(ctx, project.compositor_graph, width, height);
+  if (project.compositor_graph) applyCompositorGraph(ctx, project.compositor_graph, width, height, { layers: compositorLayers, background });
   if (preview?.cursor) {
     ctx.save();
     const cursorLayer = scene?.layers.find(layer => layer.id === preview.layerId);
