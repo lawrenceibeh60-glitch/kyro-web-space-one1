@@ -116,6 +116,38 @@
           ]
         }
       }
+    },
+    "poses": {
+      "type": "array",
+      "description": "Reusable named poses. Rotations are captured in degrees by bone ID and can be applied as keys at the current frame.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "rotations"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,64}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "rotations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "minimum": -3600,
+              "maximum": 3600
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {
