@@ -12,7 +12,7 @@ export function flattenLayerTree(layers = [], ancestors = [], output = []) {
   for (const layer of Array.isArray(layers) ? layers : []) {
     if (!layer || layer.visible === false) continue;
     const entry = { layer, ancestors: ancestors.slice() };
-    if (layer.type !== 'group' || (Array.isArray(layer.exposures) && layer.exposures.length)) output.push(entry);
+    output.push(entry);
     if (Array.isArray(layer.children) && layer.children.length) {
       flattenLayerTree(layer.children, [...ancestors, layer], output);
     }
