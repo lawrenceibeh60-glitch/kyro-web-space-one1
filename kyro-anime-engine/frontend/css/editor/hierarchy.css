@@ -1,1 +1,43 @@
-/* frontend/css/editor/hierarchy.css - TODO */
+/* Scene hierarchy / nested group rows */
+#p-outliner .layers { list-style: none; margin: 0; padding: 0; }
+#p-outliner .layer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+}
+#p-outliner .layer.active {
+  border-left-color: var(--accent, #36c5d8);
+  background: rgba(54, 197, 216, .12);
+}
+#p-outliner .layer .nm {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#p-outliner .layer > button {
+  flex: 0 0 20px;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0;
+}
+#p-outliner .layer-children {
+  flex: 1 0 100%;
+  width: 100%;
+  padding-left: 8px;
+  border-left: 1px solid rgba(130, 150, 170, .22);
+}
+#p-outliner .layer-group > .nm { font-weight: 650; color: var(--text, #e6edf3); }
+#p-outliner .panel-actions #addGroup { color: var(--accent, #36c5d8); }
+@media (max-width: 720px) {
+  #p-outliner .layer { min-height: 30px; }
+  #p-outliner .layer > button { width: 24px; min-width: 24px; height: 24px; }
+}
