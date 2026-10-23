@@ -106,6 +106,15 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_mask');
       return !!node?.params?.mask_layer_id && node.params.invert === true;
     });
+    const alphaOverCard = page.locator('.compositor-node').filter({ hasText: 'Alpha Over' });
+    const secondarySocket = alphaOverCard.locator('select').nth(2);
+    if (await secondarySocket.locator('option').count() > 1) {
+      await secondarySocket.selectOption({ index: 1 });
+      await page.waitForFunction(() => {
+        const graph = window.kae.state.project.compositor_graph;
+        return graph.links.some(link => link.to === graph.nodes.find(node => node.type === 'alpha_over')?.id && Number(link.to_socket) === 1);
+      });
+    }
     const compositorPixels = await page.evaluate(async () => {
       const { renderFrame } = await import('/js/rendering/renderer.js');
       const rect = color => ({ commands: [['M', 8, 8], ['L', 56, 8], ['L', 56, 56], ['L', 8, 56], ['Z']], fill: color, color, width: 1 });
