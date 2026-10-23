@@ -23,7 +23,7 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 | --- | --- | --- |
 | Project load/save, compatibility, and validation | Partial | Version 1 to 2 migration, schema validation, and semantic/reference checks exist; a general migration registry and dependency resolver remain future work. |
 | Drawing and paths | Partial | Point strokes and Bézier commands render and edit. Dedicated tessellation, robust Boolean path operations, stroke expansion, gradients, patterns, textures, masks, and clipping are not implemented. |
-| Scene graph | Partial | Ordered layers, exposures, transforms, visibility, cameras, and character rigs exist. General drawable groups and parent-child scene objects with composed world transforms do not. |
+| Scene graph | Partial | Recursive group/child layers, hierarchy traversal and reparenting, inherited 2D transforms/opacity, nested timeline rows, and drag-and-drop grouping are implemented. Group-level offscreen compositing/blend isolation and complete world-space object evaluation remain future work. |
 | Procedural characters | Partial | A configurable character generator produces editable parts. It is a focused generator, not the full anatomy-guided builder suite in the blueprint. |
 | Character scenes | Partial | Characters can be imported and placed as layers; full character instances, lighting/material pipeline, and compositional scene graph are not implemented. |
 | Animation | Partial | Timeline, exposures, transform interpolation, camera animation, bone rotation tracks, rotation constraints, and two-bone IK tooling exist. Mesh/puppet deformation, foot locking, automatic walk-cycle synthesis, and robust facial animation tracks remain future work. |
@@ -38,7 +38,7 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 | 2.5D camera | Camera roll, pan, and zoom are not a true 3D orbit. There is no perspective camera or world-space 3D transform model. |
 | Character motion | Rigs support hierarchical 2D rotation. IK, mesh/puppet deformation, foot locking, automatic walk-cycle synthesis, and robust facial animation tracks remain future work. |
 | Procedural drawing | The character generator is a focused editable-part generator, not a complete anatomy-aware anime drawing system. |
-| Scene graph | Layers and depth exist, but general parented groups and complete world-transform composition are not implemented. |
+| Scene graph | Nested groups and inherited 2D transforms/opacity now render and can be edited in the hierarchy. Group-level isolated blend effects and full world-transform editing/inspection remain incomplete. |
 | Rendering | Canvas rendering supports current strokes, lights, and effects. Layer-aware Alpha Over, alpha-mask/matte compositing, and Z-depth sorting are available in the compositor stack, but arbitrary socket wiring, full shadow casting/materials, integrated depth-of-field routing, color management, and a dedicated rasterizer remain incomplete. |
 | Format evolution | The custom validator handles semantic checks; a general migration registry and full runtime validation against every JSON Schema are not implemented. |
 
@@ -47,7 +47,7 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 1. **Protect the format:** keep schema references resolvable, validate camera fields and keyframes consistently, and add compatibility tests before adding fields. The current repair branch includes schema-reference integrity checks.
 2. **Unify camera behavior:** centralize camera normalization, key insertion, dolly anchoring, and inverse pointer mapping. Keep viewport, picking, lights, rig overlays, and exports aligned.
 3. **Build cinematic 2.5D:** make depth values meaningful and predictable, add camera shot presets only when their behavior is executable, and provide easing/hold controls for shot timing.
-4. **Strengthen the scene graph:** add optional drawable groups and parent-child transforms without changing the meaning of existing flat layer lists.
+4. **Strengthen the scene graph:** recursive groups and parent-child 2D transform inheritance are implemented without changing the meaning of existing flat layer lists; group-isolated blending and full world-transform tooling remain follow-up work.
 5. **Improve character production:** make generated parts editable, add alternate front/three-quarter/profile views, then develop repeatable walk-cycle clips with clear contact/passing/up/down poses.
 6. **Expand rigging safely:** add constraints/IK and deformation only with evaluators, editing tools, validation, and tests—not schema-only promises.
 7. **Improve rendering:** add measurable cache invalidation, then compositing, masks, depth-of-field, and shadow features with viewport/export parity.
