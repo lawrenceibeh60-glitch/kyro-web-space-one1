@@ -107,6 +107,14 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
   const base = makeCanvas(documentRef, width, height);
   base.getContext('2d')?.drawImage(ctx.canvas, 0, 0, width, height);
   const outputs = new Map();
+  const layerInputsToExclude = new Set();
+  for (const node of nodes) {
+    if (!node || node.enabled === false) continue;
+    const secondaryConnected = links.some(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === 1);
+    if (secondaryConnected) continue;
+    if (node.type === 'alpha_over' && node.params?.overlay_layer_id) layerInputsToExclude.add(String(node.params.overlay_layer_id));
+    if (node.type === 'alpha_mask' && node.params?.mask_layer_id) layerInputsToExclude.add(String(node.params.mask_layer_id));
+  }
   const order = topologicalCompositorOrder(nodes, links);
   const getInputLink = (node, socket) => links.find(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket);
   const getInputCanvas = (node, socket, fallback) => {
@@ -125,10 +133,11 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
     if (node.enabled === false) {
       copyCanvasInto(outCtx, input0 || base, width, height);
     } else if (node.type === 'render_layers') {
-      copyCanvasInto(outCtx, base, width, height);
+      if (layerInputsToExclude.size && layers.length) rebuildLayerStack(outCtx, layers, width, height, options.background, 'scene_order', layerInputsToExclude);
+      else copyCanvasInto(outCtx, base, width, height);
     } else if (node.type === 'z_depth') {
       rebuildLayerStack(outCtx, layers, width, height, options.background,
-        params.direction || 'far_to_near', new Set());
+        params.direction || 'far_to_near', layerInputsToExclude);
     } else {
       copyCanvasInto(outCtx, input0 || base, width, height);
       if (node.type === 'color_correct') {
