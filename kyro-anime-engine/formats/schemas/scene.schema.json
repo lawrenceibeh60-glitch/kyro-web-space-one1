@@ -89,6 +89,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
         "name": { "type": "string" },
+        "timeline_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "description": "Optional track label and exposure color in the dope sheet." },
         "character_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$", "description": "Stable character registry ID for an imported part layer." },
         "character_part_id": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$" },
         "type": { "enum": ["drawing", "group", "character_instance"] },
