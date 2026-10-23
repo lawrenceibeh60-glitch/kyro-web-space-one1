@@ -308,6 +308,19 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     assert.equal(faceKeys.roll, -12);
     assert.equal(faceKeys.depth, 1.25);
 
+    // Detailed face construction guides persist through the project editor settings schema.
+    await page.locator('#kaeGuidesEnabled').check();
+    await page.locator('#kaeGuideHead').check();
+    await page.locator('#kaeGuideEyes').check();
+    await page.locator('#kaeGuideNose').check();
+    await page.locator('#kaeGuideMouth').check();
+    await page.locator('#kaeGuideEars').check();
+    await page.locator('#kaeGuideHairline').check();
+    await page.waitForFunction(() => {
+      const guides = window.kae.state.project.editor_settings?.guides;
+      return guides?.enabled && guides.head && guides.eyes && guides.nose && guides.mouth && guides.ears && guides.hairline;
+    });
+
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
