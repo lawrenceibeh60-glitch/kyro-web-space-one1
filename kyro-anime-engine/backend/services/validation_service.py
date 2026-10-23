@@ -852,6 +852,8 @@ def _check_layer(ly, where, layer_ids, drawings, errs, ancestors=None):
             for index, keyframe in enumerate(tracks["rotation_y"]):
                 if isinstance(keyframe, dict) and _num(keyframe.get("v")) and not -180 <= keyframe["v"] <= 180:
                     errs.append(f"{where}.tracks.rotation_y[{index}].v: number -180..180 required")
+    if layer_type not in ("group", "character_instance") and "children" in ly:
+        errs.append(f"{where}.children: only group and character_instance layers may own children")
     if layer_type in ("group", "character_instance"):
         if lid in ancestors:
             errs.append(f"{where}: cycle detected (ancestor '{lid}')")
