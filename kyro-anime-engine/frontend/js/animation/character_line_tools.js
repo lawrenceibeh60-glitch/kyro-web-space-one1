@@ -4,7 +4,6 @@ import { state, setState } from '../core/state_manager.js';
 import { bus } from '../core/event_bus.js';
 import { execute, setValue } from '../core/command_manager.js';
 import { evaluateCamera } from './camera_evaluator.js';
-import { snapPointToRigJoint } from './rig_snap.js';
 
 const $ = id => document.getElementById(id);
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
@@ -103,6 +102,25 @@ function parentAtStart(rig, point, excludeId = null) {
   }
   return bestDistance <= 32 ? best : null;
 }
+function snapPointToRigJoint(point, bones, radius = 24) {
+  if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y) || !Number.isFinite(radius) || radius < 0) return null;
+  let best = null, bestDistance = radius;
+  for (const bone of bones || []) {
+    if (!Number.isFinite(bone.pivot?.x) || !Number.isFinite(bone.pivot?.y)) continue;
+    const angle = (Number(bone.rotation) || 0) * Math.PI / 180;
+    const length = Math.max(0, Number(bone.length) || 0);
+    const candidates = [
+      { x: bone.pivot.x, y: bone.pivot.y },
+      { x: bone.pivot.x + Math.cos(angle) * length, y: bone.pivot.y + Math.sin(angle) * length },
+    ];
+    for (const candidate of candidates) {
+      const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y);
+      if (distance <= bestDistance) { bestDistance = distance; best = candidate; }
+    }
+  }
+  return best;
+}
+
 function createBone(a, b) {
   const active = activeRig();
   if (!active) { notify('Create/select a character rig in Studio → Rig first.', true); return; }
