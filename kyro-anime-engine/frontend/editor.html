@@ -252,6 +252,14 @@
                 <div class="xrow n"><span>Duration</span><input id="turnDuration" type="number" min="4" max="240" step="1" value="12"></div>
                 <button id="rigTurnApply" class="primary">Build front/profile turn</button>
                 <div id="rigTurnStatus" class="hint" aria-live="polite"></div>
+                <div class="grp-title">Head / face orientation</div>
+                <div class="hint">Select the head or face artwork layer. Key orientation at the current frame: yaw uses the renderer's perspective projection, pitch controls vertical foreshortening, roll rotates in 2D, and depth scales the layer.</div>
+                <label class="fld"><span>Yaw <b id="faceYawValue">0°</b></span><input id="faceYaw" type="range" min="-90" max="90" step="1" value="0"></label>
+                <label class="fld"><span>Pitch <b id="facePitchValue">0°</b></span><input id="facePitch" type="range" min="-80" max="80" step="1" value="0"></label>
+                <label class="fld"><span>Roll <b id="faceRollValue">0°</b></span><input id="faceRoll" type="range" min="-180" max="180" step="1" value="0"></label>
+                <label class="fld"><span>Depth / scale <b id="faceDepthValue">1.00×</b></span><input id="faceDepth" type="range" min="0.1" max="3" step="0.05" value="1"></label>
+                <button id="facePoseKey" class="primary">Key Face Orientation at Current Frame</button>
+                <div id="facePoseStatus" class="hint" aria-live="polite">Select a head or face artwork layer.</div>
                 <div class="grp-title">Vector skinning</div>
                 <div class="hint">Bind every point or Bézier control point in the active drawing to bones. Auto-weight assigns the nearest pivot; edit weights after for better joints.</div>
                 <label class="fld"><span>Influence bone</span><select id="skinBone"></select></label>
