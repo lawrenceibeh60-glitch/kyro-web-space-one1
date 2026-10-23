@@ -90,3 +90,13 @@ This pass adds a small but important quality and usability improvement without r
 - Regression assertions verify the generated detail strokes and continue validating the character document against the canonical schema.
 
 The current editor already contains the rigging, IK, weighted vector deformation, walk-cycle authoring, camera motion, scene effects, and export foundations listed above. These are not a promise of a full 3D renderer: KAE remains a 2D/2.5D production editor. True mesh deformation across arbitrary artwork, production-grade masks and advanced within-character depth-of-field/shadow controls, and pixel-perfect automatic video reconstruction still require separate validated implementation work.
+
+
+## Character Line Tracement and procedural curve nodes
+
+- In Studio → Rig, select a character rig and the character part the new bone should control. Enable **Character Line Tracement** and **Bone Rigging**, then draw from the joint/pivot toward the next joint. Releasing the pointer creates an editable rig bone with pivot, length, angle, and a parent link when an existing bone endpoint is close enough. The action is undoable through the normal editor history.
+- The tool works with mouse, touch, or stylus through the viewport's existing world-coordinate pointer events. It draws a temporary guide only; it does not add permanent artwork.
+- The Geometry Nodes workspace now includes Ellipse, Line, Bezier Curve, Subdivide, Smooth Curve, and Reverse Curve nodes. Their parameters are editable in the node inspector, and open curves render as open paths in the live preview. The project node-graph schema accepts these node types.
+- Project import accepts `.kaa` as a JSON-based native project extension alongside `.json`. This is an extension-level compatibility step; it does not yet introduce a binary container or Base64 raster-asset pipeline.
+
+Current scope note: Character Line Tracement creates and connects bones; it does not automatically generate accurate skin weights, solve arbitrary IK chains, reconstruct unseen head views, or create a motion-path animation clip. Those behaviours require additional runtime integration and regression tests. The existing Geometry Nodes workspace is still a procedural vector-geometry graph, not yet a full image compositor graph.
