@@ -4,6 +4,7 @@ import { state, setState } from '../core/state_manager.js';
 import { bus } from '../core/event_bus.js';
 import { execute, setValue } from '../core/command_manager.js';
 import { evaluateCamera } from './camera_evaluator.js';
+import { snapPointToRigJoint } from './rig_snap.js';
 
 const $ = id => document.getElementById(id);
 const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
@@ -110,6 +111,8 @@ function createBone(a, b) {
   const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
   if (length < 3) { notify('Bone was too short. Draw a longer line.', true); return; }
   const rig = active.rig;
+  const snappedStart = snapPointToRigJoint(a, rig.bones || [], 24);
+  if (snappedStart) a = { x: snappedStart.x, y: snappedStart.y };
   const parent = parentAtStart(rig, a);
   const name = ($('boneName')?.value || 'Bone').trim().slice(0, 64) || 'Bone';
   const used = new Set((rig.bones || []).map(item => item.id));
