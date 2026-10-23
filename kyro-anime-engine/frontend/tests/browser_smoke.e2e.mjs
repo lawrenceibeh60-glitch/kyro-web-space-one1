@@ -281,6 +281,33 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       return rig.constraints.some(item => item.type === 'ik_two_bone' && item.enabled === false);
     });
 
+    // Head/face orientation writes editable transform keys on the active drawing layer.
+    await page.locator('#faceYaw').fill('35');
+    await page.locator('#facePitch').fill('20');
+    await page.locator('#faceRoll').fill('-12');
+    await page.locator('#faceDepth').fill('1.25');
+    await page.locator('#facePoseKey').click();
+    await page.waitForFunction(() => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      const layer = scene.layers.find(item => item.id === state.layerId);
+      return ['rotation_y', 'rotation', 'scale_x', 'scale_y'].every(channel =>
+        layer?.tracks?.[channel]?.some(key => key.t === state.frame));
+    });
+    const faceKeys = await page.evaluate(() => {
+      const state = window.kae.state;
+      const scene = state.project.scenes.find(item => item.id === state.sceneId);
+      const layer = scene.layers.find(item => item.id === state.layerId);
+      return {
+        yaw: layer.tracks.rotation_y.find(key => key.t === state.frame)?.v,
+        roll: layer.tracks.rotation.find(key => key.t === state.frame)?.v,
+        depth: layer.tracks.scale_x.find(key => key.t === state.frame)?.v,
+      };
+    });
+    assert.equal(faceKeys.yaw, 35);
+    assert.equal(faceKeys.roll, -12);
+    assert.equal(faceKeys.depth, 1.25);
+
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
