@@ -633,6 +633,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
       ctx.restore();
     }
   }
+  if (project.compositor_graph) applyCompositorGraph(ctx, project.compositor_graph, width, height, { layers: compositorLayers, background });
   if (scene?.lights?.length) {
     ctx.save();
     applyCameraTransform(ctx, width, height, camera, frame);
@@ -659,7 +660,6 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   drawGlowComposite(ctx, effects, width, height);
   drawColorGradeComposite(ctx, effects, width, height);
   drawVignetteComposite(ctx, effects, width, height);
-  if (project.compositor_graph) applyCompositorGraph(ctx, project.compositor_graph, width, height, { layers: compositorLayers, background });
   if (preview?.cursor) {
     ctx.save();
     const cursorLayer = scene?.layers.find(layer => layer.id === preview.layerId);
