@@ -100,7 +100,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#compositorNodeType').selectOption('alpha_mask');
     await page.locator('#compositorAddNode').click();
     const matteCard = page.locator('.compositor-node[data-node-type="alpha_mask"]');
-    await matteCard.locator('select').selectOption({ index: 1 });
+    await matteCard.locator('select').first().selectOption({ index: 1 });
     await matteCard.locator('input[type="checkbox"]').check();
     await page.waitForFunction(() => {
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_mask');
