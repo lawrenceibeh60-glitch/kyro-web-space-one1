@@ -60,6 +60,12 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.waitForURL(/editor\.html\?project=/);
     await page.locator('#canvas').waitFor({ state: 'visible' });
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
+    await page.locator('#compositorNodeType').selectOption('levels');
+    await page.locator('#compositorAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.compositor_graph?.nodes?.some(node => node.type === 'levels'));
+    await page.locator('#compositorNodeList input').first().fill('12');
+    await page.locator('#compositorNodeList input').first().press('Enter');
+    await page.waitForFunction(() => window.kae.state.project.compositor_graph.nodes.find(node => node.type === 'levels')?.params?.brightness === 12);
 
     // A double-click on an empty exposure cell should author a real blank drawing cel.
     await page.locator('#addLayer').click();
