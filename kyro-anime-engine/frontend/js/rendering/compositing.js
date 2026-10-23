@@ -173,7 +173,7 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
 }
 
 const makeNodeId = () => 'comp_' + Math.random().toString(36).slice(2, 11);
-const graphFromNodes = nodes => ({ nodes, links: nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id })) });
+const graphFromNodes = (nodes, previousLinks = null) => ({ nodes, links: previousLinks ? previousLinks.filter(link => nodes.some(node => node.id === link.from) && nodes.some(node => node.id === link.to)).map(link => ({ ...link })) : nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id, from_socket: 0, to_socket: 0 })) });
 const defaultCompositorGraph = () => graphFromNodes([
   { id: 'render_layers', type: 'render_layers', enabled: true, params: {} },
   { id: 'output', type: 'output', enabled: true, params: {} },
@@ -197,7 +197,26 @@ export function initCompositorStudio() {
       const card = document.createElement('article'); card.className = 'compositor-node' + (node.enabled === false ? ' disabled' : '');
       const head = document.createElement('div'); head.className = 'compositor-node-head';
       const title = document.createElement('strong'); title.textContent = meta.label; head.append(title);
-      const toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = node.enabled === false ? 'Enable' : 'On'; toggle.title = 'Toggle compositor node'; toggle.onclick = () => { const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, enabled: n.enabled === false } : { ...n }); commitGraph(graphFromNodes(nodes), 'Toggle compositor node'); }; head.append(toggle);
+      const toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = node.enabled === false ? 'Enable' : 'On'; toggle.title = 'Toggle compositor node'; toggle.onclick = () => { const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, enabled: n.enabled === false } : { ...n }); commitGraph(graphFromNodes(nodes, graph.links), 'Toggle compositor node'); }; head.append(toggle);
+      const inputCount = node.type === 'render_layers' ? 0 : (node.type === 'alpha_over' || node.type === 'alpha_mask' ? 2 : 1);
+      for (let socket = 0; socket < inputCount; socket++) {
+        const label = document.createElement('label'); label.className = 'compositor-param compositor-socket';
+        label.textContent = socket === 0 ? 'Image input' : 'Secondary image input';
+        const select = document.createElement('select');
+        const incoming = graph.links.find(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket);
+        const none = document.createElement('option'); none.value = ''; none.textContent = socket === 1 ? 'Use selected layer / none' : 'Use previous output'; select.append(none);
+        for (const source of graph.nodes.slice(0, index)) {
+          if (source.id === node.id) continue;
+          const option = document.createElement('option'); option.value = source.id; option.textContent = COMPOSITOR_NODE_TYPES[source.type]?.label || source.type; select.append(option);
+        }
+        select.value = incoming?.from || '';
+        select.onchange = () => {
+          const links = graph.links.filter(link => !(link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket));
+          if (select.value) links.push({ from: select.value, to: node.id, from_socket: 0, to_socket: socket });
+          commitGraph(graphFromNodes(graph.nodes, links), 'Connect compositor image socket');
+        };
+        label.append(select); card.append(label);
+      }
       if (!['render_layers', 'output'].includes(node.type)) {
         const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.title = 'Remove node'; remove.onclick = () => { const nodes = graph.nodes.filter(n => n.id !== node.id).map(n => ({ ...n })); commitGraph(graphFromNodes(nodes), 'Remove compositor node'); }; head.append(remove);
       }
@@ -222,7 +241,7 @@ export function initCompositorStudio() {
           const value = input.tagName === 'SELECT' ? input.value : input.type === 'checkbox' ? input.checked : Number(input.value);
           if (typeof value === 'number' && !Number.isFinite(value)) return;
           const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, params: { ...(n.params || {}), [key]: value } } : { ...n });
-          commitGraph(graphFromNodes(nodes), 'Edit compositor parameter');
+          commitGraph(graphFromNodes(nodes, graph.links), 'Edit compositor parameter');
         };
         label.append(input); card.append(label);
       }
@@ -237,7 +256,7 @@ export function initCompositorStudio() {
       }
       list.append(card);
     });
-    const footer = document.createElement('p'); footer.className = 'hint'; footer.textContent = 'Top-to-bottom order is evaluated after scene effects. Node parameters are saved in the project.'; list.append(footer);
+    const footer = document.createElement('p'); footer.className = 'hint'; footer.textContent = 'Image sockets connect processing branches. Unconnected inputs use the previous output; secondary inputs can use a selected layer.'; list.append(footer);
   };
   addButton.onclick = () => {
     const type = typeSelect.value, meta = COMPOSITOR_NODE_TYPES[type];
