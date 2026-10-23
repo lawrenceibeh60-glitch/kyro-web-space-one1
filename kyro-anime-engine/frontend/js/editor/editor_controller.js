@@ -164,7 +164,7 @@ function toggleFlag(id, key, value) {
   execute(setValue(['scenes', sceneIndex(), 'layers', ...location.path, key], value, 'Toggle ' + key));
 }
 function addLayer() {
-  const ids = new Set(state.project.scenes.flatMap(scene => flattenLayerTree(scene.layers || []).map(entry => entry.layer.id)));
+  const ids = new Set(state.project.scenes.flatMap(scene => flattenLayerTree(scene.layers || [], [], [], true).map(entry => entry.layer.id)));
   let n = 1; while (ids.has('layer_' + n)) n++;
   const layer = { id: 'layer_' + n, name: 'Layer ' + n, type: 'drawing', exposures: [] };
   execute(insertAt(['scenes', sceneIndex(), 'layers'], getScene().layers.length, layer, 'Add layer'));
@@ -188,7 +188,7 @@ function createGroup() {
   if (!scene) return;
   const layers = JSON.parse(JSON.stringify(scene.layers || []));
   const selected = state.layerId ? findLayerLocation(layers, state.layerId) : null;
-  const ids = new Set(flattenLayerTree(layers).map(entry => entry.layer.id));
+  const ids = new Set(flattenLayerTree(layers, [], [], true).map(entry => entry.layer.id));
   let n = 1; while (ids.has('group_' + n)) n++;
   const group = { id: 'group_' + n, name: 'Group ' + n, type: 'group', opacity: 1, visible: true, locked: false, transform: { x: 0, y: 0, rotation: 0, scale_x: 1, scale_y: 1, anchor_x: 0, anchor_y: 0 }, children: [] };
   if (selected) {
@@ -205,21 +205,33 @@ function duplicateLayer() {
   const source = getLayer(), location = layerLocation();
   if (!source || !location) return;
   const insertPath = ['scenes', sceneIndex(), 'layers', ...location.path.slice(0, -1)];
-  const usedLayerIds = new Set(state.project.scenes.flatMap(scene => flattenLayerTree(scene.layers || []).map(entry => entry.layer.id)));
-  let layerNumber = 1; while (usedLayerIds.has('layer_' + layerNumber)) layerNumber++;
+  const usedLayerIds = new Set(state.project.scenes.flatMap(scene => flattenLayerTree(scene.layers || [], [], [], true).map(entry => entry.layer.id)));
+  const usedDrawingIds = new Set(Object.keys(state.project.drawings));
+  let layerNumber = 1, drawingNumber = 1;
+  const nextLayerId = () => { while (usedLayerIds.has('layer_' + layerNumber)) layerNumber++; const id = 'layer_' + layerNumber++; usedLayerIds.add(id); return id; };
+  const nextDrawingId = () => { while (usedDrawingIds.has('d_' + drawingNumber)) drawingNumber++; const id = 'd_' + drawingNumber++; usedDrawingIds.add(id); return id; };
   const copy = JSON.parse(JSON.stringify(source));
-  copy.id = 'layer_' + layerNumber; copy.name = (source.name || 'Layer') + ' Copy';
-  const commands = [], usedDrawingIds = new Set(Object.keys(state.project.drawings));
-  let drawingNumber = 1;
-  for (const exposure of copy.exposures || []) {
-    const drawing = state.project.drawings[exposure.drawing]; if (!drawing) continue;
-    while (usedDrawingIds.has('d_' + drawingNumber)) drawingNumber++;
-    const drawingId = 'd_' + drawingNumber++; usedDrawingIds.add(drawingId);
-    const drawingCopy = JSON.parse(JSON.stringify(drawing)); drawingCopy.id = drawingId; exposure.drawing = drawingId;
-    commands.push(setValue(['drawings', drawingId], drawingCopy, 'Duplicate drawing'));
-  }
+  const commands = [];
+  const remap = layer => {
+    const originalId = layer.id;
+    layer.id = nextLayerId();
+    if (layer === copy) layer.name = (source.name || 'Layer') + ' Copy';
+    for (const exposure of layer.exposures || []) {
+      const drawing = state.project.drawings[exposure.drawing];
+      if (!drawing) continue;
+      const drawingId = nextDrawingId();
+      const drawingCopy = JSON.parse(JSON.stringify(drawing));
+      drawingCopy.id = drawingId;
+      exposure.drawing = drawingId;
+      commands.push(setValue(['drawings', drawingId], drawingCopy, 'Duplicate drawing'));
+    }
+    for (const child of layer.children || []) remap(child);
+    return originalId;
+  };
+  remap(copy);
   commands.push(insertAt(insertPath, location.index + 1, copy, 'Duplicate layer'));
-  execute(batch(commands, 'Duplicate layer')); selectLayer(copy.id);
+  execute(batch(commands, 'Duplicate layer'));
+  selectLayer(copy.id);
 }
 function deleteLayer() {
   const location = layerLocation(), layer = getLayer();
