@@ -11,7 +11,7 @@ on:
       - ".github/workflows/kae-tests.yml"
 
 concurrency:
-  group: kae-tests-${{ github.event.pull_request.head.ref || github.ref }}
+  group: kae-tests-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
