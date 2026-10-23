@@ -71,13 +71,14 @@ export function effectiveLayerOpacity(layer, ancestors = [], frame = 0) {
 }
 
 /** Apply ancestor transforms in parent-to-child order. Caller owns save/restore. */
-export function applyAncestorTransforms(ctx, ancestors = [], frame = 0) {
+export function applyAncestorTransforms(ctx, ancestors = [], frame = 0, afterTransform = null) {
   for (const parent of ancestors) {
     const t = evaluateTransform(parent, frame);
     ctx.translate(finite(t.x, 0), finite(t.y, 0));
     ctx.rotate(finite(t.rotation, 0) * Math.PI / 180);
     ctx.scale(finite(t.scale_x, 1), finite(t.scale_y, 1));
     ctx.translate(-finite(t.anchor_x, 0), -finite(t.anchor_y, 0));
+    if (typeof afterTransform === 'function') afterTransform(ctx, parent);
   }
 }
 
