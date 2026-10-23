@@ -261,6 +261,48 @@
             -1,
             1
           ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "upper_bone_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "lower_bone_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$"
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "x",
+            "y"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": -8192,
+              "maximum": 8192
+            },
+            "y": {
+              "type": "number",
+              "minimum": -8192,
+              "maximum": 8192
+            }
+          }
+        },
+        "bend": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
         }
       }
     }
