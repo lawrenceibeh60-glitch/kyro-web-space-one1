@@ -23,8 +23,8 @@ export function initTimelinePanel() {
   let mode = null, drag = null, exposureDrag = null, zoom = 1;
   let selectedMarkerId = null;
 
-  const rows = () => flattenLayerTree(getScene()?.layers || []).map(entry => entry.layer).reverse();
-  const findLayerById = id => flattenLayerTree(getScene()?.layers || []).find(entry => entry.layer.id === id)?.layer || null;
+  const rows = () => flattenLayerTree(getScene()?.layers || [], [], [], true).map(entry => entry.layer).reverse();
+  const findLayerById = id => flattenLayerTree(getScene()?.layers || [], [], [], true).find(entry => entry.layer.id === id)?.layer || null;
   const layerPath = (id, field) => {
     const location = findLayerLocation(getScene()?.layers || [], id);
     return location ? ['scenes', state.project.scenes.indexOf(getScene()), 'layers', ...location.path, ...(field ? [field] : [])] : null;
