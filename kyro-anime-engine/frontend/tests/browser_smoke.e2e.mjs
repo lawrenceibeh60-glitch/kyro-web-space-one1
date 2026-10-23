@@ -211,6 +211,34 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     const laterPixels = await pixelSignature();
     assert.notEqual(firstPixels, laterPixels, 'playing the rigged character must change rendered canvas pixels');
     await page.locator('#play').click();
+
+    // Author and evaluate a saved character motion path in the actual rig UI.
+    await page.locator('#motionPathStart').fill('0');
+    await page.locator('#motionPathDuration').fill('20');
+    await page.locator('#motionPathFromX').fill('0');
+    await page.locator('#motionPathFromY').fill('0');
+    await page.locator('#motionPathToX').fill('200');
+    await page.locator('#motionPathToY').fill('40');
+    await page.locator('#motionPathEasing').selectOption('linear');
+    await page.locator('#motionPathApply').click();
+    await page.waitForFunction(() => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      return rig?.animation?.type === 'motion_path'
+        && rig.animation.path_duration_frames === 20
+        && rig.animation.path_to_x === 200;
+    });
+    const pathMotion = await page.evaluate(async () => {
+      const rig = window.kae.state.project.rigs.find(item => item.character_id === 'browser_hero');
+      const { evaluateRigAnimation } = await import('/js/animation/animation_clips.js');
+      return {
+        first: evaluateRigAnimation(rig, 0).rootOffset,
+        last: evaluateRigAnimation(rig, 20).rootOffset,
+      };
+    });
+    assert.equal(pathMotion.first.x, 0);
+    assert.equal(pathMotion.last.x, 200);
+    assert.equal(pathMotion.last.y, 40);
+
     await page.locator('#save').click();
     await page.locator('#exportBtn').click();
     await page.waitForFunction(() => document.querySelector('#exportDlg')?.hidden === false);
