@@ -17,7 +17,8 @@
 <link rel="stylesheet" href="css/animation/timeline.css">
 <link rel="stylesheet" href="css/animation/dope_sheet.css">
 <link rel="stylesheet" href="css/animation/graph_editor.css">
-<link rel="stylesheet" href="css/animation/geometry_nodes.css">\n<link rel="stylesheet" href="css/animation/character_line_tools.css">
+<link rel="stylesheet" href="css/animation/geometry_nodes.css">
+<link rel="stylesheet" href="css/animation/character_line_tools.css">
 <link rel="stylesheet" href="css/rendering/export_dialog.css">
 <link rel="stylesheet" href="css/layout/responsive.css">
 <link rel="stylesheet" href="css/themes/production_workspace.css">
@@ -441,7 +442,7 @@
   </section>
 
   <section class="panel" id="p-geometry">
-    <div class="panel-h"><span class="dim">Geometry Nodes · procedural 2D graph</span><div class="panel-actions"><button id="geoNewGraph">New Graph</button><button id="geoDeleteGraph">Delete Graph</button><select id="geoNodeType" aria-label="Node type"><option value="circle">Circle</option><option value="rectangle">Rectangle</option><option value="transform">Transform 2D</option><option value="join">Join Geometry</option><option value="array">Array</option><option value="mirror">Mirror</option><option value="output">Group Output</option></select><button id="geoAddNode" class="primary">Add Node</button></div></div>
+    <div class="panel-h"><span class="dim">Geometry Nodes · procedural 2D graph</span><div class="panel-actions"><button id="geoNewGraph">New Graph</button><button id="geoDeleteGraph">Delete Graph</button><select id="geoNodeType" aria-label="Node type"><option value="circle">Circle</option><option value="rectangle">Rectangle</option><option value="ellipse">Ellipse</option><option value="line">Line</option><option value="bezier">Bezier Curve</option><option value="subdivide">Subdivide</option><option value="smooth">Smooth Curve</option><option value="reverse">Reverse Curve</option><option value="transform">Transform 2D</option><option value="join">Join Geometry</option><option value="array">Array</option><option value="mirror">Mirror</option><option value="output">Group Output</option></select><button id="geoAddNode" class="primary">Add Node</button></div></div>
     <div class="geo-toolbar"><label>Graph <select id="geoGraphSelect"></select></label><span class="geo-help">Connect output sockets to inputs. Drag node headers to arrange.</span></div>
     <div class="geo-workspace"><div class="geo-canvas-wrap"><div id="geoCanvas" class="geo-canvas"></div></div><aside class="geo-inspector"><div class="grp-title">Node Inspector</div><div id="geoInspector" class="geo-inspector-body"><p class="hint">Select a node to inspect parameters.</p></div><div class="grp-title">Live Geometry Preview</div><div id="geoPreview" class="geo-preview"></div><p id="geoStatus" class="geo-status">Ready · saved in project</p></aside></div>
   </section>
@@ -527,6 +528,7 @@
 <input id="jsonImportFile" type="file" accept=".json,application/json" multiple hidden>
 <div id="toasts" class="toasts"></div>
 <script type="module" src="js/editor/editor_controller.js"></script>
-<script type="module" src="js/editor/studio_chrome.js"></script>\n<script type="module" src="js/animation/character_line_tools.js"></script>
+<script type="module" src="js/editor/studio_chrome.js"></script>
+<script type="module" src="js/animation/character_line_tools.js"></script>
 </body>
 </html>
