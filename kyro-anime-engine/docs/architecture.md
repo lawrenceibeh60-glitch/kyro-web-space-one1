@@ -27,7 +27,7 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 | Procedural characters | Partial | A configurable character generator produces editable parts. It is a focused generator, not the full anatomy-guided builder suite in the blueprint. |
 | Character scenes | Partial | Characters can be imported and placed as layers; full character instances, lighting/material pipeline, and compositional scene graph are not implemented. |
 | Animation | Partial | Timeline, exposures, transform interpolation, camera animation, bone rotation tracks, rotation constraints, and two-bone IK tooling exist. Mesh/puppet deformation, foot locking, automatic walk-cycle synthesis, and robust facial animation tracks remain future work. |
-| Rendering and export | Partial | Browser Canvas renderer and several exports exist. Dedicated rasterizer/compositor, render cache, full lighting/shadow pipeline, color management, and server-side video rendering are not implemented. |
+| Rendering and export | Partial | Browser Canvas renderer and several exports exist. A bounded render cache, color/levels/vignette processing, layer-aware Alpha Over, alpha-mask/matte compositing, and depth-sorted layer compositing are implemented. Arbitrary socket-wired compositor graphs, full color management, a dedicated rasterizer, and server-side video rendering remain future work. |
 | Performance and determinism | Partial | Large timeline/import bottlenecks have targeted fixes and effects use deterministic seeds. General geometry/layer caches and invalidation tracking do not exist. |
 | Schemas | Partial | Core project, character, scene, animation, rig, effects, render, drawing, and path schemas exist. Separate style, palette, material, lighting, asset, audio, and export schemas remain roadmap work. |
 
@@ -39,7 +39,7 @@ Use 2.5D for parallax, layered staging, camera trucking, dolly/zoom, roll, and d
 | Character motion | Rigs support hierarchical 2D rotation. IK, mesh/puppet deformation, foot locking, automatic walk-cycle synthesis, and robust facial animation tracks remain future work. |
 | Procedural drawing | The character generator is a focused editable-part generator, not a complete anatomy-aware anime drawing system. |
 | Scene graph | Layers and depth exist, but general parented groups and complete world-transform composition are not implemented. |
-| Rendering | Canvas rendering supports current strokes, lights, and effects. Full shadow casting, materials, depth of field, masks, clipping, color management, and a dedicated compositor are not implemented. |
+| Rendering | Canvas rendering supports current strokes, lights, and effects. Layer-aware Alpha Over, alpha-mask/matte compositing, and Z-depth sorting are available in the compositor stack, but arbitrary socket wiring, full shadow casting/materials, integrated depth-of-field routing, color management, and a dedicated rasterizer remain incomplete. |
 | Format evolution | The custom validator handles semantic checks; a general migration registry and full runtime validation against every JSON Schema are not implemented. |
 
 ## Implementation order
