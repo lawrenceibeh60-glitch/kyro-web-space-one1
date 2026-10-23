@@ -494,6 +494,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   ctx.save();
   ctx.beginPath(); ctx.rect(0, 0, width, height); ctx.clip();
   if (!opts?.transparent) { ctx.fillStyle = background || '#ffffff'; ctx.fillRect(0, 0, width, height); }
+  else { ctx.clearRect(0, 0, width, height); }
   const documentRef = ctx.canvas?.ownerDocument;
   const layerEffects = effects.filter(effect => ['soft_shadow', 'depth_of_field', 'layer_mask'].includes(effect.type));
   const compositorLayers = [];
