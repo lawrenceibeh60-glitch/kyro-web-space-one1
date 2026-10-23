@@ -125,7 +125,7 @@ export function initCompositorStudio() {
         let input;
         if (key === 'direction' || key === 'overlay_layer_id') {
           input = document.createElement('select');
-          const choices = key === 'direction' ? [['far_to_near', 'Far to near'], ['near_to_far', 'Near to far']] : [['', 'Select layer'], ...(state.project && state.project.scenes || []).flatMap(scene => (scene.layers || []).map(layer => [layer.id, layer.name || layer.id]))];
+          const choices = key === 'direction' ? [['far_to_near', 'Far to near'], ['near_to_far', 'Near to far']] : [['', 'Select layer'], ...((state.project && state.project.scenes || []).find(scene => scene.id === state.sceneId)?.layers || []).map(layer => [layer.id, layer.name || layer.id])];
           for (const choice of choices) { const option = document.createElement('option'); option.value = choice[0]; option.textContent = choice[1]; input.append(option); }
           input.value = params[key] == null ? fallback : params[key];
         } else {
