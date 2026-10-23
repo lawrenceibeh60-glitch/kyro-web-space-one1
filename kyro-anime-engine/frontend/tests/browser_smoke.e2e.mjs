@@ -449,6 +449,21 @@ test('Geometry Nodes builds procedural shapes and persists graph data in the pro
     await page.locator('#create').click();
     await page.waitForURL(/editor\.html\?project=/);
     await page.waitForFunction(() => window.kae?.state?.project?.settings?.width > 0);
+    await page.waitForFunction(() => Boolean(window.kae.state.layerId));
+    await page.locator('#trackColorInput').evaluate(input => {
+      input.value = '#123456';
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await page.waitForFunction(() => {
+      const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
+      return scene?.layers.find(layer => layer.id === window.kae.state.layerId)?.timeline_color === '#123456';
+    });
+    await page.locator('#compositorNodeType').selectOption('levels');
+    await page.locator('#compositorAddNode').click();
+    await page.waitForFunction(() => window.kae.state.project.compositor_graph?.nodes?.some(node => node.type === 'levels'));
+    await page.locator('#compositorNodeList input').first().fill('12');
+    await page.locator('#compositorNodeList input').first().press('Enter');
+    await page.waitForFunction(() => window.kae.state.project.compositor_graph.nodes.find(node => node.type === 'levels')?.params?.brightness === 12);
     await page.locator('#wtabs [data-ws="nodes"]').click();
     await page.locator('#geoCanvas').waitFor({ state: 'visible' });
     await page.locator('#geoCanvas .geo-node').first().click();
