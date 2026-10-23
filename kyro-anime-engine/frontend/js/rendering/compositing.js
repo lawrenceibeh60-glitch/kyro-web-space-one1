@@ -48,7 +48,8 @@ function rebuildLayerStack(ctx, layers, width, height, background, direction, ex
   ctx.globalCompositeOperation = 'copy'; ctx.clearRect(0, 0, width, height);
   if (background && background !== 'transparent') { ctx.fillStyle = background; ctx.fillRect(0, 0, width, height); }
   ctx.restore();
-  const sorted = layers.filter(layer => layer && layer.canvas && !excludedIds.has(layer.id)).slice().sort((a, b) =>
+  const sorted = layers.filter(layer => layer && layer.canvas && !excludedIds.has(layer.id)).slice();
+  if (direction === 'near_to_far' || direction === 'far_to_near') sorted.sort((a, b) =>
     direction === 'near_to_far' ? (Number(a.depth) || 0) - (Number(b.depth) || 0) : (Number(b.depth) || 0) - (Number(a.depth) || 0));
   for (const layer of sorted) drawLayerImage(ctx, layer, width, height);
   return sorted.map(layer => layer.id);
@@ -65,7 +66,7 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
   const alphaNodes = enabled.filter(node => node.type === 'alpha_over');
   if ((depthNode || alphaNodes.length) && layers.length) {
     const excluded = new Set(alphaNodes.map(node => node.params && node.params.overlay_layer_id).filter(Boolean));
-    rebuildLayerStack(ctx, layers, width, height, options.background, depthNode && depthNode.params && depthNode.params.direction || 'far_to_near', excluded);
+    rebuildLayerStack(ctx, layers, width, height, options.background, depthNode ? (depthNode.params && depthNode.params.direction || 'far_to_near') : 'scene_order', excluded);
   }
   for (const node of enabled) {
     const p = node.params || {};
