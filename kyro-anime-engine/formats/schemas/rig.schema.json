@@ -109,10 +109,15 @@
           "minimum": -8192,
           "maximum": 8192
         },
+        "path_c1_x": { "type": "number", "minimum": -8192, "maximum": 8192 },
+        "path_c1_y": { "type": "number", "minimum": -8192, "maximum": 8192 },
+        "path_c2_x": { "type": "number", "minimum": -8192, "maximum": 8192 },
+        "path_c2_y": { "type": "number", "minimum": -8192, "maximum": 8192 },
         "path_easing": {
           "enum": [
             "linear",
-            "ease_in_out"
+            "ease_in_out",
+            "bezier"
           ]
         }
       }
