@@ -551,6 +551,76 @@ export function initStudioPanel({ onCharacterImported }) {
     }
   }
 
+  function syncFacePoseLabels() {
+    $('faceYawValue').textContent = `${Number($('faceYaw').value) || 0}°`;
+    $('facePitchValue').textContent = `${Number($('facePitch').value) || 0}°`;
+    $('faceRollValue').textContent = `${Number($('faceRoll').value) || 0}°`;
+    $('faceDepthValue').textContent = `${(Number($('faceDepth').value) || 1).toFixed(2)}×`;
+  }
+
+  function renderFacePoseControls() {
+    const info = activeDrawingInfo();
+    const layer = info?.layer;
+    const enabled = !!layer;
+    for (const id of ['faceYaw', 'facePitch', 'faceRoll', 'faceDepth', 'facePoseKey']) $(id).disabled = !enabled;
+    if (!layer) {
+      $('facePoseStatus').textContent = 'Select a head or face artwork layer exposed at the current frame.';
+      syncFacePoseLabels();
+      return;
+    }
+    const transform = evaluateLayerTransform(layer, state.frame);
+    const depth = Math.max(0.1, Math.min(3, Math.abs(Number(transform.scale_x) || 1)));
+    const ratio = Math.max(0.05, Math.min(1, Math.abs((Number(transform.scale_y) || depth) / depth)));
+    const values = {
+      faceYaw: Math.round(Number(transform.rotation_y) || 0),
+      facePitch: Math.round(Math.acos(ratio) * 180 / Math.PI),
+      faceRoll: Math.round(Number(transform.rotation) || 0),
+      faceDepth: depth,
+    };
+    for (const [id, value] of Object.entries(values)) {
+      if (document.activeElement !== $(id)) $(id).value = String(value);
+    }
+    syncFacePoseLabels();
+    const label = `${layer.name || layer.id}`;
+    $('facePoseStatus').textContent = `Target: ${label} · frame ${state.frame + 1}. Values are evaluated from existing transform keys.`;
+  }
+
+  function keyFacePose() {
+    const info = activeDrawingInfo();
+    if (!info?.layer || !state.project) {
+      $('facePoseStatus').textContent = 'No active drawing layer at this frame.';
+      return;
+    }
+    const sceneIndex = (state.project.scenes || []).findIndex(item => item.id === info.scene.id);
+    if (sceneIndex < 0) return;
+    const layers = [...info.scene.layers];
+    const layerIndex = layers.findIndex(item => item.id === info.layer.id);
+    if (layerIndex < 0) return;
+    const yaw = Math.max(-90, Math.min(90, Number($('faceYaw').value) || 0));
+    const pitch = Math.max(-80, Math.min(80, Number($('facePitch').value) || 0));
+    const roll = Math.max(-180, Math.min(180, Number($('faceRoll').value) || 0));
+    const depth = Math.max(0.1, Math.min(3, Number($('faceDepth').value) || 1));
+    const channels = {
+      rotation_y: yaw,
+      rotation: roll,
+      scale_x: depth,
+      scale_y: depth * Math.max(0.05, Math.cos(pitch * Math.PI / 180)),
+    };
+    const tracks = { ...(info.layer.tracks || {}) };
+    for (const [channel, value] of Object.entries(channels)) {
+      const keys = [...(tracks[channel] || [])];
+      const key = { t: state.frame, v: value, ease: 'linear' };
+      const existing = keys.findIndex(item => item.t === state.frame);
+      if (existing >= 0) keys[existing] = key; else keys.push(key);
+      keys.sort((a, b) => a.t - b.t);
+      tracks[channel] = keys;
+    }
+    layers[layerIndex] = { ...info.layer, tracks };
+    execute(setValue(['scenes', sceneIndex, 'layers'], layers, 'Key head / face orientation'));
+    $('facePoseStatus').textContent = `Keyed yaw ${yaw}°, pitch ${pitch}°, roll ${roll}°, depth ${depth.toFixed(2)}× at frame ${state.frame + 1}.`;
+    toast('Face orientation keyframes added.', 'ok');
+  }
+
   function renderRotationLimitControls(rig) {
     const select = $('constraintBone');
     const bones = rig?.bones || [];
@@ -1015,6 +1085,7 @@ export function initStudioPanel({ onCharacterImported }) {
     renderRig();
     renderCharacterList();
     renderAudio();
+    renderFacePoseControls();
   }
 
   root.querySelectorAll('[data-studio-tab]').forEach(button => {
@@ -1033,6 +1104,8 @@ export function initStudioPanel({ onCharacterImported }) {
   $('rigPoseApply').onclick = applySelectedPose;
   $('rigPoseDelete').onclick = deleteSelectedPose;
   $('rigTurnApply').onclick = applyTurnChoreography;
+  $('facePoseKey').onclick = keyFacePose;
+  for (const id of ['faceYaw', 'facePitch', 'faceRoll', 'faceDepth']) $(id).addEventListener('input', syncFacePoseLabels);
   for (const id of ['rigWalkStride', 'rigWalkBob', 'rigWalkWeight']) {
     $(id).addEventListener('input', () => {
       const value = Number($(id).value);
@@ -1074,7 +1147,7 @@ export function initStudioPanel({ onCharacterImported }) {
   $('audioUpload').onclick = uploadAudio;
   bus.on('project:changed', render);
   bus.on('state', patch => {
-    if ('project' in patch || 'sceneId' in patch) render();
+    if ('project' in patch || 'sceneId' in patch || 'frame' in patch || 'layerId' in patch) render();
   });
   showTab(activeTab);
   render();
