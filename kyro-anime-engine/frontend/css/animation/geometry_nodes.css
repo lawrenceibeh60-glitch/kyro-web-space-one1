@@ -1,1 +1,7 @@
 /* Geometry Nodes panel styles are defined in the KAE studio theme. */
+
+/* Searchable, larger procedural node palette */
+#geoNodeSearch { width:132px; min-width:90px; height:28px; padding:0 7px; color:var(--text); background:var(--field); border:1px solid var(--line); font:inherit; font-size:11px; }
+#geoNodeType { max-width:180px; }
+#geoNodeSearch:focus { outline:1px solid var(--accent); outline-offset:1px; }
+@media (max-width:900px) { #geoNodeSearch { width:100%; } #geoNodeType { flex:1; min-width:120px; } }
