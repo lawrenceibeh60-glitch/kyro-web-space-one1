@@ -499,6 +499,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
   const compositorLayers = [];
   const shadowEffect = layerEffects.find(effect => effect.type === 'soft_shadow');
   const depthEffect = layerEffects.find(effect => effect.type === 'depth_of_field');
+  const cameraDepthOfField = scene?.camera?.depth_of_field || null;
   const maskEffects = layerEffects.filter(effect => effect.type === 'layer_mask');
   let layerCanvas = null, layerCtx = null, shadowCanvas = null, shadowCtx = null, maskCanvas = null, maskCtx = null;
   if (documentRef?.createElement) {
@@ -517,6 +518,23 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     }
     if (!layerCtx) { layerCanvas = null; shadowCtx = null; maskCtx = null; }
   }
+  const layerBlur = layer => {
+    let blur = 0;
+    if (depthEffect) {
+      const focus = Math.max(0, Math.min(1, Number(depthEffect.focus_depth ?? 0.5)));
+      const range = Math.max(0.01, Math.min(1, Number(depthEffect.range ?? 0.25)));
+      const difference = Math.min(1, Math.abs((Number(layer.depth ?? 1) - focus) / range));
+      blur = Math.max(blur, Math.max(0, Math.min(18, difference * Number(depthEffect.intensity ?? 0.5) * 18)));
+    }
+    if (cameraDepthOfField) {
+      const focus = Math.max(0, Number(cameraDepthOfField.focus_distance ?? 100));
+      const aperture = Math.max(0, Math.min(1, Number(cameraDepthOfField.aperture ?? 0)));
+      const z = Number.isFinite(Number(layer.transform?.z)) ? Number(layer.transform.z) : Number(layer.depth ?? 1) * 100;
+      const cameraBlur = Math.min(18, Math.abs(z - focus) / Math.max(1, focus) * aperture * 18);
+      blur = Math.max(blur, cameraBlur);
+    }
+    return blur;
+  };
   for (const entry of flattenLayerTree(scene?.layers || [])) {
     const { layer, ancestors } = entry;
     if (layer.visible === false || ancestors.some(parent => parent.visible === false)) continue;
@@ -595,7 +613,10 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
         layerSnapshot.width = width; layerSnapshot.height = height;
         const snapshotCtx = layerSnapshot.getContext('2d');
         if (snapshotCtx) {
+          const snapshotBlur = layerBlur(layer);
+          snapshotCtx.filter = snapshotBlur > 0.25 ? `blur(${snapshotBlur.toFixed(1)}px)` : 'none';
           snapshotCtx.drawImage(layerCanvas, 0, 0, width, height);
+          snapshotCtx.filter = 'none';
           compositorLayers.push({
             id: layer.id,
             name: layer.name || layer.id,
@@ -624,13 +645,8 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
       }
       ctx.globalCompositeOperation = BLEND[layer.blend] || 'source-over';
       ctx.globalAlpha = 1;
-      if (depthEffect) {
-        const focus = Math.max(0, Math.min(1, Number(depthEffect.focus_depth ?? 0.5)));
-        const range = Math.max(0.01, Math.min(1, Number(depthEffect.range ?? 0.25)));
-        const difference = Math.min(1, Math.abs((Number(layer.depth ?? 1) - focus) / range));
-        const blur = Math.max(0, Math.min(18, difference * Number(depthEffect.intensity ?? 0.5) * 18));
-        ctx.filter = blur > 0.25 ? `blur(${blur.toFixed(1)}px)` : 'none';
-      }
+      const blur = layerBlur(layer);
+      ctx.filter = blur > 0.25 ? `blur(${blur.toFixed(1)}px)` : 'none';
       ctx.drawImage(layerCanvas, 0, 0);
       ctx.filter = 'none';
       ctx.restore();
