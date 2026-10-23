@@ -17,7 +17,7 @@
 <link rel="stylesheet" href="css/animation/timeline.css">
 <link rel="stylesheet" href="css/animation/dope_sheet.css">
 <link rel="stylesheet" href="css/animation/graph_editor.css">
-<link rel="stylesheet" href="css/animation/geometry_nodes.css">
+<link rel="stylesheet" href="css/animation/geometry_nodes.css">\n<link rel="stylesheet" href="css/animation/character_line_tools.css">
 <link rel="stylesheet" href="css/rendering/export_dialog.css">
 <link rel="stylesheet" href="css/layout/responsive.css">
 <link rel="stylesheet" href="css/themes/production_workspace.css">
@@ -171,6 +171,14 @@
                 <div class="grp-title">Automatic rig setup</div>
                 <button id="rigAuto" class="primary">Auto-rig all character parts</button>
                 <div class="hint">Creates one pivoted bone per unrigged part, infers common head/torso/arm/leg parent chains, and keeps existing bones intact.</div>
+                <div class="grp-title">Character Line Tracement</div>
+                <div class="hint">Draw a joint-to-joint guide on the viewport. With both tools enabled, releasing the line creates a native rig bone.</div>
+                <div class="xbtns kae-line-tool-buttons">
+                  <button id="characterLineTrace" type="button" aria-pressed="false">Character Line Tracement</button>
+                  <button id="boneRiggingMode" type="button" aria-pressed="false">Bone Rigging</button>
+                  <button id="lineTraceCancel" type="button" title="Cancel the current line">Cancel</button>
+                </div>
+                <div id="lineTraceStatus" class="hint" role="status" aria-live="polite">Select a rig and Character Part, then enable both tools.</div>
                 <div class="grp-title">Add bone</div>
                 <label class="fld"><span>Bone name</span><input id="boneName" type="text" maxlength="64" value="Bone"></label>
                 <label class="fld"><span>Character part</span><select id="bonePart"></select></label>
@@ -519,6 +527,6 @@
 <input id="jsonImportFile" type="file" accept=".json,application/json" multiple hidden>
 <div id="toasts" class="toasts"></div>
 <script type="module" src="js/editor/editor_controller.js"></script>
-<script type="module" src="js/editor/studio_chrome.js"></script>
+<script type="module" src="js/editor/studio_chrome.js"></script>\n<script type="module" src="js/animation/character_line_tools.js"></script>
 </body>
 </html>
