@@ -16,7 +16,17 @@ export function setState(patch) {
 }
 
 export const getScene = () => state.project?.scenes.find(s => s.id === state.sceneId) ?? null;
-export const getLayer = (id = state.layerId) => getScene()?.layers.find(l => l.id === id) ?? null;
+export const getLayer = (id = state.layerId) => {
+  const visit = layers => {
+    for (const layer of Array.isArray(layers) ? layers : []) {
+      if (layer?.id === id) return layer;
+      const nested = visit(layer?.children);
+      if (nested) return nested;
+    }
+    return null;
+  };
+  return visit(getScene()?.layers);
+};
 export const sceneIndex = () => state.project.scenes.findIndex(s => s.id === state.sceneId);
 
 export function getIn(obj, path) { return path.reduce((o, k) => o?.[k], obj); }

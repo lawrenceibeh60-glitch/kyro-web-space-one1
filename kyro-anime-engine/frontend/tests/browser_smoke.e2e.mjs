@@ -91,7 +91,7 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     await page.locator('#compositorNodeType').selectOption('alpha_over');
     await page.locator('#compositorAddNode').click();
     await page.waitForFunction(() => window.kae.state.project.compositor_graph.nodes.some(node => node.type === 'alpha_over'));
-    const overlaySelect = page.locator('.compositor-node').filter({ hasText: 'Alpha Over' }).locator('select');
+    const overlaySelect = page.locator('.compositor-node[data-node-type="alpha_over"] label.compositor-param').filter({ hasText: 'overlay layer id' }).locator('select');
     await overlaySelect.selectOption({ index: 1 });
     await page.waitForFunction(() => {
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_over');
@@ -99,13 +99,22 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     });
     await page.locator('#compositorNodeType').selectOption('alpha_mask');
     await page.locator('#compositorAddNode').click();
-    const matteCard = page.locator('.compositor-node').filter({ hasText: 'Alpha Mask / Matte' });
-    await matteCard.locator('select').selectOption({ index: 1 });
+    const matteCard = page.locator('.compositor-node[data-node-type="alpha_mask"]');
+    await matteCard.locator('label.compositor-param').filter({ hasText: 'mask layer id' }).locator('select').selectOption({ index: 1 });
     await matteCard.locator('input[type="checkbox"]').check();
     await page.waitForFunction(() => {
       const node = window.kae.state.project.compositor_graph.nodes.find(item => item.type === 'alpha_mask');
       return !!node?.params?.mask_layer_id && node.params.invert === true;
     });
+    const alphaOverCard = page.locator('.compositor-node[data-node-type="alpha_over"]');
+    const secondarySocket = alphaOverCard.locator('.compositor-socket select').nth(1);
+    if (await secondarySocket.locator('option').count() > 1) {
+      await secondarySocket.selectOption({ index: 1 });
+      await page.waitForFunction(() => {
+        const graph = window.kae.state.project.compositor_graph;
+        return graph.links.some(link => link.to === graph.nodes.find(node => node.type === 'alpha_over')?.id && Number(link.to_socket) === 1);
+      });
+    }
     const compositorPixels = await page.evaluate(async () => {
       const { renderFrame } = await import('/js/rendering/renderer.js');
       const rect = color => ({ commands: [['M', 8, 8], ['L', 56, 8], ['L', 56, 56], ['L', 8, 56], ['Z']], fill: color, color, width: 1 });
@@ -138,13 +147,34 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       renderFrame(ctx, maskProject, 's', 0);
       const maskInside = [...ctx.getImageData(20, 20, 1, 1).data];
       const maskOutside = [...ctx.getImageData(44, 20, 1, 1).data];
-      return { ordinary, depth, alpha, maskInside, maskOutside };
+      const nestedProject = {
+        settings: { width: 64, height: 64, background: '#ffffff', duration_frames: 1 },
+        drawings: { child: { strokes: [rect('#ff0000')] } },
+        effects: [], rigs: [],
+        scenes: [{ id: 's', layers: [{
+          id: 'character-group', type: 'group', name: 'Character', opacity: 0.5,
+          transform: { x: 20, y: 0, rotation: 0, scale_x: 1, scale_y: 1 },
+          children: [{ id: 'child-layer', type: 'drawing', exposures: [{ start: 0, length: 1, drawing: 'child' }] }],
+        }] }],
+      };
+      renderFrame(ctx, nestedProject, 's', 0, null, { transparent: true });
+      const groupInside = [...ctx.getImageData(40, 20, 1, 1).data];
+      const groupOutside = [...ctx.getImageData(20, 20, 1, 1).data];
+      return { ordinary, depth, alpha, maskInside, maskOutside, groupInside, groupOutside };
     });
     assert.ok(compositorPixels.ordinary[2] > compositorPixels.ordinary[0], 'normal scene order should leave the blue layer on top');
     assert.ok(compositorPixels.depth[0] > compositorPixels.depth[2], 'far-to-near Z-depth sorting should put the nearer red layer on top');
     assert.ok(Math.abs(compositorPixels.alpha[0] - compositorPixels.alpha[2]) < 8, '50% Alpha Over should blend red and blue approximately equally');
     assert.ok(compositorPixels.maskInside[3] > 240, 'alpha mask should preserve pixels inside the matte');
     assert.equal(compositorPixels.maskOutside[3], 0, 'alpha mask should remove pixels outside the matte');
+    assert.ok(compositorPixels.groupInside[0] > 240 && compositorPixels.groupInside[3] >= 120 && compositorPixels.groupInside[3] <= 136, 'nested group should apply child translation and inherited opacity');
+    assert.equal(compositorPixels.groupOutside[3], 0, 'nested group transform should move the child artwork');
+    await page.locator('#addGroup').click();
+    await page.waitForFunction(() => {
+      const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
+      const selected = scene?.layers.find(layer => layer.id === window.kae.state.layerId);
+      return selected?.type === 'group' && selected.children?.length === 1;
+    });
 
     // A double-click on an empty exposure cell should author a real blank drawing cel.
     await page.locator('#addLayer').click();

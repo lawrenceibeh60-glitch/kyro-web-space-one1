@@ -11,6 +11,7 @@ import { findExposure } from '../rendering/renderer.js';
 import { clamp, frameFromTimelineX, exposureBounds, previewExposureEdit, validateExposureTrack } from '../animation/timeline.js';
 import { toast } from './notifications.js';
 import { createDrawQueue } from '../rendering/draw_queue.js';
+import { flattenLayerTree, findLayerLocation } from '../scene/scene_hierarchy.js';
 
 const ROW = 20, RULER = 18, PAD = 6;
 
@@ -22,7 +23,12 @@ export function initTimelinePanel() {
   let mode = null, drag = null, exposureDrag = null, zoom = 1;
   let selectedMarkerId = null;
 
-  const rows = () => [...(getScene()?.layers || [])].reverse();
+  const rows = () => flattenLayerTree(getScene()?.layers || [], [], [], true).map(entry => entry.layer).reverse();
+  const findLayerById = id => flattenLayerTree(getScene()?.layers || [], [], [], true).find(entry => entry.layer.id === id)?.layer || null;
+  const layerPath = (id, field) => {
+    const location = findLayerLocation(getScene()?.layers || [], id);
+    return location ? ['scenes', state.project.scenes.indexOf(getScene()), 'layers', ...location.path, ...(field ? [field] : [])] : null;
+  };
   const markers = () => Array.isArray(state.project?.markers) ? state.project.markers : [];
   const selectedMarker = () => markers().find(marker => marker.id === selectedMarkerId) || null;
   const total = () => state.project.settings.duration_frames;
@@ -214,16 +220,16 @@ export function initTimelinePanel() {
   let selectedExposure = null;
 
   function setExposures(layer, exposures, label) {
-    const layerIndex = getScene().layers.indexOf(layer);
-    if (layerIndex < 0) return;
+    const path = layerPath(layer.id, 'exposures');
+    if (!path) return;
     const ordered = [...exposures].sort((a, b) => a.start - b.start);
     const validation = validateExposureTrack(ordered, total());
     if (!validation.valid) { toast(validation.reason, 'err'); requestDraw(); return; }
-    execute(setValue(['scenes', state.project.scenes.indexOf(getScene()), 'layers', layerIndex, 'exposures'], ordered, label));
+    execute(setValue(path, ordered, label));
   }
 
   function newDrawing(copyCurrent = false) {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     if (!layer || layer.locked || layer.visible === false) {
       toast(!layer ? 'Select a layer first' : layer.locked ? 'Unlock this layer to edit drawings' : 'Show this layer to edit drawings', 'err');
       return;
@@ -247,17 +253,18 @@ export function initTimelinePanel() {
     });
     exposures.push({ start: frame, length: 1, drawing: id });
     exposures.sort((a, b) => a.start - b.start);
-    const si = state.project.scenes.indexOf(getScene()), li = getScene().layers.indexOf(layer);
+    const exposuresPath = layerPath(layer.id, 'exposures');
+    if (!exposuresPath) return;
     execute(batch([
       setValue(['drawings', id], drawing, copyCurrent ? 'Duplicate drawing' : 'Create drawing'),
-      setValue(['scenes', si, 'layers', li, 'exposures'], exposures, copyCurrent ? 'Duplicate exposure' : 'Create exposure'),
+      setValue(exposuresPath, exposures, copyCurrent ? 'Duplicate exposure' : 'Create exposure'),
     ], copyCurrent ? 'Duplicate exposure' : 'Create exposure'));
     selectedExposure = layer.exposures.find(e => e.start === frame);
     requestDraw();
   }
 
   function holdDrawing() {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     const exposure = layer && findExposure(layer, state.frame);
     if (!layer || !exposure) { toast('Place the playhead on a drawing exposure first', 'err'); return; }
     if (layer.locked) { toast('Unlock this layer to edit drawings', 'err'); return; }
@@ -269,7 +276,7 @@ export function initTimelinePanel() {
   }
 
   function clearDrawingExposure() {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     const exposure = layer && findExposure(layer, state.frame);
     if (!layer || !exposure) { toast('There is no drawing exposure on this frame', 'err'); return; }
     if (layer.locked) { toast('Unlock this layer to clear its exposure', 'err'); return; }
@@ -371,7 +378,7 @@ export function initTimelinePanel() {
     }
     if (mode === 'exposure' && exposureDrag) {
       const { layerId, source, original, preview } = exposureDrag;
-      const layer = getScene()?.layers.find(item => item.id === layerId);
+      const layer = findLayerById(layerId);
       if (layer && (preview.start !== original.start || preview.length !== original.length)) {
         const exposures = layer.exposures.map(e => e === source ? preview : e).sort((a, b) => a.start - b.start);
         setExposures(layer, exposures, 'Edit exposure');
@@ -530,17 +537,18 @@ export function initTimelinePanel() {
   $('previewEnd').onclick = setPreviewEnd;
   $('previewClear').onclick = clearPreviewRange;
   $('trackColorButton').onclick = () => {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     if (!layer) { toast('Select a track first', 'err'); return; }
     const input = $('trackColorInput');
     input.value = /^#[0-9a-f]{6}$/i.test(layer.timeline_color || '') ? layer.timeline_color : '#e87d0d';
     input.click();
   };
   $('trackColorInput').onchange = () => {
-    const scene = getScene(), layer = scene?.layers.find(item => item.id === state.layerId);
+    const scene = getScene(), layer = findLayerById(state.layerId);
     if (!scene || !layer || !/^#[0-9a-f]{6}$/i.test($('trackColorInput').value)) return;
-    const si = state.project.scenes.indexOf(scene), li = scene.layers.indexOf(layer);
-    execute(setValue(['scenes', si, 'layers', li, 'timeline_color'], $('trackColorInput').value, 'Set timeline track color'));
+    const path = layerPath(layer.id, 'timeline_color');
+    if (!path) return;
+    execute(setValue(path, $('trackColorInput').value, 'Set timeline track color'));
     renderNames(); requestDraw();
   };
   $('addMarker').onclick = addMarker;
@@ -548,7 +556,7 @@ export function initTimelinePanel() {
   $('deleteMarker').onclick = deleteSelectedMarker;
   let copiedKeys = null;
   function copyKeyframe() {
-    const layer = getScene()?.layers.find(item => item.id === (state.selKey?.layerId || state.layerId));
+    const layer = findLayerById(state.selKey?.layerId || state.layerId);
     const frame = state.selKey?.frame ?? state.frame;
     if (!layer) { toast('Select a track first', 'err'); return; }
     const channels = Object.entries(layer.tracks || {}).map(([name, keys]) => [name, keys.filter(key => key.t === frame).map(key => ({ ...key }))]).filter(([, keys]) => keys.length);
@@ -557,7 +565,7 @@ export function initTimelinePanel() {
     toast('Copied ' + channels.length + ' animated channel(s)');
   }
   function pasteKeyframe() {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     if (!layer || !copiedKeys) { toast(!layer ? 'Select a track first' : 'Copy keys before pasting', 'err'); return; }
     const tracks = JSON.parse(JSON.stringify(layer.tracks || {})), frame = state.frame;
     let count = 0;
@@ -571,8 +579,9 @@ export function initTimelinePanel() {
       }
     }
     if (!count) return;
-    const scene = getScene(), si = state.project.scenes.indexOf(scene), li = scene.layers.indexOf(layer);
-    execute(setValue(['scenes', si, 'layers', li, 'tracks'], tracks, 'Paste keyframes'));
+    const path = layerPath(layer.id, 'tracks');
+    if (!path) return;
+    execute(setValue(path, tracks, 'Paste keyframes'));
     state.selKey = { layerId: layer.id, frame };
     requestDraw();
   }

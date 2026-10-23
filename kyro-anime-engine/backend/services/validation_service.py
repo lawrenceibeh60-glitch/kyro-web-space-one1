@@ -852,6 +852,8 @@ def _check_layer(ly, where, layer_ids, drawings, errs, ancestors=None):
             for index, keyframe in enumerate(tracks["rotation_y"]):
                 if isinstance(keyframe, dict) and _num(keyframe.get("v")) and not -180 <= keyframe["v"] <= 180:
                     errs.append(f"{where}.tracks.rotation_y[{index}].v: number -180..180 required")
+    if layer_type not in ("group", "character_instance") and "children" in ly:
+        errs.append(f"{where}.children: only group and character_instance layers may own children")
     if layer_type in ("group", "character_instance"):
         if lid in ancestors:
             errs.append(f"{where}: cycle detected (ancestor '{lid}')")
@@ -1125,6 +1127,87 @@ def _check_node_graphs(project, errs):
             errs.append(f"{where}.links: graph must be acyclic")
 
 
+def _check_compositor_graph(project, errs):
+    graph = project.get("compositor_graph")
+    if graph is None:
+        return
+    where = "compositor_graph"
+    if not isinstance(graph, dict):
+        errs.append(f"{where}: must be an object")
+        return
+    nodes = graph.get("nodes", [])
+    links = graph.get("links", [])
+    if not isinstance(nodes, list):
+        errs.append(f"{where}.nodes: must be a list")
+        return
+    if not isinstance(links, list):
+        errs.append(f"{where}.links: must be a list")
+        return
+    input_counts = {
+        "render_layers": 0, "color_correct": 1, "levels": 1, "vignette": 1,
+        "alpha_over": 2, "alpha_mask": 2, "z_depth": 1, "output": 1,
+    }
+    output_counts = {kind: (0 if kind == "output" else 1) for kind in input_counts}
+    node_by_id = {}
+    for index, node in enumerate(nodes):
+        nw = f"{where}.nodes[{index}]"
+        if not isinstance(node, dict):
+            errs.append(f"{nw}: must be an object")
+            continue
+        nid = node.get("id")
+        if not isinstance(nid, str) or not ID_RE.fullmatch(nid):
+            errs.append(f"{nw}.id: invalid")
+        elif nid in node_by_id:
+            errs.append(f"{nw}.id: duplicate '{nid}'")
+        else:
+            node_by_id[nid] = node
+        if node.get("type") not in input_counts:
+            errs.append(f"{nw}.type: unsupported compositor node type")
+    adjacency = {nid: [] for nid in node_by_id}
+    connected_inputs = set()
+    for index, link in enumerate(links):
+        lw = f"{where}.links[{index}]"
+        if not isinstance(link, dict):
+            errs.append(f"{lw}: must be an object")
+            continue
+        source_id, target_id = link.get("from"), link.get("to")
+        source, target = node_by_id.get(source_id), node_by_id.get(target_id)
+        if source is None or target is None:
+            errs.append(f"{lw}: source and destination must reference existing nodes")
+            continue
+        if source_id == target_id:
+            errs.append(f"{lw}: node cannot connect to itself")
+        source_socket = link.get("from_socket", 0)
+        target_socket = link.get("to_socket", 0)
+        if not _int(source_socket) or source_socket < 0:
+            errs.append(f"{lw}.from_socket: non-negative integer required")
+        elif source.get("type") in output_counts and source_socket >= output_counts[source.get("type")]:
+            errs.append(f"{lw}.from_socket: source output socket is out of range")
+        if not _int(target_socket) or target_socket < 0:
+            errs.append(f"{lw}.to_socket: non-negative integer required")
+        elif target.get("type") in input_counts and target_socket >= input_counts[target.get("type")]:
+            errs.append(f"{lw}.to_socket: destination input socket is out of range")
+        key = (target_id, target_socket)
+        if key in connected_inputs:
+            errs.append(f"{lw}: an input socket may only have one connection")
+        connected_inputs.add(key)
+        if source_id in adjacency and target_id in adjacency:
+            adjacency[source_id].append(target_id)
+    visiting, visited = set(), set()
+    def visit(nid):
+        if nid in visiting:
+            return True
+        if nid in visited:
+            return False
+        visiting.add(nid)
+        cyclic = any(visit(child) for child in adjacency.get(nid, []))
+        visiting.remove(nid)
+        visited.add(nid)
+        return cyclic
+    if any(visit(nid) for nid in adjacency if nid not in visited):
+        errs.append(f"{where}.links: compositor graph must be acyclic")
+
+
 def validate_project(p):
     errs = []
     if not isinstance(p, dict):
@@ -1166,4 +1249,5 @@ def validate_project(p):
     _check_scenes(p.get("scenes"), drawings, errs)
     _check_studio_data(p, errs)
     _check_node_graphs(p, errs)
+    _check_compositor_graph(p, errs)
     return errs[:MAX_ERRORS]

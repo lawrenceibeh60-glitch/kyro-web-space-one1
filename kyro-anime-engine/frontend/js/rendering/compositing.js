@@ -1,6 +1,7 @@
 // KAE compositor graph: ordered, saved post-processing nodes.
 import { state } from '../core/state_manager.js';
 import { execute, setValue } from '../core/command_manager.js';
+import { flattenLayerTree } from '../scene/scene_hierarchy.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 export const COMPOSITOR_NODE_TYPES = Object.freeze({
@@ -56,53 +57,140 @@ function rebuildLayerStack(ctx, layers, width, height, background, direction, ex
   return sorted.map(layer => layer.id);
 }
 
-/** Apply post-processing and optional layer-aware compositor nodes. */
-export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
-  const nodes = Array.isArray(graph && graph.nodes) ? graph.nodes : [];
-  const trace = [];
-  const layers = Array.isArray(options.layers) ? options.layers : [];
-  const byId = new Map(layers.map(layer => [layer.id, layer]));
-  const enabled = nodes.filter(node => node && node.enabled !== false);
-  const depthNode = enabled.find(node => node.type === 'z_depth');
-  const alphaNodes = enabled.filter(node => node.type === 'alpha_over');
-  const maskNodes = enabled.filter(node => node.type === 'alpha_mask');
-  if ((depthNode || alphaNodes.length || maskNodes.length) && layers.length) {
-    const excluded = new Set([...alphaNodes.map(node => node.params && node.params.overlay_layer_id), ...maskNodes.map(node => node.params && node.params.mask_layer_id)].filter(Boolean));
-    rebuildLayerStack(ctx, layers, width, height, options.background, depthNode ? (depthNode.params && depthNode.params.direction || 'far_to_near') : 'scene_order', excluded);
+function makeCanvas(documentRef, width, height) {
+  const canvas = documentRef.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  return canvas;
+}
+function copyCanvasInto(targetCtx, source, width, height, composite = 'copy') {
+  targetCtx.save();
+  targetCtx.setTransform(1, 0, 0, 1, 0, 0);
+  targetCtx.globalAlpha = 1;
+  targetCtx.globalCompositeOperation = composite;
+  targetCtx.filter = 'none';
+  targetCtx.clearRect(0, 0, width, height);
+  if (source) targetCtx.drawImage(source, 0, 0, width, height);
+  targetCtx.restore();
+}
+function topologicalCompositorOrder(nodes, links) {
+  const orderIndex = new Map(nodes.map((node, index) => [node.id, index]));
+  const incoming = new Map(nodes.map(node => [node.id, 0]));
+  const outgoing = new Map(nodes.map(node => [node.id, []]));
+  for (const link of links || []) {
+    if (!incoming.has(link.from) || !incoming.has(link.to)) continue;
+    outgoing.get(link.from).push(link.to);
+    incoming.set(link.to, incoming.get(link.to) + 1);
   }
-  for (const node of enabled) {
-    const p = node.params || {};
-    if (node.type === 'color_correct') {
-      const brightness = clamp(Number(p.brightness) || 0, -100, 100);
-      const contrast = clamp(Number(p.contrast) || 0, -100, 100);
-      const saturation = clamp(Number(p.saturation == null ? 100 : p.saturation), 0, 300);
-      compositeFilter(ctx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%) saturate(' + saturation + '%)');
-    } else if (node.type === 'levels') {
-      const brightness = clamp(Number(p.brightness) || 0, -100, 100);
-      const contrast = clamp(Number(p.contrast) || 0, -100, 100);
-      compositeFilter(ctx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%)');
-    } else if (node.type === 'vignette') {
-      vignette(ctx, width, height, p);
-    } else if (node.type === 'alpha_over') {
-      const layer = byId.get(String(p.overlay_layer_id || ''));
-      if (layer) drawLayerImage(ctx, layer, width, height, p.opacity == null ? 1 : p.opacity);
-    } else if (node.type === 'alpha_mask') {
-      const layer = byId.get(String(p.mask_layer_id || ''));
-      if (layer) {
-        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = p.invert ? 'destination-out' : 'destination-in';
-        ctx.drawImage(layer.canvas, 0, 0, width, height);
-        ctx.restore();
+  const queue = nodes.filter(node => incoming.get(node.id) === 0).map(node => node.id);
+  const result = [];
+  while (queue.length) {
+    queue.sort((a, b) => orderIndex.get(a) - orderIndex.get(b));
+    const id = queue.shift();
+    result.push(nodes[orderIndex.get(id)]);
+    for (const next of outgoing.get(id) || []) {
+      incoming.set(next, incoming.get(next) - 1);
+      if (incoming.get(next) === 0) queue.push(next);
+    }
+  }
+  return result.length === nodes.length ? result : nodes;
+}
+
+/** Evaluate image sockets as a DAG. Each node writes an isolated surface, so branches can be reused. */
+export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  const links = Array.isArray(graph?.links) ? graph.links : [];
+  const trace = [];
+  const documentRef = ctx?.canvas?.ownerDocument;
+  if (!documentRef?.createElement || !nodes.length) return trace;
+  const layers = Array.isArray(options.layers) ? options.layers : [];
+  const layerById = new Map(layers.map(layer => [layer.id, layer]));
+  const base = makeCanvas(documentRef, width, height);
+  base.getContext('2d')?.drawImage(ctx.canvas, 0, 0, width, height);
+  const outputs = new Map();
+  const layerInputsToExclude = new Set();
+  for (const node of nodes) {
+    if (!node || node.enabled === false) continue;
+    const secondaryConnected = links.some(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === 1);
+    if (secondaryConnected) continue;
+    if (node.type === 'alpha_over' && node.params?.overlay_layer_id) layerInputsToExclude.add(String(node.params.overlay_layer_id));
+    if (node.type === 'alpha_mask' && node.params?.mask_layer_id) layerInputsToExclude.add(String(node.params.mask_layer_id));
+  }
+  const underlay = makeCanvas(documentRef, width, height);
+  const underlayCtx = underlay.getContext('2d');
+  if (layerInputsToExclude.size && layers.length) rebuildLayerStack(underlayCtx, layers, width, height, options.background, 'scene_order', layerInputsToExclude);
+  else copyCanvasInto(underlayCtx, base, width, height);
+  const order = topologicalCompositorOrder(nodes, links);
+  const getInputLink = (node, socket) => links.find(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket);
+  const getInputCanvas = (node, socket, fallback) => {
+    const link = getInputLink(node, socket);
+    return link ? outputs.get(link.from) || fallback : fallback;
+  };
+  let lastOutput = underlay;
+  for (const node of order) {
+    const params = node.params || {};
+    const input0 = getInputCanvas(node, 0, lastOutput || base);
+    const input1Link = getInputLink(node, 1);
+    const input1 = input1Link ? outputs.get(input1Link.from) : null;
+    const output = makeCanvas(documentRef, width, height);
+    const outCtx = output.getContext('2d');
+    if (!outCtx) continue;
+    if (node.enabled === false) {
+      copyCanvasInto(outCtx, input0 || base, width, height);
+    } else if (node.type === 'render_layers') {
+      if (layerInputsToExclude.size && layers.length) rebuildLayerStack(outCtx, layers, width, height, options.background, 'scene_order', layerInputsToExclude);
+      else copyCanvasInto(outCtx, base, width, height);
+    } else if (node.type === 'z_depth') {
+      rebuildLayerStack(outCtx, layers, width, height, options.background,
+        params.direction || 'far_to_near', layerInputsToExclude);
+    } else {
+      copyCanvasInto(outCtx, input0 || base, width, height);
+      if (node.type === 'color_correct') {
+        const brightness = clamp(Number(params.brightness) || 0, -100, 100);
+        const contrast = clamp(Number(params.contrast) || 0, -100, 100);
+        const saturation = clamp(Number(params.saturation == null ? 100 : params.saturation), 0, 300);
+        compositeFilter(outCtx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%) saturate(' + saturation + '%)');
+      } else if (node.type === 'levels') {
+        const brightness = clamp(Number(params.brightness) || 0, -100, 100);
+        const contrast = clamp(Number(params.contrast) || 0, -100, 100);
+        compositeFilter(outCtx, width, height, 'brightness(' + (100 + brightness) + '%) contrast(' + (100 + contrast) + '%)');
+      } else if (node.type === 'vignette') {
+        vignette(outCtx, width, height, params);
+      } else if (node.type === 'alpha_over') {
+        const layer = layerById.get(String(params.overlay_layer_id || ''));
+        const overlay = input1 || layer?.canvas || null;
+        if (overlay) {
+          outCtx.save(); outCtx.globalAlpha = clamp(Number(params.opacity ?? 1), 0, 1);
+          outCtx.globalCompositeOperation = 'source-over';
+          outCtx.drawImage(overlay, 0, 0, width, height); outCtx.restore();
+        }
+      } else if (node.type === 'alpha_mask') {
+        const layer = layerById.get(String(params.mask_layer_id || ''));
+        const matte = input1 || layer?.canvas || null;
+        if (matte) {
+          outCtx.save(); outCtx.globalAlpha = 1;
+          outCtx.globalCompositeOperation = params.invert ? 'destination-out' : 'destination-in';
+          outCtx.drawImage(matte, 0, 0, width, height); outCtx.restore();
+        }
       }
     }
+    outputs.set(node.id, output);
+    lastOutput = output;
     trace.push(node.type);
   }
+  const outputNode = order.find(node => node.type === 'output' && node.enabled !== false);
+  const finalCanvas = outputNode
+    ? getInputCanvas(outputNode, 0, outputs.get(outputNode.id) || lastOutput || base)
+    : lastOutput || base;
+  copyCanvasInto(ctx, finalCanvas, width, height);
   return trace;
 }
 
 const makeNodeId = () => 'comp_' + Math.random().toString(36).slice(2, 11);
-const graphFromNodes = nodes => ({ nodes, links: nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id })) });
+const graphFromNodes = (nodes, previousLinks = null) => ({ nodes, links: previousLinks ? previousLinks.filter(link => nodes.some(node => node.id === link.from) && nodes.some(node => node.id === link.to)).map(link => ({ ...link })) : nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id, from_socket: 0, to_socket: 0 })) });
+const graphWithDefaultChain = (nodes, existingLinks = []) => graphFromNodes(nodes, [
+  ...nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id, from_socket: 0, to_socket: 0 })),
+  ...existingLinks.filter(link => Number(link.to_socket ?? link.input ?? 0) > 0),
+]);
 const defaultCompositorGraph = () => graphFromNodes([
   { id: 'render_layers', type: 'render_layers', enabled: true, params: {} },
   { id: 'output', type: 'output', enabled: true, params: {} },
@@ -123,12 +211,31 @@ export function initCompositorStudio() {
     graph.nodes.forEach((node, index) => {
       const meta = COMPOSITOR_NODE_TYPES[node.type];
       if (!meta) return;
-      const card = document.createElement('article'); card.className = 'compositor-node' + (node.enabled === false ? ' disabled' : '');
+      const card = document.createElement('article'); card.className = 'compositor-node' + (node.enabled === false ? ' disabled' : ''); card.dataset.nodeType = node.type; card.dataset.nodeId = node.id;
       const head = document.createElement('div'); head.className = 'compositor-node-head';
       const title = document.createElement('strong'); title.textContent = meta.label; head.append(title);
-      const toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = node.enabled === false ? 'Enable' : 'On'; toggle.title = 'Toggle compositor node'; toggle.onclick = () => { const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, enabled: n.enabled === false } : { ...n }); commitGraph(graphFromNodes(nodes), 'Toggle compositor node'); }; head.append(toggle);
+      const toggle = document.createElement('button'); toggle.type = 'button'; toggle.textContent = node.enabled === false ? 'Enable' : 'On'; toggle.title = 'Toggle compositor node'; toggle.onclick = () => { const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, enabled: n.enabled === false } : { ...n }); commitGraph(graphFromNodes(nodes, graph.links), 'Toggle compositor node'); }; head.append(toggle);
+      const inputCount = node.type === 'render_layers' ? 0 : (node.type === 'alpha_over' || node.type === 'alpha_mask' ? 2 : 1);
+      for (let socket = 0; socket < inputCount; socket++) {
+        const label = document.createElement('label'); label.className = 'compositor-param compositor-socket';
+        label.textContent = socket === 0 ? 'Image input' : 'Secondary image input';
+        const select = document.createElement('select');
+        const incoming = graph.links.find(link => link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket);
+        const none = document.createElement('option'); none.value = ''; none.textContent = socket === 1 ? 'Use selected layer / none' : 'Use previous output'; select.append(none);
+        for (const source of graph.nodes.slice(0, index)) {
+          if (source.id === node.id) continue;
+          const option = document.createElement('option'); option.value = source.id; option.textContent = COMPOSITOR_NODE_TYPES[source.type]?.label || source.type; select.append(option);
+        }
+        select.value = incoming?.from || '';
+        select.onchange = () => {
+          const links = graph.links.filter(link => !(link.to === node.id && Number(link.to_socket ?? link.input ?? 0) === socket));
+          if (select.value) links.push({ from: select.value, to: node.id, from_socket: 0, to_socket: socket });
+          commitGraph(graphFromNodes(graph.nodes, links), 'Connect compositor image socket');
+        };
+        label.append(select); card.append(label);
+      }
       if (!['render_layers', 'output'].includes(node.type)) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.title = 'Remove node'; remove.onclick = () => { const nodes = graph.nodes.filter(n => n.id !== node.id).map(n => ({ ...n })); commitGraph(graphFromNodes(nodes), 'Remove compositor node'); }; head.append(remove);
+        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.title = 'Remove node'; remove.onclick = () => { const nodes = graph.nodes.filter(n => n.id !== node.id).map(n => ({ ...n })); commitGraph(graphWithDefaultChain(nodes, graph.links), 'Remove compositor node'); }; head.append(remove);
       }
       card.append(head);
       const params = node.params || {};
@@ -137,7 +244,7 @@ export function initCompositorStudio() {
         let input;
         if (key === 'direction' || key === 'overlay_layer_id' || key === 'mask_layer_id') {
           input = document.createElement('select');
-          const choices = key === 'direction' ? [['far_to_near', 'Far to near'], ['near_to_far', 'Near to far']] : [['', 'Select layer'], ...((state.project && state.project.scenes || []).find(scene => scene.id === state.sceneId)?.layers || []).map(layer => [layer.id, layer.name || layer.id])];
+          const choices = key === 'direction' ? [['far_to_near', 'Far to near'], ['near_to_far', 'Near to far']] : [['', 'Select layer'], ...flattenLayerTree((state.project && state.project.scenes || []).flatMap(scene => scene.layers || []), [], []).map(({ layer }) => [layer.id, layer.name || layer.id])];
           for (const choice of choices) { const option = document.createElement('option'); option.value = choice[0]; option.textContent = choice[1]; input.append(option); }
           input.value = params[key] == null ? fallback : params[key];
         } else if (key === 'invert') {
@@ -151,7 +258,7 @@ export function initCompositorStudio() {
           const value = input.tagName === 'SELECT' ? input.value : input.type === 'checkbox' ? input.checked : Number(input.value);
           if (typeof value === 'number' && !Number.isFinite(value)) return;
           const nodes = graph.nodes.map(n => n.id === node.id ? { ...n, params: { ...(n.params || {}), [key]: value } } : { ...n });
-          commitGraph(graphFromNodes(nodes), 'Edit compositor parameter');
+          commitGraph(graphFromNodes(nodes, graph.links), 'Edit compositor parameter');
         };
         label.append(input); card.append(label);
       }
@@ -159,14 +266,14 @@ export function initCompositorStudio() {
         const order = document.createElement('div'); order.className = 'compositor-order';
         for (const [textLabel, delta] of [['↑', -1], ['↓', 1]]) {
           const button = document.createElement('button'); button.type = 'button'; button.textContent = textLabel; button.title = delta < 0 ? 'Move node up' : 'Move node down'; button.disabled = (index + delta <= 0 || index + delta >= graph.nodes.length - 1);
-          button.onclick = () => { const nodes = graph.nodes.map(n => ({ ...n })); const target = index + delta; [nodes[index], nodes[target]] = [nodes[target], nodes[index]]; commitGraph(graphFromNodes(nodes), 'Reorder compositor node'); };
+          button.onclick = () => { const nodes = graph.nodes.map(n => ({ ...n })); const target = index + delta; [nodes[index], nodes[target]] = [nodes[target], nodes[index]]; commitGraph(graphFromNodes(nodes, graph.links), 'Reorder compositor node'); };
           order.append(button);
         }
         card.append(order);
       }
       list.append(card);
     });
-    const footer = document.createElement('p'); footer.className = 'hint'; footer.textContent = 'Top-to-bottom order is evaluated after scene effects. Node parameters are saved in the project.'; list.append(footer);
+    const footer = document.createElement('p'); footer.className = 'hint'; footer.textContent = 'Image sockets connect processing branches. Unconnected inputs use the previous output; secondary inputs can use a selected layer.'; list.append(footer);
   };
   addButton.onclick = () => {
     const type = typeSelect.value, meta = COMPOSITOR_NODE_TYPES[type];
@@ -176,7 +283,7 @@ export function initCompositorStudio() {
     const nodes = graph.nodes.map(n => ({ ...n, params: { ...(n.params || {}) } }));
     const outputIndex = nodes.findIndex(n => n.type === 'output');
     nodes.splice(outputIndex < 0 ? nodes.length : outputIndex, 0, { id: makeNodeId(), type, enabled: true, params: { ...meta.defaults } });
-    commitGraph(graphFromNodes(nodes), 'Add compositor node');
+    commitGraph(graphWithDefaultChain(nodes, graph.links), 'Add compositor node');
   };
   render();
 }

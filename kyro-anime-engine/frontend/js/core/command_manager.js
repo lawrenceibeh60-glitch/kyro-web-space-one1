@@ -52,7 +52,18 @@ export function batch(cmds, label = 'Batch') {
 
 // ---- layer animation state (transform / tracks / opacity) as one undoable unit ----
 export function findLayer(id) {
-  for (const sc of state.project.scenes) { const l = sc.layers.find(x => x.id === id); if (l) return l; }
+  const visit = layers => {
+    for (const layer of Array.isArray(layers) ? layers : []) {
+      if (layer?.id === id) return layer;
+      const nested = visit(layer?.children);
+      if (nested) return nested;
+    }
+    return null;
+  };
+  for (const scene of state.project.scenes || []) {
+    const layer = visit(scene.layers);
+    if (layer) return layer;
+  }
   return null;
 }
 export const snapshotLayer = l => ({ transform: clone(l.transform), tracks: clone(l.tracks), opacity: l.opacity });
