@@ -59,6 +59,8 @@
               "math",
               "switch",
               "animate",
+              "style",
+              "opacity",
               "grid",
               "resample",
               "translate",
