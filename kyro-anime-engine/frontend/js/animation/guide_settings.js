@@ -4,7 +4,7 @@ import { bus } from '../core/event_bus.js';
 
 const $ = id => document.getElementById(id);
 const DEFAULTS = Object.freeze({
-  enabled:false, grid:true, center:true, thirds:false, head:false, body:false,
+  enabled:false, grid:true, center:true, thirds:false, head:false, eyes:false, nose:false, mouth:false, ears:false, hairline:false, body:false,
   color:'#36c5d8', opacity:0.55, spacing:32, centered:true
 });
 let canvas=null, ctx=null, host=null, observer=null;
@@ -74,6 +74,19 @@ function paint() {
     line(cx-rx,cy,cx+rx,cy);line(cx,cy-ry,cx,cy+ry);
     ctx.beginPath();ctx.ellipse(cx,cy+ry*.22,rx,ry*.42,0,0,Math.PI*2);ctx.stroke();
   }
+  if(s.eyes || s.nose || s.mouth || s.ears || s.hairline){
+    const cx=w/2,cy=h*.28,rx=Math.min(w*.095,66),ry=rx*1.22;
+    ctx.lineWidth=1.25;
+    if(s.eyes){
+      const eyeY=cy-ry*.05,eyeGap=rx*.43,eyeW=rx*.22,eyeH=ry*.11;
+      for(const ex of [cx-eyeGap,cx+eyeGap]){ctx.beginPath();ctx.ellipse(ex,eyeY,eyeW,eyeH,0,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(ex,eyeY,2.5,0,Math.PI*2);ctx.stroke();}
+      line(cx-rx*.82,eyeY,cx+rx*.82,eyeY);
+    }
+    if(s.nose){line(cx,cy+ry*.02,cx-rx*.08,cy+ry*.38);line(cx-rx*.08,cy+ry*.38,cx+rx*.12,cy+ry*.4);ctx.beginPath();ctx.arc(cx,cy+ry*.4,rx*.16,0.15*Math.PI,0.85*Math.PI);ctx.stroke();}
+    if(s.mouth){const my=cy+ry*.61;ctx.beginPath();ctx.ellipse(cx,my,rx*.28,ry*.065,0,0,Math.PI*2);ctx.stroke();line(cx-rx*.25,my,cx+rx*.25,my);}
+    if(s.ears){for(const side of [-1,1]){ctx.beginPath();ctx.ellipse(cx+side*rx*1.04,cy+ry*.17,rx*.12,ry*.23,0,0,Math.PI*2);ctx.stroke();}}
+    if(s.hairline){ctx.beginPath();ctx.ellipse(cx,cy-ry*.08,rx*.91,ry*.7,0,Math.PI*1.08,Math.PI*1.92);ctx.stroke();line(cx-rx*.85,cy+ry*.08,cx+rx*.85,cy+ry*.08);}
+  }
   if(s.body){
     const cx=w/2,shoulderY=h*.43,hipY=h*.63,span=Math.min(w*.2,150);
     ctx.lineWidth=1.5;line(cx-span,shoulderY,cx+span,shoulderY);line(cx-span*.65,hipY,cx+span*.65,hipY);
@@ -83,11 +96,11 @@ function paint() {
   }
   ctx.restore();
   const status=$('kaeGuideStatus');
-  if(status)status.textContent='Guides active · editor overlay only · '+[s.grid&&'grid',s.center&&'axes',s.thirds&&'thirds',s.head&&'head',s.body&&'body'].filter(Boolean).join(', ');
+  if(status)status.textContent='Guides active · editor overlay only · '+[s.grid&&'grid',s.center&&'axes',s.thirds&&'thirds',s.head&&'head',s.eyes&&'eyes',s.nose&&'nose',s.mouth&&'mouth',s.ears&&'ears',s.hairline&&'hairline',s.body&&'body'].filter(Boolean).join(', ');
 }
 function syncControls() {
   const s=settings();
-  const map={kaeGuidesEnabled:'enabled',kaeGuideGrid:'grid',kaeGuideCenter:'center',kaeGuideThirds:'thirds',kaeGuideHead:'head',kaeGuideBody:'body'};
+  const map={kaeGuidesEnabled:'enabled',kaeGuideGrid:'grid',kaeGuideCenter:'center',kaeGuideThirds:'thirds',kaeGuideHead:'head',kaeGuideEyes:'eyes',kaeGuideNose:'nose',kaeGuideMouth:'mouth',kaeGuideEars:'ears',kaeGuideHairline:'hairline',kaeGuideBody:'body'};
   for(const [id,key] of Object.entries(map)){const el=$(id);if(el)el.checked=!!s[key];}
   for(const [id,key] of [['kaeGuideColor','color'],['kaeGuideOpacity','opacity'],['kaeGuideSpacing','spacing']]){
     const el=$(id);if(el)el.value=String(s[key]??DEFAULTS[key]);
