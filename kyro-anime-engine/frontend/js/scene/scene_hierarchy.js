@@ -8,13 +8,13 @@ const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(valu
  * Group nodes are retained as drawable entries when they have exposures, then
  * their children are visited in order. Invisible ancestors suppress a subtree.
  */
-export function flattenLayerTree(layers = [], ancestors = [], output = []) {
+export function flattenLayerTree(layers = [], ancestors = [], output = [], includeHidden = false) {
   for (const layer of Array.isArray(layers) ? layers : []) {
-    if (!layer || layer.visible === false) continue;
+    if (!layer || (!includeHidden && layer.visible === false)) continue;
     const entry = { layer, ancestors: ancestors.slice() };
     output.push(entry);
     if (Array.isArray(layer.children) && layer.children.length) {
-      flattenLayerTree(layer.children, [...ancestors, layer], output);
+      flattenLayerTree(layer.children, [...ancestors, layer], output, includeHidden);
     }
   }
   return output;
