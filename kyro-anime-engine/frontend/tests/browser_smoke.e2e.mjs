@@ -2,8 +2,41 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { transformPoint } from '../js/animation/rig_deformer.js';
+import { createRenderCache } from '../js/rendering/render_cache.js';
+import { createDrawQueue } from '../js/rendering/draw_queue.js';
 
 const baseURL = process.env.KAE_BASE_URL || 'http://127.0.0.1:5000';
+
+test('render cache enforces LRU and memory bounds', () => {
+  const cache = createRenderCache({ maxEntries: 2, maxBytes: 8 });
+  cache.set('a', 'A', 4);
+  cache.set('b', 'B', 4);
+  assert.equal(cache.get('a'), 'A');
+  cache.set('c', 'C', 4);
+  assert.equal(cache.has('b'), false, 'least-recently-used entry should be evicted');
+  assert.equal(cache.get('a'), 'A');
+  assert.equal(cache.get('c'), 'C');
+  assert.ok(cache.bytes <= 8);
+  assert.equal(cache.stats.hits, 3);
+});
+
+test('draw queue coalesces repeated invalidations into one scheduled frame', () => {
+  let nextId = 0;
+  const pending = new Map();
+  const draws = [];
+  const queue = createDrawQueue(() => draws.push('draw'), {
+    request(callback) { const id = ++nextId; pending.set(id, callback); return id; },
+    cancel(id) { pending.delete(id); },
+  });
+  queue.request(); queue.request(); queue.request();
+  assert.equal(pending.size, 1);
+  const [id, callback] = [...pending.entries()][0];
+  pending.delete(id); callback();
+  assert.deepEqual(draws, ['draw']);
+  assert.equal(queue.pending, false);
+  assert.equal(queue.stats.requested, 3);
+  assert.equal(queue.stats.completed, 3);
+});
 
 test('hierarchical skinning moves child pivots with parent bones', () => {
   const root = { id: 'root', pivot: { x: 0, y: 0 }, rotation: 90 };
