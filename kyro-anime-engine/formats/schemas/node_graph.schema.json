@@ -54,6 +54,8 @@
               "array",
               "mirror",
               "polygon",
+              "star",
+              "wave",
               "grid",
               "resample",
               "translate",
