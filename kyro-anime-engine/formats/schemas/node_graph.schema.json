@@ -61,6 +61,7 @@
               "animate",
               "style",
               "opacity",
+              "mask",
               "grid",
               "resample",
               "translate",
