@@ -9,6 +9,7 @@ import { applyCameraShake } from '../effects/camera_shake.js';
 import { drawLightning } from '../effects/lightning.js';
 import { drawParticles } from '../effects/particles.js';
 import { drawSpeedLines } from '../effects/speed_lines.js';
+import { applyCompositorGraph } from './compositing.js';
 
 const BLEND = { normal: 'source-over', multiply: 'multiply', screen: 'screen', overlay: 'overlay', add: 'lighter' };
 
@@ -632,11 +633,14 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     }
     ctx.restore();
   }
-  drawGlowComposite(ctx, effects, width, height);\n  drawColorGradeComposite(ctx, effects, width, height);\n  drawVignetteComposite(ctx, effects, width, height);
+  drawGlowComposite(ctx, effects, width, height);
   ctx.save();
   applyCameraTransform(ctx, width, height, camera, frame);
   drawEffects(ctx, effects, width, height, frame);
   ctx.restore();
+  drawColorGradeComposite(ctx, effects, width, height);
+  drawVignetteComposite(ctx, effects, width, height);
+  if (project.compositor_graph) applyCompositorGraph(ctx, project.compositor_graph, width, height);
   if (preview?.cursor) {
     ctx.save();
     const cursorLayer = scene?.layers.find(layer => layer.id === preview.layerId);
