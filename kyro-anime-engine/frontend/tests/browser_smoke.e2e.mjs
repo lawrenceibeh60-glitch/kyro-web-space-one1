@@ -138,13 +138,28 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
       renderFrame(ctx, maskProject, 's', 0);
       const maskInside = [...ctx.getImageData(20, 20, 1, 1).data];
       const maskOutside = [...ctx.getImageData(44, 20, 1, 1).data];
-      return { ordinary, depth, alpha, maskInside, maskOutside };
+      const nestedProject = {
+        settings: { width: 64, height: 64, background: '#ffffff', duration_frames: 1 },
+        drawings: { child: { strokes: [rect('#ff0000')] } },
+        effects: [], rigs: [],
+        scenes: [{ id: 's', layers: [{
+          id: 'character-group', type: 'group', name: 'Character', opacity: 0.5,
+          transform: { x: 20, y: 0, rotation: 0, scale_x: 1, scale_y: 1 },
+          children: [{ id: 'child-layer', type: 'drawing', exposures: [{ start: 0, length: 1, drawing: 'child' }] }],
+        }] }],
+      };
+      renderFrame(ctx, nestedProject, 's', 0, null, { transparent: true });
+      const groupInside = [...ctx.getImageData(40, 20, 1, 1).data];
+      const groupOutside = [...ctx.getImageData(20, 20, 1, 1).data];
+      return { ordinary, depth, alpha, maskInside, maskOutside, groupInside, groupOutside };
     });
     assert.ok(compositorPixels.ordinary[2] > compositorPixels.ordinary[0], 'normal scene order should leave the blue layer on top');
     assert.ok(compositorPixels.depth[0] > compositorPixels.depth[2], 'far-to-near Z-depth sorting should put the nearer red layer on top');
     assert.ok(Math.abs(compositorPixels.alpha[0] - compositorPixels.alpha[2]) < 8, '50% Alpha Over should blend red and blue approximately equally');
     assert.ok(compositorPixels.maskInside[3] > 240, 'alpha mask should preserve pixels inside the matte');
     assert.equal(compositorPixels.maskOutside[3], 0, 'alpha mask should remove pixels outside the matte');
+    assert.ok(compositorPixels.groupInside[0] > 240 && compositorPixels.groupInside[3] >= 120 && compositorPixels.groupInside[3] <= 136, 'nested group should apply child translation and inherited opacity');
+    assert.equal(compositorPixels.groupOutside[3], 0, 'nested group transform should move the child artwork');
 
     // A double-click on an empty exposure cell should author a real blank drawing cel.
     await page.locator('#addLayer').click();
