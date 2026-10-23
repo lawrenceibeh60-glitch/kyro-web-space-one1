@@ -42,6 +42,13 @@ test('world transform composes parent translation, rotation, and child offset', 
   assert.ok(Math.abs(world.scale_x - 2) < 1e-8);
 });
 
+test('world transform applies anchor offsets in the same order as Canvas2D', () => {
+  const layer = { id: 'pivot', transform: { x: 100, y: 50, rotation: 90, scale_x: 1, scale_y: 1, anchor_x: 10, anchor_y: 0 } };
+  const world = worldTransformForLayer(layer, [], 0);
+  assert.ok(Math.abs(world.x - 100) < 1e-8);
+  assert.ok(Math.abs(world.y - 40) < 1e-8);
+});
+
 test('reparentLayer moves a layer into a group immutably and rejects cycles', () => {
   const moved = reparentLayer(tree, 'background', 'character', 0);
   assert.deepEqual(moved[0].children.map(layer => layer.id), ['background', 'body', 'faceGroup']);
