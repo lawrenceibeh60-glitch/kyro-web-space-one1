@@ -546,6 +546,38 @@ export function initTimelinePanel() {
   $('addMarker').onclick = addMarker;
   $('renameMarker').onclick = renameSelectedMarker;
   $('deleteMarker').onclick = deleteSelectedMarker;
+  let copiedKeys = null;
+  function copyKeyframe() {
+    const layer = getScene()?.layers.find(item => item.id === (state.selKey?.layerId || state.layerId));
+    const frame = state.selKey?.frame ?? state.frame;
+    if (!layer) { toast('Select a track first', 'err'); return; }
+    const channels = Object.entries(layer.tracks || {}).map(([name, keys]) => [name, keys.filter(key => key.t === frame).map(key => ({ ...key }))]).filter(([, keys]) => keys.length);
+    if (!channels.length) { toast('No transform or opacity keys at this frame', 'err'); return; }
+    copiedKeys = { channels, sourceFrame: frame };
+    toast('Copied ' + channels.length + ' animated channel(s)');
+  }
+  function pasteKeyframe() {
+    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    if (!layer || !copiedKeys) { toast(!layer ? 'Select a track first' : 'Copy keys before pasting', 'err'); return; }
+    const tracks = JSON.parse(JSON.stringify(layer.tracks || {})), frame = state.frame;
+    let count = 0;
+    for (const [channel, keys] of copiedKeys.channels) {
+      tracks[channel] ||= [];
+      for (const source of keys) {
+        const existing = tracks[channel].find(key => key.t === frame);
+        if (existing) { existing.v = source.v; existing.ease = source.ease; }
+        else tracks[channel].push({ ...source, t: frame });
+        tracks[channel].sort((a, b) => a.t - b.t); count++;
+      }
+    }
+    if (!count) return;
+    const scene = getScene(), si = state.project.scenes.indexOf(scene), li = scene.layers.indexOf(layer);
+    execute(setValue(['scenes', si, 'layers', li, 'tracks'], tracks, 'Paste keyframes'));
+    state.selKey = { layerId: layer.id, frame };
+    requestDraw();
+  }
+  $('copyKeyframe').onclick = copyKeyframe;
+  $('pasteKeyframe').onclick = pasteKeyframe;
   $('newDrawing').onclick = () => newDrawing(false);
   $('duplicateDrawing').onclick = () => newDrawing(true);
   $('holdDrawing').onclick = holdDrawing;
