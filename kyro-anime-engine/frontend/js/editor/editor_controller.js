@@ -29,6 +29,7 @@ import { initAssetBrowser } from '../ui/asset_browser.js';
 import { initStudioPanel } from '../ui/studio_panel.js';
 import { svg, setIcon, hydrate } from '../ui/icons.js';
 import { toast } from '../ui/notifications.js';
+import { findLayerLocation, flattenLayerTree } from '../scene/scene_hierarchy.js';
 
 const $ = id => document.getElementById(id);
 const TOOL_NAMES = { pan: 'Hand', camera: 'Camera', brush: 'Brush', grease: 'Grease Pencil', eraser: 'Eraser', edit: 'Edit', weight: 'Weight Paint', line: 'Line', rectangle: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', fill: 'Fill', eyedropper: 'Eyedropper', move: 'Move', rotate: 'Rotate', scale: 'Scale' };
@@ -95,84 +96,103 @@ function renderLayers() {
   $('duplicateLayer').disabled = !getLayer();
   $('deleteLayer').disabled = !getLayer();
   if (!sc) return;
-  for (const l of [...sc.layers].reverse()) {
-    const li = document.createElement('li');
-    li.className = 'layer' + (l.id === state.layerId ? ' active' : '');
-    const eye = document.createElement('button');
-    eye.innerHTML = svg(l.visible === false ? 'eye-off' : 'eye'); eye.title = 'Visibility';
-    eye.onclick = ev => { ev.stopPropagation(); toggleFlag(l.id, 'visible', l.visible === false); };
-    const lock = document.createElement('button');
-    lock.innerHTML = svg(l.locked ? 'lock' : 'unlock'); lock.title = 'Lock';
-    lock.onclick = ev => { ev.stopPropagation(); toggleFlag(l.id, 'locked', !l.locked); };
-    const name = document.createElement('span');
-    name.className = 'nm'; name.textContent = l.name || l.id;
-    name.title = 'Double-click or press F2 to rename';
-    li.append(eye, lock, name);
-    li.onclick = () => selectLayer(l.id);
-    li.ondblclick = e => { e.preventDefault(); e.stopPropagation(); renameLayer(l.id); };
-    ul.append(li);
-  }
+  const renderNodes = (nodes, parent, depth = 0) => {
+    for (const layer of [...(nodes || [])].reverse()) {
+      const li = document.createElement('li');
+      li.className = 'layer' + (layer.id === state.layerId ? ' active' : '') + (layer.type === 'group' ? ' layer-group' : '');
+      li.dataset.layerId = layer.id;
+      li.style.paddingLeft = (depth * 12) + 'px';
+      const eye = document.createElement('button');
+      eye.innerHTML = svg(layer.visible === false ? 'eye-off' : 'eye'); eye.title = 'Visibility';
+      eye.onclick = ev => { ev.stopPropagation(); toggleFlag(layer.id, 'visible', layer.visible === false); };
+      const lock = document.createElement('button');
+      lock.innerHTML = svg(layer.locked ? 'lock' : 'unlock'); lock.title = 'Lock';
+      lock.onclick = ev => { ev.stopPropagation(); toggleFlag(layer.id, 'locked', !layer.locked); };
+      const name = document.createElement('span');
+      name.className = 'nm'; name.textContent = (layer.type === 'group' ? '▾ ' : '') + (layer.name || layer.id);
+      name.title = 'Double-click or press F2 to rename';
+      li.append(eye, lock, name);
+      li.onclick = () => selectLayer(layer.id);
+      li.ondblclick = e => { e.preventDefault(); e.stopPropagation(); renameLayer(layer.id); };
+      parent.append(li);
+      if (Array.isArray(layer.children) && layer.children.length) {
+        const children = document.createElement('ul');
+        children.className = 'layers layer-children';
+        li.append(children);
+        renderNodes(layer.children, children, depth + 1);
+      }
+    }
+  };
+  renderNodes(sc.layers, ul);
 }
 
 function toggleFlag(id, key, value) {
-  const si = sceneIndex(), li = getScene().layers.findIndex(l => l.id === id);
-  execute(setValue(['scenes', si, 'layers', li, key], value, 'Toggle ' + key));
+  const location = findLayerLocation(getScene()?.layers || [], id);
+  if (!location) return;
+  execute(setValue(['scenes', sceneIndex(), 'layers', ...location.path, key], value, 'Toggle ' + key));
 }
-
 function addLayer() {
-  const ids = new Set(state.project.scenes.flatMap(s => s.layers.map(l => l.id)));
+  const ids = new Set(state.project.scenes.flatMap(scene => flattenLayerTree(scene.layers || []).map(entry => entry.layer.id)));
   let n = 1; while (ids.has('layer_' + n)) n++;
   const layer = { id: 'layer_' + n, name: 'Layer ' + n, type: 'drawing', exposures: [] };
   execute(insertAt(['scenes', sceneIndex(), 'layers'], getScene().layers.length, layer, 'Add layer'));
   selectLayer(layer.id);
 }
-
-function layerIndex(id = state.layerId) { return getScene()?.layers.findIndex(layer => layer.id === id) ?? -1; }
-
+function layerLocation(id = state.layerId) { return findLayerLocation(getScene()?.layers || [], id); }
+function layerIndex(id = state.layerId) { return layerLocation(id)?.index ?? -1; }
+function layerValuePath(id = state.layerId) {
+  const location = layerLocation(id);
+  return location ? ['scenes', sceneIndex(), 'layers', ...location.path] : null;
+}
 function renameLayer(id = state.layerId) {
-  const layer = getLayer(id);
-  if (!layer) return;
+  const layer = getLayer(id), path = layerValuePath(id);
+  if (!layer || !path) return;
   const name = prompt('Rename layer', layer.name || layer.id);
   if (!name || !name.trim() || name.trim() === layer.name) return;
-  execute(setValue(['scenes', sceneIndex(), 'layers', layerIndex(id), 'name'], name.trim(), 'Rename layer'));
+  execute(setValue([...path, 'name'], name.trim(), 'Rename layer'));
 }
-
+function createGroup() {
+  const scene = getScene();
+  if (!scene) return;
+  const layers = JSON.parse(JSON.stringify(scene.layers || []));
+  const selected = state.layerId ? findLayerLocation(layers, state.layerId) : null;
+  const ids = new Set(flattenLayerTree(layers).map(entry => entry.layer.id));
+  let n = 1; while (ids.has('group_' + n)) n++;
+  const group = { id: 'group_' + n, name: 'Group ' + n, type: 'group', opacity: 1, visible: true, locked: false, transform: { x: 0, y: 0, rotation: 0, scale_x: 1, scale_y: 1, anchor_x: 0, anchor_y: 0 }, children: [] };
+  if (selected) {
+    selected.container.splice(selected.index, 1);
+    group.children.push(selected.layer);
+    const parent = selected.ancestors[selected.ancestors.length - 1];
+    const siblings = parent ? (findLayerLocation(layers, parent.id)?.layer.children || layers) : layers;
+    siblings.splice(Math.max(0, Math.min(selected.index, siblings.length)), 0, group);
+  } else layers.push(group);
+  execute(setValue(['scenes', sceneIndex(), 'layers'], layers, 'Create group'));
+  selectLayer(group.id);
+}
 function duplicateLayer() {
-  const source = getLayer(), index = layerIndex();
-  if (!source || index < 0) return;
-  const usedLayerIds = new Set(state.project.scenes.flatMap(scene => scene.layers.map(layer => layer.id)));
-  let layerNumber = 1;
-  while (usedLayerIds.has('layer_' + layerNumber)) layerNumber++;
+  const source = getLayer(), location = layerLocation();
+  if (!source || !location) return;
+  const insertPath = ['scenes', sceneIndex(), 'layers', ...location.path.slice(0, -1)];
+  const usedLayerIds = new Set(state.project.scenes.flatMap(scene => flattenLayerTree(scene.layers || []).map(entry => entry.layer.id)));
+  let layerNumber = 1; while (usedLayerIds.has('layer_' + layerNumber)) layerNumber++;
   const copy = JSON.parse(JSON.stringify(source));
-  copy.id = 'layer_' + layerNumber;
-  copy.name = `${source.name || 'Layer'} Copy`;
-  const commands = [];
-  const usedDrawingIds = new Set(Object.keys(state.project.drawings));
+  copy.id = 'layer_' + layerNumber; copy.name = (source.name || 'Layer') + ' Copy';
+  const commands = [], usedDrawingIds = new Set(Object.keys(state.project.drawings));
   let drawingNumber = 1;
-
   for (const exposure of copy.exposures || []) {
-    const drawing = state.project.drawings[exposure.drawing];
-    if (!drawing) continue;
+    const drawing = state.project.drawings[exposure.drawing]; if (!drawing) continue;
     while (usedDrawingIds.has('d_' + drawingNumber)) drawingNumber++;
-    const drawingId = 'd_' + drawingNumber;
-    usedDrawingIds.add(drawingId);
-    drawingNumber++;
-    const drawingCopy = JSON.parse(JSON.stringify(drawing));
-    drawingCopy.id = drawingId;
-    exposure.drawing = drawingId;
+    const drawingId = 'd_' + drawingNumber++; usedDrawingIds.add(drawingId);
+    const drawingCopy = JSON.parse(JSON.stringify(drawing)); drawingCopy.id = drawingId; exposure.drawing = drawingId;
     commands.push(setValue(['drawings', drawingId], drawingCopy, 'Duplicate drawing'));
   }
-
-  commands.push(insertAt(['scenes', sceneIndex(), 'layers'], index + 1, copy, 'Duplicate layer'));
-  execute(batch(commands, 'Duplicate layer'));
-  selectLayer(copy.id);
+  commands.push(insertAt(insertPath, location.index + 1, copy, 'Duplicate layer'));
+  execute(batch(commands, 'Duplicate layer')); selectLayer(copy.id);
 }
-
 function deleteLayer() {
-  const index = layerIndex();
-  const layer = getLayer();
-  if (index < 0 || !layer || !confirm(`Delete layer "${layer.name || layer.id}"?`)) return;
-  execute(removeAt(['scenes', sceneIndex(), 'layers'], index, 'Delete layer'));
+  const location = layerLocation(), layer = getLayer();
+  if (!location || !layer || !confirm(`Delete layer "${layer.name || layer.id}"?`)) return;
+  execute(removeAt(['scenes', sceneIndex(), 'layers', ...location.path.slice(0, -1)], location.index, 'Delete layer'));
 }
 
 function createQuickAnimation(channel) {
@@ -338,6 +358,7 @@ async function boot() {
     };
   });
   $('addLayer').onclick = addLayer;
+  $('addGroup').onclick = createGroup;
   $('duplicateLayer').onclick = duplicateLayer;
   $('deleteLayer').onclick = deleteLayer;
   $('gridToggle').onclick = () => {
