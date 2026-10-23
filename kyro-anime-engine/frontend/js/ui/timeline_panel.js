@@ -547,7 +547,7 @@ export function initTimelinePanel() {
       renderPreviewRange();
     }
   });
-  bus.on('project:changed', () => { selectedExposure = null; renderNames(); renderMarkers(); renderPreviewRange(); requestDraw(); });
+  bus.on('project:changed', () => { selectedExposure = null; syncTimelineFps(); renderNames(); renderMarkers(); renderPreviewRange(); requestDraw(); });
   bus.on('selection', () => { renderNames(); requestDraw(); });
   bus.on('playback', requestDraw);
   renderNames(); renderMarkers(); renderPreviewRange(); requestDraw();
