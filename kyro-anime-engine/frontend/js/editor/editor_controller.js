@@ -29,7 +29,7 @@ import { initAssetBrowser } from '../ui/asset_browser.js';
 import { initStudioPanel } from '../ui/studio_panel.js';
 import { svg, setIcon, hydrate } from '../ui/icons.js';
 import { toast } from '../ui/notifications.js';
-import { findLayerLocation, flattenLayerTree } from '../scene/scene_hierarchy.js';
+import { findLayerLocation, flattenLayerTree, reparentLayer } from '../scene/scene_hierarchy.js';
 
 const $ = id => document.getElementById(id);
 const TOOL_NAMES = { pan: 'Hand', camera: 'Camera', brush: 'Brush', grease: 'Grease Pencil', eraser: 'Eraser', edit: 'Edit', weight: 'Weight Paint', line: 'Line', rectangle: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', fill: 'Fill', eyedropper: 'Eyedropper', move: 'Move', rotate: 'Rotate', scale: 'Scale' };
@@ -101,6 +101,27 @@ function renderLayers() {
       const li = document.createElement('li');
       li.className = 'layer' + (layer.id === state.layerId ? ' active' : '') + (layer.type === 'group' ? ' layer-group' : '');
       li.dataset.layerId = layer.id;
+      li.draggable = true;
+      li.ondragstart = event => {
+        event.dataTransfer?.setData('text/kae-layer-id', layer.id);
+        if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+      };
+      li.ondragover = event => {
+        if (layer.type === 'group' || layer.type === 'character_instance') {
+          event.preventDefault();
+          if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+        }
+      };
+      li.ondrop = event => {
+        event.preventDefault(); event.stopPropagation();
+        const sourceId = event.dataTransfer?.getData('text/kae-layer-id');
+        if (!sourceId || sourceId === layer.id) return;
+        try {
+          const next = reparentLayer(getScene().layers, sourceId, layer.id);
+          execute(setValue(['scenes', sceneIndex(), 'layers'], next, 'Move layer into group'));
+          selectLayer(sourceId);
+        } catch (error) { toast(error.message || 'Could not move layer', 'err'); }
+      };
       li.style.paddingLeft = (depth * 12) + 'px';
       const eye = document.createElement('button');
       eye.innerHTML = svg(layer.visible === false ? 'eye-off' : 'eye'); eye.title = 'Visibility';
@@ -122,6 +143,17 @@ function renderLayers() {
         renderNodes(layer.children, children, depth + 1);
       }
     }
+  };
+  ul.ondragover = event => { event.preventDefault(); };
+  ul.ondrop = event => {
+    if (event.target.closest('.layer')) return;
+    event.preventDefault();
+    const sourceId = event.dataTransfer?.getData('text/kae-layer-id');
+    if (!sourceId) return;
+    try {
+      execute(setValue(['scenes', sceneIndex(), 'layers'], reparentLayer(getScene().layers, sourceId, null), 'Move layer to scene root'));
+      selectLayer(sourceId);
+    } catch (error) { toast(error.message || 'Could not move layer', 'err'); }
   };
   renderNodes(sc.layers, ul);
 }
