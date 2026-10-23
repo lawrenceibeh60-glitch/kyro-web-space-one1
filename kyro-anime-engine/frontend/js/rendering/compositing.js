@@ -187,6 +187,10 @@ export function applyCompositorGraph(ctx, graph, width, height, options = {}) {
 
 const makeNodeId = () => 'comp_' + Math.random().toString(36).slice(2, 11);
 const graphFromNodes = (nodes, previousLinks = null) => ({ nodes, links: previousLinks ? previousLinks.filter(link => nodes.some(node => node.id === link.from) && nodes.some(node => node.id === link.to)).map(link => ({ ...link })) : nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id, from_socket: 0, to_socket: 0 })) });
+const graphWithDefaultChain = (nodes, existingLinks = []) => graphFromNodes(nodes, [
+  ...nodes.slice(0, -1).map((node, index) => ({ from: node.id, to: nodes[index + 1].id, from_socket: 0, to_socket: 0 })),
+  ...existingLinks.filter(link => Number(link.to_socket ?? link.input ?? 0) > 0),
+]);
 const defaultCompositorGraph = () => graphFromNodes([
   { id: 'render_layers', type: 'render_layers', enabled: true, params: {} },
   { id: 'output', type: 'output', enabled: true, params: {} },
@@ -231,7 +235,7 @@ export function initCompositorStudio() {
         label.append(select); card.append(label);
       }
       if (!['render_layers', 'output'].includes(node.type)) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.title = 'Remove node'; remove.onclick = () => { const nodes = graph.nodes.filter(n => n.id !== node.id).map(n => ({ ...n })); commitGraph(graphFromNodes(nodes), 'Remove compositor node'); }; head.append(remove);
+        const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.title = 'Remove node'; remove.onclick = () => { const nodes = graph.nodes.filter(n => n.id !== node.id).map(n => ({ ...n })); commitGraph(graphWithDefaultChain(nodes, graph.links), 'Remove compositor node'); }; head.append(remove);
       }
       card.append(head);
       const params = node.params || {};
@@ -262,7 +266,7 @@ export function initCompositorStudio() {
         const order = document.createElement('div'); order.className = 'compositor-order';
         for (const [textLabel, delta] of [['↑', -1], ['↓', 1]]) {
           const button = document.createElement('button'); button.type = 'button'; button.textContent = textLabel; button.title = delta < 0 ? 'Move node up' : 'Move node down'; button.disabled = (index + delta <= 0 || index + delta >= graph.nodes.length - 1);
-          button.onclick = () => { const nodes = graph.nodes.map(n => ({ ...n })); const target = index + delta; [nodes[index], nodes[target]] = [nodes[target], nodes[index]]; commitGraph(graphFromNodes(nodes), 'Reorder compositor node'); };
+          button.onclick = () => { const nodes = graph.nodes.map(n => ({ ...n })); const target = index + delta; [nodes[index], nodes[target]] = [nodes[target], nodes[index]]; commitGraph(graphFromNodes(nodes, graph.links), 'Reorder compositor node'); };
           order.append(button);
         }
         card.append(order);
@@ -279,7 +283,7 @@ export function initCompositorStudio() {
     const nodes = graph.nodes.map(n => ({ ...n, params: { ...(n.params || {}) } }));
     const outputIndex = nodes.findIndex(n => n.type === 'output');
     nodes.splice(outputIndex < 0 ? nodes.length : outputIndex, 0, { id: makeNodeId(), type, enabled: true, params: { ...meta.defaults } });
-    commitGraph(graphFromNodes(nodes), 'Add compositor node');
+    commitGraph(graphWithDefaultChain(nodes, graph.links), 'Add compositor node');
   };
   render();
 }
