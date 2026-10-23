@@ -614,12 +614,13 @@ export function initStudioPanel({ onCharacterImported }) {
       $('ikTargetY').value = constraint.target.y;
       $('ikBend').value = String(constraint.bend || 1);
     }
+    $('ikEnabled').checked = constraint?.enabled !== false;
     const enabled = !!rig && bones.length >= 2;
-    for (const id of ['ikUpperBone', 'ikLowerBone', 'ikTargetX', 'ikTargetY', 'ikBend', 'ikApply', 'ikRemove']) {
+    for (const id of ['ikUpperBone', 'ikLowerBone', 'ikTargetX', 'ikTargetY', 'ikBend', 'ikEnabled', 'ikApply', 'ikRemove']) {
       $(id).disabled = !enabled;
     }
     $('ikStatus').textContent = constraint
-      ? `Saved target (${constraint.target.x}, ${constraint.target.y}) for this bone pair.`
+      ? `Saved target (${constraint.target.x}, ${constraint.target.y}); ${constraint.enabled === false ? 'FK mode' : 'IK mode'}.`
       : 'Choose two bones, set the end target, then save.';
   }
 
@@ -641,10 +642,13 @@ export function initStudioPanel({ onCharacterImported }) {
         targetX: Number($('ikTargetX').value),
         targetY: Number($('ikTargetY').value),
         bend: Number($('ikBend').value),
-      });
+      }).map(item => item.type === 'ik_two_bone'
+        && item.upper_bone_id === upperBoneId && item.lower_bone_id === lowerBoneId
+        ? { ...item, enabled: $('ikEnabled').checked }
+        : item);
       updateRig({ ...clone(rig), constraints });
-      $('ikStatus').textContent = 'IK target saved. It will be applied during procedural rig playback.';
-      toast('IK target saved.', 'ok');
+      $('ikStatus').textContent = `IK target saved in ${$('ikEnabled').checked ? 'IK' : 'FK'} mode.`;
+      toast(`IK target saved · ${$('ikEnabled').checked ? 'IK' : 'FK'} mode`, 'ok');
     } catch (error) {
       $('ikStatus').textContent = error.message || 'Invalid IK target.';
       toast(error.message || 'Invalid IK target.', 'err');
