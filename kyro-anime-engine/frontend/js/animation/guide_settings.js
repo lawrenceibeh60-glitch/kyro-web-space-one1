@@ -115,7 +115,7 @@ function persist() {
 function init() {
   if (!$('kaeGuidesEnabled')||!$('viewport')) return;
   setupCanvas();syncControls();
-  const checks={kaeGuidesEnabled:'enabled',kaeGuideGrid:'grid',kaeGuideCenter:'center',kaeGuideThirds:'thirds',kaeGuideHead:'head',kaeGuideBody:'body'};
+  const checks={kaeGuidesEnabled:'enabled',kaeGuideGrid:'grid',kaeGuideCenter:'center',kaeGuideThirds:'thirds',kaeGuideHead:'head',kaeGuideEyes:'eyes',kaeGuideNose:'nose',kaeGuideMouth:'mouth',kaeGuideEars:'ears',kaeGuideHairline:'hairline',kaeGuideBody:'body'};
   for(const [id,key] of Object.entries(checks))$(id).addEventListener('change',e=>{settings()[key]=e.target.checked;persist();});
   for(const [id,key] of [['kaeGuideColor','color'],['kaeGuideOpacity','opacity'],['kaeGuideSpacing','spacing']]){
     $(id).addEventListener('input',e=>{settings()[key]=key==='color'?e.target.value:Number(e.target.value);schedulePaint();});
