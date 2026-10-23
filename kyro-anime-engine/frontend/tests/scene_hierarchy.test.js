@@ -18,7 +18,7 @@ const tree = [
 
 test('flattenLayerTree preserves paint order and ancestor paths while excluding hidden subtrees', () => {
   const flattened = flattenLayerTree(tree);
-  assert.deepEqual(flattened.map(entry => entry.layer.id), ['background', 'body', 'mouth']);
+  assert.deepEqual(flattened.map(entry => entry.layer.id), ['background', 'character', 'body', 'faceGroup', 'mouth']);
   assert.deepEqual(flattened.find(entry => entry.layer.id === 'mouth').ancestors.map(layer => layer.id), ['character', 'faceGroup']);
 });
 
@@ -43,7 +43,7 @@ test('world transform composes parent translation, rotation, and child offset', 
 
 test('reparentLayer moves a layer into a group immutably and rejects cycles', () => {
   const moved = reparentLayer(tree, 'background', 'character', 0);
-  assert.deepEqual(moved[1].children.map(layer => layer.id), ['background', 'body', 'faceGroup']);
+  assert.deepEqual(moved[0].children.map(layer => layer.id), ['background', 'body', 'faceGroup']);
   assert.equal(tree[0].id, 'background');
   assert.throws(() => reparentLayer(tree, 'character', 'faceGroup'), /own subtree/);
   assert.throws(() => reparentLayer(tree, 'background', 'body'), /Destination must be a group/);
