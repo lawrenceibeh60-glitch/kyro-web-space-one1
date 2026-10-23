@@ -557,7 +557,7 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     const rigPose = rig ? evaluateRigAnimation(rig, frame, { layer, layerTransform: t }) : null;
     targetCtx.globalAlpha = effectiveLayerOpacity(layer, ancestors, frame);
     targetCtx.globalCompositeOperation = targetCtx === layerCtx ? 'source-over' : (BLEND[layer.blend] || 'source-over');
-    applyAncestorTransforms(targetCtx, ancestors, frame);
+    applyAncestorTransforms(targetCtx, ancestors, frame, (parentCtx, parent) => { if (parent.clip_path) applyVectorClip(parentCtx, parent.clip_path); });
     targetCtx.translate((t.x || 0) + (rigPose?.rootOffset?.x || 0),
       (t.y || 0) + (rigPose?.rootOffset?.y || 0));
     targetCtx.rotate((t.rotation || 0) * Math.PI / 180);
