@@ -102,7 +102,7 @@ export function worldTransformForLayer(layer, ancestors = [], frame = 0) {
     const c = Math.cos(angle), s = Math.sin(angle);
     const x = finite(t.x, 0), y = finite(t.y, 0);
     const ax = finite(t.anchor_x, 0), ay = finite(t.anchor_y, 0);
-    matrix = multiply(matrix, [c * sx, s * sx, -s * sy, c * sy, x + ax * (1 - c * sx) + ay * s * sy, y - ax * s * sx + ay * (1 - c * sy)]);
+    matrix = multiply(matrix, [c * sx, s * sx, -s * sy, c * sy, x - c * sx * ax + s * sy * ay, y - s * sx * ax - c * sy * ay]);
   }
   return { x: matrix[4], y: matrix[5], rotation: Math.atan2(matrix[1], matrix[0]) * 180 / Math.PI,
     scale_x: Math.hypot(matrix[0], matrix[1]), scale_y: Math.hypot(matrix[2], matrix[3]), matrix };
