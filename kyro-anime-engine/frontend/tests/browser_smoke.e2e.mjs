@@ -169,6 +169,12 @@ test('browser boots editor, generates a character, authors a rig, and opens expo
     assert.equal(compositorPixels.maskOutside[3], 0, 'alpha mask should remove pixels outside the matte');
     assert.ok(compositorPixels.groupInside[0] > 240 && compositorPixels.groupInside[3] >= 120 && compositorPixels.groupInside[3] <= 136, 'nested group should apply child translation and inherited opacity');
     assert.equal(compositorPixels.groupOutside[3], 0, 'nested group transform should move the child artwork');
+    await page.locator('#addGroup').click();
+    await page.waitForFunction(() => {
+      const scene = window.kae.state.project.scenes.find(item => item.id === window.kae.state.sceneId);
+      const selected = scene?.layers.find(layer => layer.id === window.kae.state.layerId);
+      return selected?.type === 'group' && selected.children?.length === 1;
+    });
 
     // A double-click on an empty exposure cell should author a real blank drawing cel.
     await page.locator('#addLayer').click();
