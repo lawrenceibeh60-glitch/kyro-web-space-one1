@@ -10,6 +10,7 @@ import { drawLightning } from '../effects/lightning.js';
 import { drawParticles } from '../effects/particles.js';
 import { drawSpeedLines } from '../effects/speed_lines.js';
 import { applyCompositorGraph } from './compositing.js';
+import { flattenLayerTree, applyAncestorTransforms, effectiveLayerOpacity } from '../scene/scene_hierarchy.js';
 
 const BLEND = { normal: 'source-over', multiply: 'multiply', screen: 'screen', overlay: 'overlay', add: 'lighter' };
 
@@ -516,8 +517,9 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
     }
     if (!layerCtx) { layerCanvas = null; shadowCtx = null; maskCtx = null; }
   }
-  for (const layer of scene?.layers || []) {
-    if (layer.visible === false) continue;
+  for (const entry of flattenLayerTree(scene?.layers || [])) {
+    const { layer, ancestors } = entry;
+    if (layer.visible === false || ancestors.some(parent => parent.visible === false)) continue;
     const ex = findExposure(layer, frame);
     const strokes = (ex && project.drawings[ex.drawing]?.strokes) || [];
     const pv = preview && preview.layerId === layer.id ? preview : null;
@@ -535,8 +537,9 @@ export function renderFrame(ctx, project, sceneId, frame, preview, opts) {
       ? (project.rigs || []).find(item => item.character_id === layer.character_id)
       : null;
     const rigPose = rig ? evaluateRigAnimation(rig, frame, { layer, layerTransform: t }) : null;
-    targetCtx.globalAlpha = evaluateOpacity(layer, frame);
+    targetCtx.globalAlpha = effectiveLayerOpacity(layer, ancestors, frame);
     targetCtx.globalCompositeOperation = targetCtx === layerCtx ? 'source-over' : (BLEND[layer.blend] || 'source-over');
+    applyAncestorTransforms(targetCtx, ancestors, frame);
     targetCtx.translate((t.x || 0) + (rigPose?.rootOffset?.x || 0),
       (t.y || 0) + (rigPose?.rootOffset?.y || 0));
     targetCtx.rotate((t.rotation || 0) * Math.PI / 180);
