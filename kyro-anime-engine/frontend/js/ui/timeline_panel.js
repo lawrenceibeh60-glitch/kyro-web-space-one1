@@ -276,7 +276,7 @@ export function initTimelinePanel() {
   }
 
   function clearDrawingExposure() {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     const exposure = layer && findExposure(layer, state.frame);
     if (!layer || !exposure) { toast('There is no drawing exposure on this frame', 'err'); return; }
     if (layer.locked) { toast('Unlock this layer to clear its exposure', 'err'); return; }
@@ -537,7 +537,7 @@ export function initTimelinePanel() {
   $('previewEnd').onclick = setPreviewEnd;
   $('previewClear').onclick = clearPreviewRange;
   $('trackColorButton').onclick = () => {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     if (!layer) { toast('Select a track first', 'err'); return; }
     const input = $('trackColorInput');
     input.value = /^#[0-9a-f]{6}$/i.test(layer.timeline_color || '') ? layer.timeline_color : '#e87d0d';
@@ -565,7 +565,7 @@ export function initTimelinePanel() {
     toast('Copied ' + channels.length + ' animated channel(s)');
   }
   function pasteKeyframe() {
-    const layer = getScene()?.layers.find(item => item.id === state.layerId);
+    const layer = findLayerById(state.layerId);
     if (!layer || !copiedKeys) { toast(!layer ? 'Select a track first' : 'Copy keys before pasting', 'err'); return; }
     const tracks = JSON.parse(JSON.stringify(layer.tracks || {})), frame = state.frame;
     let count = 0;
